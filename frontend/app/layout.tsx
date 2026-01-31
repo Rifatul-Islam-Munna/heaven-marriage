@@ -9,7 +9,7 @@ import {
 import "./globals.css";
 import Navbar from "@/components/custom/Navbar/Navbar";
 import Footer from "@/components/custom/common/footer";
-
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
@@ -48,9 +48,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className={` ${cormorant.variable} ${lato.variable} antialiased`}>
-        <Navbar />
-        {children}
-        <Footer />
+        <NuqsAdapter>
+          <Navbar />
+          {children}
+          <Footer />
+        </NuqsAdapter>
       </body>
     </html>
   );
