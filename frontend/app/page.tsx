@@ -1,5 +1,6 @@
 import { ComponentExample } from "@/components/component-example";
 import AboutSection from "@/components/custom/Home/about-sections";
+import BiodataFilter from "@/components/custom/Home/biodata-filter";
 import EarlyMarriageSection from "@/components/custom/Home/early-marriage-section";
 import HeroSection from "@/components/custom/Home/hero-section";
 import HMSBenefitsSection from "@/components/custom/Home/hms-benefits-section";
@@ -12,6 +13,7 @@ export default function Page() {
   return (
     <main className=" w-full min-h-dvh">
       <HeroSection />
+      <BiodataFilter />
       <AboutSection />
       <IslamicMarriageSection />
       <EarlyMarriageSection />
