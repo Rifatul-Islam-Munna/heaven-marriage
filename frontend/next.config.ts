@@ -4,7 +4,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   images: {
     domains: ["images.unsplash.com"],
-  }
+  },
+  typedRoutes: true,
 };
 
 export default nextConfig;
