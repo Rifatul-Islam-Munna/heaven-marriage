@@ -1,0 +1,222 @@
+"use client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useProfileStore } from "@/zustan/useProfileStore";
+
+export function MarriageInfoStep() {
+  const formData = useProfileStore((state) => state.formData);
+  const updateNestedField = useProfileStore((state) => state.updateNestedField);
+
+  if (formData.gender === "female") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="isGuardiansAgreed"
+            checked={
+              formData.marriageInformationWomen?.isGuardiansAgreed || false
+            }
+            onCheckedChange={(checked) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "isGuardiansAgreed",
+                checked,
+              )
+            }
+          />
+          <Label htmlFor="isGuardiansAgreed" className="cursor-pointer">
+            অভিভাবক বিয়েতে রাজি
+          </Label>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="jobAfterMarriage">বিয়ের পর চাকরি করতে ইচ্ছুক?</Label>
+          <Input
+            id="jobAfterMarriage"
+            value={formData.marriageInformationWomen?.jobAfterMarriage || ""}
+            onChange={(e) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "jobAfterMarriage",
+                e.target.value,
+              )
+            }
+            placeholder="হ্যাঁ/না/শর্তসাপেক্ষে"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="studyAfterMarriage">
+            বিয়ের পর পড়াশোনা চালিয়ে যেতে চান?
+          </Label>
+          <Input
+            id="studyAfterMarriage"
+            value={formData.marriageInformationWomen?.studyAfterMarriage || ""}
+            onChange={(e) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "studyAfterMarriage",
+                e.target.value,
+              )
+            }
+            placeholder="হ্যাঁ/না"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="thoughtsOnMarriage">বিয়ে সম্পর্কে আপনার ধারণা</Label>
+          <Textarea
+            id="thoughtsOnMarriage"
+            value={formData.marriageInformationWomen?.thoughtsOnMarriage || ""}
+            onChange={(e) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "thoughtsOnMarriage",
+                e.target.value,
+              )
+            }
+            placeholder="বিয়ে সম্পর্কে আপনার চিন্তাভাবনা"
+            rows={4}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Male
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="isGuardiansAgreed"
+          checked={formData.marriageInformationMan?.isGuardiansAgreed || false}
+          onCheckedChange={(checked) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "isGuardiansAgreed",
+              checked,
+            )
+          }
+        />
+        <Label htmlFor="isGuardiansAgreed" className="cursor-pointer">
+          অভিভাবক বিয়েতে রাজি
+        </Label>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="wifeVailAfterMarriage">
+          বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন?
+        </Label>
+        <Input
+          id="wifeVailAfterMarriage"
+          value={formData.marriageInformationMan?.wifeVailAfterMarriage || ""}
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "wifeVailAfterMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="হ্যাঁ/না"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="allowWifeStudyAfterMarriage">
+          স্ত্রীকে পড়াশোনা করতে দিতে চান?
+        </Label>
+        <Input
+          id="allowWifeStudyAfterMarriage"
+          value={
+            formData.marriageInformationMan?.allowWifeStudyAfterMarriage || ""
+          }
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "allowWifeStudyAfterMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="হ্যাঁ/না/শর্তসাপেক্ষে"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="wifeJobAfterMarriage">
+          স্ত্রীকে চাকরি করতে দিতে চান?
+        </Label>
+        <Input
+          id="wifeJobAfterMarriage"
+          value={formData.marriageInformationMan?.wifeJobAfterMarriage || ""}
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "wifeJobAfterMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="হ্যাঁ/না/শর্তসাপেক্ষে"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="livingPlaceAfterMarriage">
+          বিয়ের পর কোথায় থাকবেন?
+        </Label>
+        <Input
+          id="livingPlaceAfterMarriage"
+          value={
+            formData.marriageInformationMan?.livingPlaceAfterMarriage || ""
+          }
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "livingPlaceAfterMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="নিজস্ব বাসা/পরিবারের সাথে"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="expectedAnyGiftFromMarriage">
+          পাত্রীপক্ষের কাছে কোনো উপহার আশা করেন?
+        </Label>
+        <Input
+          id="expectedAnyGiftFromMarriage"
+          value={
+            formData.marriageInformationMan?.expectedAnyGiftFromMarriage || ""
+          }
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "expectedAnyGiftFromMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="হ্যাঁ/না"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="thoughtsOnMarriage">বিয়ে সম্পর্কে আপনার ধারণা</Label>
+        <Textarea
+          id="thoughtsOnMarriage"
+          value={formData.marriageInformationMan?.thoughtsOnMarriage || ""}
+          onChange={(e) =>
+            updateNestedField(
+              "marriageInformationMan",
+              "thoughtsOnMarriage",
+              e.target.value,
+            )
+          }
+          placeholder="বিয়ে সম্পর্কে আপনার চিন্তাভাবনা"
+          rows={4}
+        />
+      </div>
+    </div>
+  );
+}

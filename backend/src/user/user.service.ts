@@ -62,7 +62,7 @@ export class UserService  {
      if(!phoneNumber || !password){
        throw new HttpException('All fields are required', 400);
      }
-     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified").lean();
+     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId").lean();
      if(!findOneUser){
        throw new HttpException('User not found', 400);
      }
@@ -220,11 +220,18 @@ export class UserService  {
   console.log('Total documents after filters:', total);
 
   // 4. Add sorting
-  if (query) {
-    pipeline.push({ $sort: { searchScore: -1, createdAt: -1 } });
-  } else {
-    pipeline.push({ $sort: { createdAt: -1 } });
+  // ✅ NEW CODE - Add random field
+pipeline.push({
+  $addFields: {
+    randomSort: { $rand: {} }  // Generates random 0-1 for each document
   }
+});
+
+// ✅ NEW CODE - Sort by random field
+pipeline.push({
+  $sort: { randomSort: 1 }
+});
+
 
   // 5. Add pagination
   pipeline.push({ $skip: skip }, { $limit: limit });
@@ -250,6 +257,7 @@ export class UserService  {
       'personalInformation.fiqhFollow': 1,
       'occupational.profession': 1,
       'familyInfo.familyFinancial': 1,
+       
     },
   });
 
@@ -278,7 +286,7 @@ export class UserService  {
 
 
   async findOne(id: FindOneDto) {
-    const findOne = await this.userModel.findById(id.id).select("  -password -email -otpNumber -otpValidatedAt -phoneNumber").lean();
+    const findOne = await this.userModel.findById(id.id).select("  -password -email -otpNumber -otpValidatedAt -phoneNumber -name").lean();
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }

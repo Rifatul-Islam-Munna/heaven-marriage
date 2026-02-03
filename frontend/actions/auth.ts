@@ -1,7 +1,7 @@
 "use server"
 import { PostRequestAxios } from "@/api-hooks/api-hooks";
 import { cookies } from "next/headers";
-import {User} from "@/@types/user"
+import {User, UserInfo} from "@/@types/user"
 
  type userData ={
     user:User,
@@ -18,4 +18,12 @@ export const loginUser = async (phoneNumber: string, password: string) => {
    
    return {data,error};
 
+}
+
+export const getUser = async ()=>{
+    const cookie = await cookies();
+    const userString = cookie.get("user")?.value;
+    const UserData:UserInfo | null = userString ? JSON.parse(userString) : null;
+
+    return UserData;
 }

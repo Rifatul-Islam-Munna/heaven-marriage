@@ -1,7 +1,7 @@
 // components/biodata-advanced-filter.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useQueryStates,
   parseAsString,
@@ -61,7 +61,7 @@ import {
 import { cn } from "@/lib/utils";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
-
+import { useDebounce } from "use-debounce";
 // Filter Data
 const genderOptions = [
   { value: "all", label: "সকল" },
@@ -167,6 +167,28 @@ function FilterContent({
   selectedDistrict,
   selectedUpazila,
 }: FilterContentProps) {
+  const [age, setAge] = useState({
+    min: 18,
+    max: 40,
+  });
+  const [height, setHeight] = useState({
+    min: 4,
+    max: 7,
+  });
+  const [newAge] = useDebounce(age, 600);
+  const [newHeight] = useDebounce(height, 600);
+
+  useEffect(() => {
+    setFilters({ ...filters, ageMin: newAge.min, ageMax: newAge.max });
+  }, [newAge]);
+  useEffect(() => {
+    setFilters({
+      ...filters,
+      heightMin: newHeight.min,
+      heightMax: newHeight.max,
+    });
+  }, [newHeight]);
+
   return (
     <div className="h-full overflow-y-auto pb-4">
       <div className="space-y-3">
@@ -270,10 +292,8 @@ function FilterContent({
                 min={18}
                 max={70}
                 step={1}
-                value={[filters.ageMin, filters.ageMax]}
-                onValueChange={([min, max]) =>
-                  setFilters({ ageMin: min, ageMax: max })
-                }
+                value={[age.min, age.max]}
+                onValueChange={([min, max]) => setAge({ min: min, max: max })}
                 className="w-full"
               />
             </div>
@@ -539,11 +559,11 @@ function FilterContent({
               </Label>
               <Slider
                 min={4}
-                max={7}
+                max={8}
                 step={0.1}
-                value={[filters.heightMin, filters.heightMax]}
+                value={[height.min, height.max]}
                 onValueChange={([min, max]) =>
-                  setFilters({ heightMin: min, heightMax: max })
+                  setHeight({ min: min, max: max })
                 }
                 className="w-full"
               />

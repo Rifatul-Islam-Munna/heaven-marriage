@@ -106,6 +106,7 @@ export interface Pledge {
 }
 
 export interface User {
+  _id?: string;
   name: string;
   userId?: string;
   role: UserType;
@@ -135,11 +136,27 @@ export interface User {
   updatedAt?: Date;
 }
 export interface UserInfo {
+  _id:string
   name: string;               // "Rifat Islam"
   userId: string;             // "user123"
   role: UserType;             // UserType.USER
   email: string;              // "rifat@example.com"
   phoneNumber: string;        // "+8801712345678"
   password: string;           // "securePassword123"
-  isOtpVerified: boolean;     // true
+  isOtpVerified: boolean; 
+   // true
+}
+
+
+export interface PaginatedUserResponse {
+  docs: User[];
+  totalDocs: number;
+  limit: number;
+  page: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  nextPage: number | null;
+  prevPage: number | null;
+  pagingCounter: number;
 }

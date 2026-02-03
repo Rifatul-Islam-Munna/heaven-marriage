@@ -1,4 +1,4 @@
-// components/footer-light.tsx
+"use client";
 import Link from "next/link";
 import {
   Heart,
@@ -8,6 +8,8 @@ import {
   Instagram,
   MessageCircle,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "হোম", href: "/" },
@@ -24,8 +26,16 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+  const pathName = usePathname();
   return (
-    <footer className="w-full border-t bg-gradient-to-br from-pink-50 to-purple-50">
+    <footer
+      className={cn(
+        `w-full border-t bg-gradient-to-br from-pink-50 to-purple-50`,
+        {
+          hidden: pathName.includes("/profile"),
+        },
+      )}
+    >
       <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
         {/* Main Footer */}
         <div className="grid gap-8 md:grid-cols-3 lg:grid-cols-4">

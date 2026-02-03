@@ -1,5 +1,13 @@
-// components/biodata-grid.tsx
+"use client";
+import {
+  parseAsArrayOf,
+  parseAsInteger,
+  parseAsString,
+  useQueryStates,
+} from "nuqs";
 import BiodataCard from "./biodata-card";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { PaginatedUserResponse } from "@/@types/user";
 
 interface Biodata {
   id: string;
@@ -20,7 +28,44 @@ interface BiodataGridProps {
   isLoading?: boolean;
 }
 
-export default function BiodataGrid({ biodatas, isLoading }: BiodataGridProps) {
+export default function BiodataGrid({ biodatas }: BiodataGridProps) {
+  const [filters, setFilters] = useQueryStates({
+    gender: parseAsString.withDefault("all"),
+    maritalStatus: parseAsArrayOf(parseAsString).withDefault([]),
+    ageMin: parseAsInteger.withDefault(18),
+    ageMax: parseAsInteger.withDefault(40),
+    districtId: parseAsString, // Changed from permanentDistrict/currentDistrict
+    upazilaId: parseAsString, // Added upazila
+    educationMedium: parseAsArrayOf(parseAsString).withDefault([]),
+    religiousEducation: parseAsArrayOf(parseAsString).withDefault([]),
+    heightMin: parseAsInteger.withDefault(4),
+    heightMax: parseAsInteger.withDefault(7),
+    skinColor: parseAsArrayOf(parseAsString).withDefault([]),
+    fiqh: parseAsArrayOf(parseAsString).withDefault([]),
+    profession: parseAsArrayOf(parseAsString).withDefault([]),
+    economicStatus: parseAsArrayOf(parseAsString).withDefault([]),
+    category: parseAsArrayOf(parseAsString).withDefault([]),
+    page: parseAsInteger.withDefault(1),
+    query: parseAsString.withDefault(""),
+  });
+
+  const query = Object.entries(filters)
+    .filter(
+      ([_, value]) =>
+        value != null &&
+        value !== "" &&
+        !(Array.isArray(value) && value.length === 0),
+    )
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  const { data, isLoading } = useQueryWrapper<PaginatedUserResponse>(
+    ["get-biodatas", query],
+    `/user/get-all-user?${query}`,
+  );
+
+  console.log("Query:", query);
+
   if (isLoading) {
     return (
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -31,7 +76,7 @@ export default function BiodataGrid({ biodatas, isLoading }: BiodataGridProps) {
     );
   }
 
-  if (biodatas.length === 0) {
+  if (data?.docs?.length === 0) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
         <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-pink-100">
@@ -62,8 +107,19 @@ export default function BiodataGrid({ biodatas, isLoading }: BiodataGridProps) {
 
   return (
     <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {biodatas.map((biodata) => (
-        <BiodataCard key={biodata.id} {...biodata} />
+      {data?.docs?.map((biodata) => (
+        <BiodataCard
+          key={biodata._id}
+          age={biodata?.age ?? 0}
+          biodataNumber={biodata?.userId ?? ""}
+          district={biodata?.address?.district ?? ""}
+          upazila={biodata?.address?.upazila ?? ""}
+          education={biodata?.educationInfo?.highestEducation ?? ""}
+          profession={biodata?.occupational?.profession ?? ""}
+          gender={biodata?.gender ?? ""}
+          height={biodata?.personalInformation?.height ?? ""}
+          id={biodata._id ?? ""}
+        />
       ))}
     </div>
   );

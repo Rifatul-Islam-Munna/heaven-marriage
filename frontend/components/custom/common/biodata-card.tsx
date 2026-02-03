@@ -173,7 +173,7 @@ export default function BiodataCard({
         </div>
 
         {/* View Button */}
-        <Link href={`/biodatas/${id}`} className="mt-3 block">
+        <Link href={`/biodata/${id}`} className="mt-3 block">
           <Button
             className="w-full rounded-lg bg-pink-600 font-heading text-sm font-semibold transition-colors hover:bg-pink-700"
             size="sm"

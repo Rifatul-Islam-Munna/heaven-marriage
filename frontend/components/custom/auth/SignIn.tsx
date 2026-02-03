@@ -15,17 +15,20 @@ import { Heart } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { loginUser } from "@/actions/auth";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function SignIn() {
   const [formData, setFormData] = useState({
     phoneNumber: "",
     password: "",
   });
+  const router = useRouter();
   const { mutate, isPending } = useMutation({
     mutationKey: ["login-user"],
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
     onSuccess: (data) => {
       if (data.data) {
+        router.push("/");
         return toast.success("User logged in successfully");
       }
       return toast.error(data?.error?.message);
