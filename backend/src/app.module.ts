@@ -10,6 +10,7 @@ import { FaqModule } from './faq/faq.module';
 import { GuidelinesModule } from './guidelines/guidelines.module';
 import { ContactModule } from './contact/contact.module';
 import { ImageModule } from './image/image.module';
+import { WebDataModule } from './web-data/web-data.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
 @Module({
@@ -48,6 +49,7 @@ import virtuals from "mongoose-lean-virtuals"
     GuidelinesModule,
     ContactModule,
     ImageModule,
+    WebDataModule,
   ],
   controllers: [AppController],
   providers: [AppService],

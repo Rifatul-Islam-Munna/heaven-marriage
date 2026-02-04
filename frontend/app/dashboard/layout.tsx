@@ -37,6 +37,10 @@ const data = {
           title: "contact",
           url: "/dashboard/contact",
         },
+        {
+          title: "Images",
+          url: "/dashboard/images",
+        },
       ],
     },
     {

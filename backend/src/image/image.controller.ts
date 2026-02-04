@@ -25,7 +25,8 @@ export class ImageController {
       },
       
     }),
-    limits:{fileSize:1024*1024*10},
+   limits: { fileSize: 1024 * 1024 * 20 },
+
     fileFilter: (req, file, callback) => {
       const allowedMimeTypes = [ 'image/jpeg', 'image/png', 'image/webp', "image/avif",'image/jpg','application/pdf','video/mp4',
   'video/webm',

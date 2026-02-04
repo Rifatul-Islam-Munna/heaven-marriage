@@ -13,8 +13,8 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({origin:"*", compression: true, credentials: true});
-  app.use(json({limit: '5mb'}));
-  app.use(urlencoded({extended:true,limit: '5mb'}));
+  app.use(json({limit: '20mb'}));
+  app.use(urlencoded({extended:true,limit: '20mb'}));
   app.useGlobalPipes(
     new ValidationPipe({
       transform:true,

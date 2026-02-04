@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
     domains: ["images.unsplash.com"],
   },
   typedRoutes: true,
+     experimental: {
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
+  }
 };
 
 export default nextConfig;
