@@ -1,4 +1,5 @@
 // app/about/page.tsx
+
 import ExpatMessageSection from "@/components/custom/about/expat-message-section";
 import HMSGoalsSection from "@/components/custom/about/hms-goals-section";
 import HMSIntroductionSection from "@/components/custom/about/hms-introduction-section";

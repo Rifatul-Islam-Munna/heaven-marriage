@@ -1,8 +1,16 @@
-// components/about/hms-introduction-section-v2.tsx
+"use client";
 import Image from "next/image";
 import { Quote } from "lucide-react";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { WebData } from "@/@types/user";
 
 export default function HMSIntroductionSectionV2() {
+  const { data: webData, isLoading } = useQueryWrapper<WebData>(
+    ["web-data"],
+    "/web-data",
+    { gcTime: 85000, staleTime: 85000 },
+    25000,
+  );
   return (
     <section className="w-full border-y bg-background py-12 md:py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,9 +29,10 @@ export default function HMSIntroductionSectionV2() {
             <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl shadow-2xl">
               <div className="relative aspect-[16/9]">
                 <Image
-                  src="https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=1200&q=80"
+                  src={webData?.about?.images?.right || ""}
                   alt="HMS Introduction"
-                  fill
+                  width={1000}
+                  height={1000}
                   className="object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

@@ -3,7 +3,30 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ["images.unsplash.com"],
+   
+     
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+       {
+        protocol: "http",
+        hostname: "localhost",
+        port: "9000", // Add the MinIO port
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
+        port: "9000",
+        pathname: "/niqha-public-bukcet/**",
+      },
+      
+    ],
+     unoptimized: process.env.NODE_ENV === "development",
+  
+
   },
   typedRoutes: true,
      experimental: {

@@ -25,6 +25,17 @@ import {
 import { User } from "@/@types/user";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import {
+  economicStatusOptions,
+  educationMediumOptions,
+  fiqhOptions,
+  marriedStatus,
+  professionOptions,
+  religiousEducationOptions,
+  skinColorOptions,
+} from "@/staticData/all-data";
+import { districts } from "@/staticData/districts";
+import { upazilas } from "@/staticData/upazilas";
 
 interface ProfileViewProps {
   id: string;
@@ -165,7 +176,10 @@ export default function ProfileView({ id }: ProfileViewProps) {
           <QuickInfoCard
             icon={Activity}
             label="বৈবাহিক অবস্থা"
-            value={userData?.maritalStatus}
+            value={
+              marriedStatus.find((item) => item.en === userData?.maritalStatus)
+                ?.bn
+            }
           />
           <QuickInfoCard
             icon={Calendar}
@@ -209,7 +223,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 <div className="space-y-1">
                   <InfoRow
                     label="গাত্রবর্ণ"
-                    value={userData?.personalInformation?.skinTone}
+                    value={
+                      skinColorOptions?.find(
+                        (t) =>
+                          t.value === userData?.personalInformation?.skinTone,
+                      )?.label
+                    }
                   />
                   <InfoRow
                     label="প্রতিদিন পাঁচ ওয়াক্ত নামাজ পড়েন কি?"
@@ -221,11 +240,22 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   />
                   <InfoRow
                     label="কোন ফিকহ অনুসরণ করেন?"
-                    value={userData?.personalInformation?.fiqhFollow}
+                    value={
+                      fiqhOptions?.find(
+                        (t) =>
+                          t.value === userData?.personalInformation?.fiqhFollow,
+                      )?.label
+                    }
                   />
                   <InfoRow
                     label="দ্বীনের শিক্ষা"
-                    value={userData?.personalInformation?.islamicStudy}
+                    value={
+                      religiousEducationOptions?.find(
+                        (t) =>
+                          t.value ===
+                          userData?.personalInformation?.islamicStudy,
+                      )?.label
+                    }
                   />
                   <InfoRow
                     label="ঘরের বাহিরে সাধারণত কি ধরণের পোশাক পরেন?"
@@ -302,7 +332,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   <div className="space-y-1">
                     <InfoRow
                       label="আপনার শিক্ষা মাধ্যম"
-                      value={userData?.educationInfo?.educationMethod}
+                      value={
+                        educationMediumOptions?.find(
+                          (t) =>
+                            t.value ===
+                            userData?.educationInfo?.educationMethod,
+                        )?.label
+                      }
                     />
                     <InfoRow
                       label="সর্বোচ্চ শিক্ষাগত যোগ্যতা"
@@ -389,7 +425,11 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   <div className="space-y-1">
                     <InfoRow
                       label="পেশা"
-                      value={userData?.occupational?.profession}
+                      value={
+                        professionOptions?.find(
+                          (t) => t.value === userData?.occupational?.profession,
+                        )?.label
+                      }
                     />
                     <InfoRow
                       label="পেশার বিস্তারিত বিবরণ"
@@ -413,10 +453,21 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 <CardContent className="pt-6">
                   <SectionHeader icon={MapPin} title="ঠিকানা" />
                   <div className="space-y-1">
-                    <InfoRow label="জেলা" value={userData?.address?.district} />
+                    <InfoRow
+                      label="জেলা"
+                      value={
+                        districts?.find(
+                          (t) => t.name === userData?.address?.district,
+                        )?.bn_name
+                      }
+                    />
                     <InfoRow
                       label="উপজেলা"
-                      value={userData?.address?.upazila}
+                      value={
+                        upazilas?.find(
+                          (t) => t.name === userData?.address?.upazila,
+                        )?.bn_name
+                      }
                     />
                     <InfoRow
                       label="বর্তমান ঠিকানা"
@@ -492,7 +543,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     </div>
                     <InfoRow
                       label="পারিবারিক অর্থনৈতিক অবস্থা"
-                      value={userData?.familyInfo?.familyFinancial}
+                      value={
+                        economicStatusOptions?.find(
+                          (t) =>
+                            t.value === userData?.familyInfo?.familyFinancial,
+                        )?.label
+                      }
                     />
                     <InfoRow
                       label="পারিবারিক সম্পদের বিবরণ"

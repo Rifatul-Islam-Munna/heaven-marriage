@@ -761,6 +761,7 @@ export default function BiodataAdvancedFilter() {
     profession: parseAsArrayOf(parseAsString).withDefault([]),
     economicStatus: parseAsArrayOf(parseAsString).withDefault([]),
     category: parseAsArrayOf(parseAsString).withDefault([]),
+    query: parseAsString.withDefault(""),
   });
 
   // Collapsible sections state - ALL CLOSED BY DEFAULT
@@ -807,6 +808,7 @@ export default function BiodataAdvancedFilter() {
       profession: [],
       economicStatus: [],
       category: [],
+      query: "",
     });
   };
 

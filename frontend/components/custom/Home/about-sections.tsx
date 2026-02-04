@@ -1,4 +1,4 @@
-// components/about-section.tsx
+"use client";
 import Image from "next/image";
 import {
   CheckCircle2,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { WebData } from "@/@types/user";
 
 const activities = [
   {
@@ -69,6 +71,12 @@ const activities = [
 ];
 
 export default function AboutSection() {
+  const { data: webData, isLoading } = useQueryWrapper<WebData>(
+    ["web-data"],
+    "/web-data",
+    { gcTime: 85000, staleTime: 85000 },
+    25000,
+  );
   return (
     <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/30 to-background pt-20 pb-10 md:pt-32 md:pb-12">
       {/* Decorative Elements */}
@@ -105,10 +113,11 @@ export default function AboutSection() {
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
             <div className="relative aspect-[4/3] overflow-hidden">
               <Image
-                src="https://images.unsplash.com/photo-1606800052052-a08af7148866?w=800&q=80"
+                src={webData?.home?.images?.left ?? ""}
                 alt="Wedding ceremony"
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                width={1000}
+                height={1000}
+                className="object-conatin transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
@@ -122,10 +131,11 @@ export default function AboutSection() {
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
             <div className="relative aspect-[4/3] overflow-hidden">
               <Image
-                src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=800&q=80"
+                src={webData?.home?.images?.right ?? ""}
                 alt="Islamic marriage"
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                width={1000}
+                height={1000}
+                className="object-contain transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">

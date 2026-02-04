@@ -1,6 +1,8 @@
-// components/about/welcome-section-with-image.tsx
+"use client";
 import Image from "next/image";
 import { CheckCircle2, Heart } from "lucide-react";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { WebData } from "@/@types/user";
 
 const features = [
   "HMS কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়",
@@ -11,6 +13,12 @@ const features = [
 ];
 
 export default function WelcomeSectionWithImage() {
+  const { data: webData, isLoading } = useQueryWrapper<WebData>(
+    ["web-data"],
+    "/web-data",
+    { gcTime: 85000, staleTime: 85000 },
+    25000,
+  );
   return (
     <section className="w-full py-8 md:py-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,9 +40,10 @@ export default function WelcomeSectionWithImage() {
             <div className="relative overflow-hidden rounded-2xl shadow-2xl">
               <div className="relative aspect-[4/3]">
                 <Image
-                  src="https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?w=800&q=80"
+                  src={webData?.about?.images?.left || ""}
                   alt="Islamic Marriage"
-                  fill
+                  width={1000}
+                  height={1000}
                   className="object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />

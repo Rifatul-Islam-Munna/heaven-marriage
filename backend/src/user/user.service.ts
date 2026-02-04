@@ -113,39 +113,33 @@ export class UserService  {
   const pipeline: any[] = [];
 
   // 1. Fuzzy Search Stage (only if query provided)
-  if (query) {
-    console.log('Adding search stage for:', query);
+ if (query) { 
+    console.log('Adding text search stage for:', query);
+    
+    // Use $text instead of $search (works with local MongoDB)
     pipeline.push({
-      $search: {
-        index: 'userSearchIndex',
-        compound: {
-          should: [
-            {
-              text: {
-                query: query,
-                path: 'name',
-                fuzzy: { maxEdits: 2, prefixLength: 0, maxExpansions: 50 },
-                score: { boost: { value: 5 } },
-              },
-            },
-            {
-              text: {
-                query: query,
-                path: ['address.presentAddress', 'address.district', 'occupational.profession'],
-                fuzzy: { maxEdits: 2 },
-                score: { boost: { value: 2 } },
-              },
-            },
-          ],
-          minimumShouldMatch: 1,
-        },
-      },
+      $match: {
+        $text: { 
+          $search: query,
+          $caseSensitive: false,
+          $diacriticSensitive: false
+        }
+      }
     });
 
+    // Add text score for sorting/filtering
     pipeline.push({
-      $addFields: { searchScore: { $meta: 'searchScore' } },
+      $addFields: { 
+        searchScore: { $meta: 'textScore' } 
+      }
+    });
+
+    // Optional: Sort by relevance
+    pipeline.push({
+      $sort: { searchScore: -1 }
     });
   }
+
 
   // 2. Build $match conditions
   const matchConditions: any = {};

@@ -1,5 +1,6 @@
 // components/about/special-announcement-section.tsx
 import { Sparkles, Heart, Scale, Phone } from "lucide-react";
+import Link from "next/link";
 
 const announcements = [
   {
@@ -77,9 +78,12 @@ export default function SpecialAnnouncementSection() {
                 ফর্ম পূরণ করুন।
               </p>
               <div className="text-center">
-                <button className="rounded-full border-2 border-pink-600 bg-pink-600 px-8 py-3 font-heading text-base font-semibold text-white transition-colors hover:bg-pink-700 hover:border-pink-700">
+                <Link
+                  href={"/contact"}
+                  className="rounded-full border-2 border-pink-600 bg-pink-600 px-8 py-3 font-heading text-base font-semibold text-white transition-colors hover:bg-pink-700 hover:border-pink-700"
+                >
                   ফর্ম পূরণ করুন
-                </button>
+                </Link>
               </div>
             </div>
           </div>

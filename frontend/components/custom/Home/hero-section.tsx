@@ -1,14 +1,23 @@
-// components/hero-section.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ChevronDown, Heart, Shield, Users } from "lucide-react";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { WebData } from "@/@types/user";
 
 export default function HeroSection() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  const { data: webData, isLoading } = useQueryWrapper<WebData>(
+    ["web-data"],
+    "/web-data",
+    { gcTime: 85000, staleTime: 85000 },
+    25000,
+  );
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -17,53 +26,101 @@ export default function HeroSection() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Debug: Log video URLs
+  useEffect(() => {
+    if (webData) {
+      console.log("Video URLs:", {
+        desktop: webData?.home?.heroVideo?.bigScreen,
+        mobile: webData?.home?.heroVideo?.mobileScreen,
+      });
+    }
+  }, [webData]);
+
+  const videoSrc = isMobile
+    ? webData?.home?.heroVideo?.mobileScreen
+    : webData?.home?.heroVideo?.bigScreen;
+
   return (
     <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
       {/* Video Background */}
       <div className="absolute inset-0 z-0">
-        {/* Loading Skeleton */}
-        {!isVideoLoaded && (
+        {/* Loading Skeleton - Show until data is loaded AND video is ready */}
+        {(isLoading || !isVideoLoaded || !videoSrc) && (
+          <div className="absolute inset-0 bg-gradient-to-br from-pink-950 via-black to-purple-950 animate-pulse" />
+        )}
+
+        {/* Only render video when we have the source */}
+        {videoSrc && (
+          <>
+            {/* Desktop Video */}
+            <video
+              key={webData?.home?.heroVideo?.bigScreen} // Force re-render when URL changes
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              onLoadedData={() => {
+                console.log("Desktop video loaded");
+                setIsVideoLoaded(true);
+                setVideoError(false);
+              }}
+              onError={(e) => {
+                console.error("Desktop video error:", e);
+                setVideoError(true);
+              }}
+              className={`hidden h-full w-full object-cover md:block ${
+                isVideoLoaded && !videoError ? "opacity-100" : "opacity-0"
+              } transition-opacity duration-1000`}
+            >
+              <source
+                src={webData?.home?.heroVideo?.bigScreen}
+                type="video/mp4"
+              />
+            </video>
+
+            {/* Mobile Video */}
+            <video
+              key={webData?.home?.heroVideo?.mobileScreen} // Force re-render when URL changes
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              onLoadedData={() => {
+                console.log("Mobile video loaded");
+                setIsVideoLoaded(true);
+                setVideoError(false);
+              }}
+              onError={(e) => {
+                console.error("Mobile video error:", e);
+                setVideoError(true);
+              }}
+              className={`block h-full w-full object-cover md:hidden ${
+                isVideoLoaded && !videoError ? "opacity-100" : "opacity-0"
+              } transition-opacity duration-1000`}
+            >
+              <source
+                src={webData?.home?.heroVideo?.mobileScreen}
+                type="video/mp4"
+              />
+            </video>
+          </>
+        )}
+
+        {/* Error Fallback */}
+        {videoError && (
           <div className="absolute inset-0 bg-gradient-to-br from-pink-950 via-black to-purple-950" />
         )}
 
-        {/* Desktop Video */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          onCanPlayThrough={() => setIsVideoLoaded(true)}
-          className={`hidden h-full w-full object-cover md:block ${
-            isVideoLoaded ? "opacity-100" : "opacity-0"
-          } transition-opacity duration-1000`}
-        >
-          <source src="/videos/hero-desktop.mp4" type="video/mp4" />
-        </video>
-
-        {/* Mobile Video */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          onCanPlayThrough={() => setIsVideoLoaded(true)}
-          className={`block h-full w-full object-cover md:hidden ${
-            isVideoLoaded ? "opacity-100" : "opacity-0"
-          } transition-opacity duration-1000`}
-        >
-          <source src="/videos/hero-mobile.mp4" type="video/mp4" />
-        </video>
-
-        {/* Dark Overlay - Much stronger */}
+        {/* Dark Overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/85" />
       </div>
 
       {/* Main Content */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-32 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center space-y-8 text-center">
-          {/* Logo/Brand Mark (Optional) */}
+          {/* Logo/Brand Mark */}
           <div
             className="animate-in fade-in zoom-in duration-700"
             style={{ animationDelay: "0.1s", animationFillMode: "both" }}
@@ -155,8 +212,6 @@ export default function HeroSection() {
           <ChevronDown className="h-6 w-6 text-gray-400" />
         </div>
       </div>
-
-      {/* Bottom Gradient Fade */}
     </section>
   );
 }

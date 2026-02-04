@@ -160,3 +160,25 @@ export interface PaginatedUserResponse {
   prevPage: number | null;
   pagingCounter: number;
 }
+
+export interface WebData {
+  _id: string;
+  home?: {
+    heroVideo?: {
+      bigScreen?: string;
+      mobileScreen?: string;
+    };
+    images?: {
+      left?: string;
+      right?: string;
+    };
+  };
+  about?: {
+    images?: {
+      left?: string;
+      right?: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
+}
