@@ -6,6 +6,10 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule} from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { UserModule } from './user/user.module';
+import { FaqModule } from './faq/faq.module';
+import { GuidelinesModule } from './guidelines/guidelines.module';
+import { ContactModule } from './contact/contact.module';
+import { ImageModule } from './image/image.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
 @Module({
@@ -40,6 +44,10 @@ import virtuals from "mongoose-lean-virtuals"
   },
     }),
     UserModule,
+    FaqModule,
+    GuidelinesModule,
+    ContactModule,
+    ImageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

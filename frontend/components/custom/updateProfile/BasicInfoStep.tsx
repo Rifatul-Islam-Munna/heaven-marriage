@@ -28,6 +28,15 @@ export function BasicInfoStep() {
             placeholder="আপনার পূর্ণ নাম"
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="name">ইমেইল </Label>
+          <Input
+            id="name"
+            value={formData.email || ""}
+            onChange={(e) => updateField("email", e.target.value)}
+            placeholder="আপনার পূর্ণ ইমেইল"
+          />
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="gender">লিঙ্গ *</Label>

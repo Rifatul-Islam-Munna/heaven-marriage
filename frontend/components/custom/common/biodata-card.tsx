@@ -13,10 +13,15 @@ import {
   ArrowRight,
   User2,
   CheckCircle2,
+  UserRoundMinus,
+  X,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface BiodataCardProps {
   id: string;
@@ -31,6 +36,7 @@ interface BiodataCardProps {
   isVerified?: boolean;
   isUrgent?: boolean;
   className?: string;
+  isForShortList?: boolean;
 }
 
 export default function BiodataCard({
@@ -46,13 +52,23 @@ export default function BiodataCard({
   isVerified = false,
   isUrgent = false,
   className,
+  isForShortList,
 }: BiodataCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const client = useQueryClient();
 
-  const toggleFavorite = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsFavorite(!isFavorite);
+  const { mutate, isPending } = useCommonMutationApi({
+    method: "POST",
+    url: "/user/remove-from-shortlist",
+    mutationKey: ["remove-from-shortlist"],
+    successMessage: "Successfully removed from shortlist",
+    onSuccess() {
+      client.refetchQueries({ queryKey: ["get-shortlist"], exact: false });
+    },
+  });
+
+  const toggleFavorite = (id: string) => {
+    mutate({ shortlistedUserId: id });
   };
 
   return (
@@ -81,7 +97,7 @@ export default function BiodataCard({
             <div>
               <div className="flex items-center gap-1.5">
                 <h3 className="font-heading text-base font-bold text-gray-900">
-                  {biodataNumber}
+                  userId: {biodataNumber}
                 </h3>
                 {isVerified && (
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
@@ -100,17 +116,19 @@ export default function BiodataCard({
 
           {/* Favorite Button */}
           <button
-            onClick={toggleFavorite}
-            className="rounded-full p-1.5 transition-colors hover:bg-pink-50"
+            onClick={() => toggleFavorite(id)}
+            className={cn(
+              "rounded-full p-1.5  hidden transition-colors hover:bg-pink-50",
+              {
+                block: isForShortList,
+              },
+            )}
           >
-            <Heart
-              className={cn(
-                "h-4 w-4 transition-all",
-                isFavorite
-                  ? "fill-pink-500 text-pink-500"
-                  : "text-gray-400 hover:text-pink-500",
-              )}
-            />
+            {isPending ? (
+              <Loader2 className=" w-5 h-5 animate-spin" />
+            ) : (
+              <X className=" w-5 h-5" />
+            )}
           </button>
         </div>
 

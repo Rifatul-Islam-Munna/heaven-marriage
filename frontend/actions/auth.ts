@@ -20,6 +20,13 @@ export const loginUser = async (phoneNumber: string, password: string) => {
 
 }
 
+export const logOutUser = async ()=>{
+        const cookie = await cookies();
+ cookie.delete("access_token");
+ cookie.delete("user");
+ return true
+}
+
 export const getUser = async ()=>{
     const cookie = await cookies();
     const userString = cookie.get("user")?.value;

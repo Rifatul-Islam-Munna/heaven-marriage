@@ -1,17 +1,19 @@
 import { HttpException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { FindOneDto, LoginDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AdminUserDto, FindOneDto, LoginDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './entities/user.entity';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
-import type  { PaginateModel } from 'mongoose';
+
 import { JwtService } from '@nestjs/jwt';
 import ShortUniqueId from 'short-unique-id';
+import { Shortlist, ShortlistDocument } from './entities/shortlist.schema';
+import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
 @Injectable()
 export class UserService  {
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument> , private jwtService:JwtService){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService){}
   
   async create(createUserDto: CreateUserDto) {
     
@@ -283,6 +285,91 @@ pipeline.push({
   };
 }
 
+ async addToShortList(payload: CreateShortlistDto, userId: string) {
+  const findAndUpdate = await this.shortlistModel.findOneAndUpdate(
+    { userId: userId },
+    { $addToSet: { shortlistedUserId: payload.shortlistedUserId } }, 
+    { new: true, upsert: true }
+  );
+   
+  return findAndUpdate;
+}
+ async removeFromShortList(payload: CreateShortlistDto, userId: string) {
+  const findAndUpdate = await this.shortlistModel.findOneAndUpdate(
+    { userId: userId },
+    { $pull: { shortlistedUserId: payload.shortlistedUserId } }, // ✅ Use $pull instead
+    { new: true }
+  ).exec();
+   
+  return findAndUpdate;
+}
+async getShortlist(userId: string, paginationDto: PaginationDto) {
+  const { page = 1, limit = 10 } = paginationDto;
+  const skip = (page - 1) * limit;
+  this.logger.debug("user-id",userId)
+  const result = await this.shortlistModel.aggregate([
+    // Match the user's shortlist
+    { $match: { userId: new Types.ObjectId(userId) } },
+    
+    // Unwind the shortlisted user IDs array
+    { $unwind: '$shortlistedUserId' },
+    
+    // Lookup/join with User collection
+    {
+      $lookup: {
+        from: 'users', // Your User collection name (lowercase, pluralized)
+        localField: 'shortlistedUserId',
+        foreignField: '_id',
+        as: 'userDetails'
+      }
+    },
+    
+    // Unwind the user details
+    { $unwind: '$userDetails' },
+    
+    // Replace root with user details
+    { $replaceRoot: { newRoot: '$userDetails' } },
+    
+    // Project only the fields you need
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        email: 1,
+        age: 1,
+        gender: 1,
+        maritalStatus: 1,
+        userId: 1,
+        role: 1,
+        createdAt: 1,
+        'address.district': 1,
+        'address.upazila': 1,
+        'address.presentAddress': 1,
+        'educationInfo.educationMethod': 1,
+        'educationInfo.highestEducation': 1,
+        'personalInformation.height': 1,
+        'personalInformation.skinTone': 1,
+        'personalInformation.fiqhFollow': 1,
+        'occupational.profession': 1,
+        'familyInfo.familyFinancial': 1,
+      }
+    },
+    
+    // Facet for pagination
+    {
+      $facet: {
+        metadata: [{ $count: 'totalItems' }],
+        data: [{ $skip: skip }, { $limit: limit }]
+      }
+    }
+  ]).exec();
+  
+
+  const totalItems = result[0]?.metadata[0]?.totalItems || 0;
+  const data = result[0]?.data || [];
+
+  return {data, page, limit, totalItems};
+}
 
 
 
@@ -317,4 +404,90 @@ pipeline.push({
     }
     return findOne;
   }
+
+
+  async updatePassword(id:string, updateDto:ResetPasswordDto){
+    const {newPassword,oldPassword} = updateDto
+    const findOne = await this.userModel.findById(id).select("password").lean();
+    if(!findOne) {
+      throw new HttpException('User not found', 400);
+    }
+    const isMatch = await bcrypt.compare(oldPassword,findOne.password);
+    if(!isMatch){
+      throw new HttpException('Invalid credentials', 400);
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const updatePassword = await this.userModel.findByIdAndUpdate(id,{$set:{password:passwordHash}},{new:true}).lean();
+    if(!updatePassword) {
+      throw new HttpException('User not found', 400);
+    }
+    return updatePassword;
+  }
+
+
+
+ async getUserForAdmin(query: AdminUserDto) {
+  const { page = 1, gender = 'all', query: searchQuery } = query;
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  // Build filter
+  const filter: any = {};
+
+  // Text search using MongoDB text index
+  if (searchQuery && searchQuery.trim()) {
+    filter.$text = { $search: searchQuery };
+  }
+
+  // Gender filter
+  if (gender && gender !== 'all') {
+    filter.gender = gender;
+  }
+
+  // Execute query with pagination
+  const [data, totalItems] = await Promise.all([
+    this.userModel
+      .find(filter)
+      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified')
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 }) // Latest users first
+      .lean()
+      .exec(),
+    this.userModel.countDocuments(filter).exec(),
+  ]);
+
+  const totalPages = Math.ceil(totalItems / limit);
+
+  return {
+    data,
+    page,
+    limit,
+    totalItems,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
+}
+
+async toggleSubscription(id:string) {
+  const findOne = await this.userModel.findById(id).select("isSubscriber").lean();
+  if(!findOne) {
+    throw new HttpException('User not found', 400);
+  }
+  const updateSubscription = await this.userModel.findByIdAndUpdate(id,{$set:{isSubscriber:!findOne.isSubscriber}},{new:true}).lean();
+  if(!updateSubscription) {
+    throw new HttpException('User not found', 400);
+  }
+  return updateSubscription;
+}
+async userDeleteAdmin(id:string) {
+  const findOne = await this.userModel.findByIdAndDelete(id).lean();
+  if(!findOne) {
+    throw new HttpException('User not found', 400);
+  }
+  
+  return findOne;
+}
+
 }

@@ -20,12 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
+import { useUser } from "@/lib/useUser";
+import { UserNav } from "./UserNav";
+
+import { cn } from "@/lib/utils";
 
 // Navigation items array
 const navItems = [
   { label: "হোম", href: "/" },
   { label: "আমাদের সম্পর্কে", href: "/about" },
-  { label: "জিজ্ঞাসা", href: "/biodata" },
+  { label: "জিজ্ঞাসা", href: "/faq" },
   { label: "নির্দেশনা", href: "/guidelines" },
   { label: "যোগাযোগ", href: "/contact" },
 ];
@@ -39,9 +43,14 @@ const languages = [
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState("bn");
+  const { user } = useUser();
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav
+      className={cn(
+        "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      )}
+    >
       <div className=" container md:w-full lg:container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -84,13 +93,17 @@ export default function Navbar() {
             </Select>
 
             {/* Login Button */}
-            <Button
-              variant="default"
-              className="bg-primary font-heading font-semibold hover:bg-primary/90"
-              asChild
-            >
-              <Link href="/login">লগইন</Link>
-            </Button>
+            {user ? (
+              <UserNav user={user} />
+            ) : (
+              <Button
+                variant="default"
+                className="bg-primary font-heading font-semibold hover:bg-primary/90"
+                asChild
+              >
+                <Link href="/login">লগইন</Link>
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu */}
@@ -108,6 +121,9 @@ export default function Navbar() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex  md:hidden">
+              {user && <UserNav user={user} />}
+            </div>
 
             {/* Mobile Sheet Menu */}
             <Sheet open={isOpen} onOpenChange={setIsOpen}>

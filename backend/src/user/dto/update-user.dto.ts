@@ -33,7 +33,7 @@ export class LoginDto{
       @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
       @IsString()
       @IsNotEmpty()
-      @MinLength(8)
+      @MinLength(7)
       @MaxLength(50)
       /* @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
         message: 'Password must contain uppercase, lowercase, number and special character',
@@ -260,4 +260,49 @@ export class FindOneDto {
   @IsString()
   @IsMongoId()
   id: string;
+}
+
+export class ResetPasswordDto{
+    @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  oldPassword: string;
+  
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  newPassword: string;
+
+}
+
+export class AdminUserDto{
+    @ApiPropertyOptional({
+    description: 'Search term for name (fuzzy search)',
+    example: 'John',
+  })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => value?.trim())
+  query?: string;
+
+  // Pagination
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    example: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  // Gender filter
+  @ApiPropertyOptional({
+    description: 'Gender filter',
+    example: 'male',
+    default: 'all',
+    enum: ['all', 'male', 'female'],
+  })
+  @IsOptional()
+  @IsString()
+  gender?: string = 'all';
 }

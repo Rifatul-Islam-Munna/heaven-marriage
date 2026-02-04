@@ -20,9 +20,11 @@ import {
   Droplet,
   Weight,
   Flag,
+  Loader2,
 } from "lucide-react";
 import { User } from "@/@types/user";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 
 interface ProfileViewProps {
   id: string;
@@ -93,6 +95,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
     `/user/get-one-user?id=${id}`,
     { enabled: !!id },
   );
+  const { mutate, isPending } = useCommonMutationApi({
+    method: "POST",
+    url: "/user/add-to-shortlist",
+    mutationKey: ["add-to-shortlist"],
+    successMessage: "Added to shortlist",
+  });
 
   if (isLoading) {
     return (
@@ -133,8 +141,15 @@ export default function ProfileView({ id }: ProfileViewProps) {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <Button className="bg-pink-600 hover:bg-pink-700 text-white">
-                <Heart className="w-4 h-4 mr-2" />
+              <Button
+                onClick={() => mutate({ shortlistedUserId: id })}
+                className="bg-pink-600 hover:bg-pink-700 text-white"
+              >
+                {isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Heart className="w-4 h-4 mr-2" />
+                )}
                 Shortlist
               </Button>
               <Button className="bg-green-600 hover:bg-green-700 text-white">

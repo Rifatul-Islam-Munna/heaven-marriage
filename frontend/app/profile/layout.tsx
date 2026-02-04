@@ -18,25 +18,25 @@ import {
 const data = {
   navMain: [
     {
-      title: "Getting Started",
+      title: "শুরু করুন",
       url: "/profile",
       items: [
         {
-          title: "Profile",
+          title: "প্রোফাইল",
           url: "/profile",
         },
         {
-          title: "short list",
+          title: "শর্টলিস্ট",
           url: "/profile/short-list",
         },
       ],
     },
     {
-      title: "settings",
+      title: "সেটিংস",
       url: "/profile/settings",
       items: [
         {
-          title: "profile",
+          title: "প্রোফাইল সেটিংস",
           url: "/profile/settings",
         },
       ],
@@ -51,23 +51,6 @@ const layout = ({ children }: { children: React.ReactNode }) => {
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#">
-                  Building Your Application
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
         </header>
         <div className="flex flex-1 flex-col gap-4 ">{children}</div>
       </SidebarInset>

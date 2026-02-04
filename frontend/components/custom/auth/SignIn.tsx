@@ -11,18 +11,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Heart } from "lucide-react";
+import { Heart, Eye, EyeOff } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { loginUser } from "@/actions/auth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/lib/useUser";
 
 export default function SignIn() {
+  const { refetch } = useUser();
   const [formData, setFormData] = useState({
     phoneNumber: "",
     password: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+
   const { mutate, isPending } = useMutation({
     mutationKey: ["login-user"],
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
@@ -37,10 +41,10 @@ export default function SignIn() {
       return toast.error(error?.message);
     },
   });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     mutate();
-    // Handle signin logic here
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +56,7 @@ export default function SignIn() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 p-4">
-      <Card className="w-full max-w-md  border-pink-200">
+      <Card className="w-full max-w-md border-pink-200">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
             <Heart className="w-8 h-8 text-white fill-white" />
@@ -97,16 +101,31 @@ export default function SignIn() {
                   Forgot?
                 </a>
               </div>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <Button

@@ -449,7 +449,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
+  @MinLength(7)
   @MaxLength(50)
  /*  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
     message: 'Password must contain uppercase, lowercase, number and special character',
