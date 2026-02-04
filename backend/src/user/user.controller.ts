@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { FindOneDto, LoginDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
 
 @Controller('user')
 export class UserController {
@@ -27,9 +28,16 @@ export class UserController {
     return this.userService.findOne(id);
   }
 
+  @UseGuards(AuthGuard)
+  @Get("get-my-profile")
+  getMyProfile(@Req() req:ExpressRequest) {
+    return this.userService.finMyProfile(req.user?.id);
+  }
+  @UseGuards(AuthGuard)
+
   @Patch('update-user')
-  update( @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updatedFullUserInformation( updateUserDto);
+  update( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
+    return this.userService.updatedFullUserInformation( updateUserDto,req.user?.id);
   }
   @Patch('update-user-admin')
   UpdateUserAdmin( @Body() updateUserDto: UpdateUserDto) {

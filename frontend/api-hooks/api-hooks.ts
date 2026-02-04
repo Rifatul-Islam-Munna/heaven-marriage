@@ -51,7 +51,7 @@ export const PostRequestAxios = async <T>(url: string, payload: any) : Promise<[
     }catch(error ){
         if (axios.isAxiosError(error)) {
             if (error.status === 401) {
-                throw redirect('/auth/login')
+                throw redirect('/login')
                 
                 }
                 console.log("error->",error.response?.data)
@@ -81,7 +81,7 @@ export const PatchRequestAxios = async <T>(url: string, payload: T) : Promise<[T
     }catch(error ){
         if (axios.isAxiosError(error)) {
             if (error.status === 401 || error.status === 403) {
-                throw redirect('/auth/login')
+                throw redirect('/login')
                 
                 }
                 console.log("error->",error.response?.data)
@@ -127,7 +127,7 @@ export const GetRequestNormal = async <T>(url: string,revalidate=0 ,revalidateTa
     } else {
         console.log("response",response.status)
       if (response.status === 401 || response.status === 403) {
-       throw redirect('/auth/login')
+       throw redirect('/login')
       }
    
       const errorPayload = await response.json()
@@ -172,7 +172,7 @@ export const DeleteRequestAxios = async <T>(url: string):
         if (axios.isAxiosError(error)) {
 
             if (error.status === 401) {
-                throw redirect('/auth/login');
+                throw redirect('/login');
             }
 
             console.log("error->", error.response?.data);

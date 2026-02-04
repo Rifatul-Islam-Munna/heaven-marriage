@@ -11,6 +11,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import {
+  fiqhOptions,
+  religiousEducationOptions,
+  skinColorOptions,
+} from "@/staticData/all-data";
 
 export function PersonalInfoStep() {
   const formData = useProfileStore((state) => state.formData);
@@ -49,27 +54,36 @@ export function PersonalInfoStep() {
               <SelectValue placeholder="নির্বাচন করুন" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Fair">ফর্সা</SelectItem>
-              <SelectItem value="Medium">শ্যামলা</SelectItem>
-              <SelectItem value="Dark">কালো</SelectItem>
+              {skinColorOptions.map((item) => (
+                <SelectItem key={item?.value} value={item?.value}>
+                  {item?.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="islamicStudy">দ্বীনের শিক্ষা</Label>
-          <Input
-            id="islamicStudy"
-            value={formData.personalInformation?.islamicStudy || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "islamicStudy",
-                e.target.value,
-              )
-            }
-            placeholder="মাদ্রাসা/স্বশিক্ষিত"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="মাদ্রাসা/স্বশিক্ষিত">দ্বীনের শিক্ষা</Label>
+            <Select
+              value={formData.personalInformation?.islamicStudy || ""}
+              onValueChange={(value) =>
+                updateNestedField("personalInformation", "islamicStudy", value)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="নির্বাচন করুন" />
+              </SelectTrigger>
+              <SelectContent>
+                {religiousEducationOptions.map((item) => (
+                  <SelectItem key={item?.value} value={item?.value}>
+                    {item?.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -118,10 +132,11 @@ export function PersonalInfoStep() {
               <SelectValue placeholder="নির্বাচন করুন" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Hanafi">হানাফি</SelectItem>
-              <SelectItem value="Shafi">শাফেয়ী</SelectItem>
-              <SelectItem value="Maliki">মালিকী</SelectItem>
-              <SelectItem value="Hanbali">হাম্বলী</SelectItem>
+              {fiqhOptions.map((item) => (
+                <SelectItem key={item?.value} value={item?.value}>
+                  {item?.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

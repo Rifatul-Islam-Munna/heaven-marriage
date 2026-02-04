@@ -12,8 +12,8 @@ export const loginUser = async (phoneNumber: string, password: string) => {
     const [data, error] = await PostRequestAxios<userData>("/user/login-user",{phoneNumber,password});
     if(data){
     const cookie = await cookies();
-   cookie.set("access_token", data?.access_token || "");
-   cookie.set("user", JSON.stringify(data?.user) || "");
+   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+   cookie.set("user", JSON.stringify(data?.user) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
     }
    
    return {data,error};

@@ -5,6 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { economicStatusOptions } from "@/staticData/all-data";
 
 export function FamilyInfoStep() {
   const formData = useProfileStore((state) => state.formData);
@@ -83,7 +91,7 @@ export function FamilyInfoStep() {
             <Input
               id="brotherCount"
               type="number"
-              value={formData.familyInfo?.brotherCount || 0}
+              value={formData.familyInfo?.brotherCount || ""}
               onChange={(e) =>
                 updateNestedField(
                   "familyInfo",
@@ -99,7 +107,7 @@ export function FamilyInfoStep() {
             <Input
               id="sisterCount"
               type="number"
-              value={formData.familyInfo?.sisterCount || 0}
+              value={formData.familyInfo?.sisterCount || ""}
               onChange={(e) =>
                 updateNestedField(
                   "familyInfo",
@@ -154,19 +162,26 @@ export function FamilyInfoStep() {
         <h4 className="font-semibold text-gray-700 mb-4">পারিবারিক অবস্থা</h4>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="familyFinancial">পারিবারিক আর্থিক অবস্থা</Label>
-            <Input
-              id="familyFinancial"
-              value={formData.familyInfo?.familyFinancial || ""}
-              onChange={(e) =>
-                updateNestedField(
-                  "familyInfo",
-                  "familyFinancial",
-                  e.target.value,
-                )
-              }
-              placeholder="নিম্ন/মধ্যবিত্ত/উচ্চবিত্ত"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="fiqhFollow">পারিবারিক আর্থিক অবস্থা</Label>
+              <Select
+                value={formData.familyInfo?.familyFinancial || ""}
+                onValueChange={(value) =>
+                  updateNestedField("familyInfo", "familyFinancial", value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="নির্বাচন করুন" />
+                </SelectTrigger>
+                <SelectContent>
+                  {economicStatusOptions.map((item) => (
+                    <SelectItem key={item?.value} value={item?.value}>
+                      {item?.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

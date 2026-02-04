@@ -458,7 +458,7 @@ export class CreateUserDto {
 
   // OPTIONAL FIELDS (no required:true in schema)
   @ApiPropertyOptional({ example: 'ahmed@example.com' })
-  @IsEmail()
+ 
   @IsOptional()
   @Transform(({ value }) => value?.toLowerCase().trim())
   email?: string;
@@ -489,7 +489,7 @@ export class CreateUserDto {
   @ApiPropertyOptional({ example: 65, minimum: 30, maximum: 200, description: 'Weight in kg' })
   @IsNumber()
   @IsOptional()
-  @Min(30)
+  @Min(10)
   @Max(200)
   @Transform(({ value }) => parseInt(value, 10))
   weight?: number;

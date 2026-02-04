@@ -41,9 +41,9 @@ export class UserService  {
     return {message:'User created successfully',data:create};
   }
 
-  async updatedFullUserInformation (updated:UpdateUserDto){
-    const {password,phoneNumber,isOtpVerified,isSubscriber, role, otpNumber, id, otpValidatedAt,...payload} = updated
-    const idAndUpdate =  await this.userModel.findOneAndUpdate({_id:id},{$set:payload},{new:true}).lean();
+  async updatedFullUserInformation (updated:UpdateUserDto,userId:string){
+    const {password,phoneNumber,isOtpVerified,isSubscriber, role, otpNumber, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
+    const idAndUpdate =  await this.userModel.findOneAndUpdate({_id:userId},{$set:payload},{new:true}).lean();
     if(!idAndUpdate){
       throw new HttpException('User not updated', 400);
     }
@@ -245,6 +245,7 @@ pipeline.push({
       age: 1,
       gender: 1,
       maritalStatus: 1,
+      userId:1,
       role: 1,
       createdAt: 1,
       'address.district': 1,
@@ -292,9 +293,16 @@ pipeline.push({
     }
     return findOne;
   }
+  async finMyProfile(id: string) {
+    const findOne = await this.userModel.findById(id).select("  -password -otpNumber -otpValidatedAt ").lean();
+    if(!findOne) {
+      throw new HttpException('User not found', 400);
+    }
+    return findOne;
+  }
 
  async update( updateUserDto: UpdateUserDto) {
-    const {id,password,...rest} = updateUserDto
+    const {id,password, _v,updatedAt,createdAt,...rest} = updateUserDto
     const findOne = await this.userModel.findByIdAndUpdate(id,{$set:rest},{new:true}).lean();
     if(!findOne) {
       throw new HttpException('User not found', 400);

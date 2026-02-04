@@ -1,7 +1,15 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { professionOptions } from "@/staticData/all-data";
 import { useProfileStore } from "@/zustan/useProfileStore";
 
 export function OccupationalStep() {
@@ -12,14 +20,24 @@ export function OccupationalStep() {
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="profession">পেশা *</Label>
-        <Input
-          id="profession"
+
+        <Select
           value={formData.occupational?.profession || ""}
-          onChange={(e) =>
-            updateNestedField("occupational", "profession", e.target.value)
+          onValueChange={(value) =>
+            updateNestedField("occupational", "profession", value)
           }
-          placeholder="যেমন: শিক্ষক, ব্যবসায়ী, ছাত্র"
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="নির্বাচন করুন" />
+          </SelectTrigger>
+          <SelectContent>
+            {professionOptions.map((option) => (
+              <SelectItem key={option?.value} value={option?.value}>
+                {option?.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">

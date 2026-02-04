@@ -9,10 +9,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import { marriedStatus } from "@/staticData/all-data";
 
 export function BasicInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateField = useProfileStore((state) => state.updateField);
+  const filterOutstatus = marriedStatus.filter((item) => item.id !== 1);
 
   return (
     <div className="space-y-6">
@@ -53,9 +55,11 @@ export function BasicInfoStep() {
               <SelectValue placeholder="নির্বাচন করুন" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="unmarried">অবিবাহিত</SelectItem>
-              <SelectItem value="divorced">তালাকপ্রাপ্ত</SelectItem>
-              <SelectItem value="widowed">বিধবা/বিপত্নীক</SelectItem>
+              {filterOutstatus.map((status) => (
+                <SelectItem key={status.id} value={status.en}>
+                  {status.bn}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

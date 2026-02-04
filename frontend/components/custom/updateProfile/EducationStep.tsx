@@ -11,6 +11,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import { educationMediumOptions } from "@/staticData/all-data";
 
 export function EducationStep() {
   const formData = useProfileStore((state) => state.formData);
@@ -31,9 +32,11 @@ export function EducationStep() {
               <SelectValue placeholder="নির্বাচন করুন" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="general">সাধারণ</SelectItem>
-              <SelectItem value="madrasa">মাদ্রাসা</SelectItem>
-              <SelectItem value="english">ইংলিশ মিডিয়াম</SelectItem>
+              {educationMediumOptions.map((option) => (
+                <SelectItem key={option?.value} value={option?.value}>
+                  {option?.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

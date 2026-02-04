@@ -12,6 +12,10 @@ import { MarriageInfoStep } from "./MarriageInfoStep";
 import { ExpectedPartnerStep } from "./ExpectedPartnerStep";
 import { PledgeStep } from "./PledgeStep";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { useEffect } from "react";
+import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import { useRouter } from "next/navigation";
 
 const steps = [
   "মৌলিক তথ্য",
@@ -29,6 +33,7 @@ export default function ProfileUpdateForm() {
   const currentStep = useProfileStore((state) => state.currentStep);
   const setCurrentStep = useProfileStore((state) => state.setCurrentStep);
   const getFormData = useProfileStore((state) => state.getFormData);
+  const initializeForm = useProfileStore((state) => state.initializeForm);
   console.log("current-data", getFormData());
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -36,6 +41,25 @@ export default function ProfileUpdateForm() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+  const { data, isLoading } = useQueryWrapper(
+    ["get-my-profile"],
+    "/user/get-my-profile",
+  );
+  const router = useRouter();
+  const { mutate, isPending } = useCommonMutationApi({
+    method: "PATCH",
+    url: "/user/update-user",
+    mutationKey: ["update-user"],
+    successMessage: "User Updated",
+    onSuccess: (data) => {
+      return router.push("/profile");
+    },
+  });
+  useEffect(() => {
+    if (data) {
+      initializeForm(data);
+    }
+  }, [data]);
 
   const handlePrevious = () => {
     if (currentStep > 0) {
@@ -47,21 +71,9 @@ export default function ProfileUpdateForm() {
   const handleSubmit = async () => {
     const formData = getFormData();
 
-    try {
-      console.log("Submitting:", formData);
+    console.log("Submitting:", formData);
 
-      // Your API call here
-      // const response = await fetch('/api/user/update', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // });
-
-      alert("Profile updated successfully!");
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      alert("Failed to update profile");
-    }
+    mutate(formData);
   };
 
   const renderStep = () => {
@@ -181,6 +193,7 @@ export default function ProfileUpdateForm() {
             <Button
               onClick={handleSubmit}
               className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-11 sm:h-10"
+              disabled={isPending}
             >
               সম্পন্ন করুন
             </Button>

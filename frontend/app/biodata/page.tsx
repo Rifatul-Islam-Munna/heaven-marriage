@@ -84,9 +84,6 @@ export default function BiodatasPage() {
           <h1 className="mb-2 font-heading text-2xl font-bold text-gray-900 md:text-3xl">
             বায়োডাটা সমূহ
           </h1>
-          <p className="text-sm text-gray-600 md:text-base">
-            5622 টি বায়োডাটা পাওয়া গেছে!
-          </p>
         </div>
       </div>
 

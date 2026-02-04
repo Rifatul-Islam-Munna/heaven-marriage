@@ -62,64 +62,20 @@ import { cn } from "@/lib/utils";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { useDebounce } from "use-debounce";
+import {
+  economicStatusOptions,
+  educationMediumOptions,
+  fiqhOptions,
+  marriedStatus,
+  professionOptions,
+  religiousEducationOptions,
+  skinColorOptions,
+} from "@/staticData/all-data";
 // Filter Data
 const genderOptions = [
   { value: "all", label: "সকল" },
   { value: "male", label: "ছেলে" },
   { value: "female", label: "মেয়ে" },
-];
-
-const maritalStatusOptions = [
-  { value: "unmarried", label: "অবিবাহিত" },
-  { value: "divorced", label: "ডিভোর্সড" },
-  { value: "widowed", label: "বিধবা/বিপত্নীক" },
-];
-
-const educationMediumOptions = [
-  { value: "bangla", label: "বাংলা মাধ্যম" },
-  { value: "english", label: "ইংলিশ মাধ্যম" },
-  { value: "madrasa", label: "মাদ্রাসা" },
-  { value: "english-version", label: "ইংলিশ ভার্সন" },
-];
-
-const religiousEducationOptions = [
-  { value: "hafez", label: "হাফেজ/হাফেজা" },
-  { value: "alim", label: "আলিম/আলিমা" },
-  { value: "mufti", label: "মুফতি" },
-  { value: "qari", label: "কারী" },
-  { value: "dawah", label: "দাঈ" },
-];
-
-const skinColorOptions = [
-  { value: "fair", label: "ফর্সা" },
-  { value: "brown", label: "শ্যামলা" },
-  { value: "dark", label: "কালো" },
-  { value: "bright", label: "উজ্জ্বল" },
-];
-
-const fiqhOptions = [
-  { value: "hanafi", label: "হানাফি" },
-  { value: "shafi", label: "শাফেঈ" },
-  { value: "maliki", label: "মালিকি" },
-  { value: "hanbali", label: "হাম্বলি" },
-];
-
-const professionOptions = [
-  { value: "doctor", label: "ডাক্তার" },
-  { value: "engineer", label: "ইঞ্জিনিয়ার" },
-  { value: "teacher", label: "শিক্ষক" },
-  { value: "businessman", label: "ব্যবসায়ী" },
-  { value: "govt-job", label: "সরকারি চাকরি" },
-  { value: "private-job", label: "বেসরকারি চাকরি" },
-  { value: "student", label: "ছাত্র/ছাত্রী" },
-  { value: "housewife", label: "গৃহিণী" },
-];
-
-const economicStatusOptions = [
-  { value: "upper", label: "উচ্চবিত্ত" },
-  { value: "upper-middle", label: "উচ্চ মধ্যবিত্ত" },
-  { value: "middle", label: "মধ্যবিত্ত" },
-  { value: "lower-middle", label: "নিম্ন মধ্যবিত্ত" },
 ];
 
 const categoryOptions = [
@@ -255,28 +211,28 @@ function FilterContent({
                 বৈবাহিক অবস্থা
               </Label>
               <div className="grid grid-cols-2 gap-2">
-                {maritalStatusOptions.map((option) => (
+                {marriedStatus.map((option) => (
                   <div
-                    key={option.value}
+                    key={option.id}
                     className="flex items-center space-x-1.5"
                   >
                     <Checkbox
-                      id={`marital-${option.value}`}
-                      checked={filters.maritalStatus.includes(option.value)}
+                      id={`marital-${option.en}`}
+                      checked={filters.maritalStatus.includes(option.en)}
                       onCheckedChange={(checked) =>
                         handleCheckboxChange(
                           "maritalStatus",
-                          option.value,
+                          option.en,
                           checked as boolean,
                         )
                       }
                       className="h-4 w-4"
                     />
                     <Label
-                      htmlFor={`marital-${option.value}`}
+                      htmlFor={`marital-${option.en}`}
                       className="cursor-pointer text-xs font-normal leading-tight"
                     >
-                      {option.label}
+                      {option.bn}
                     </Label>
                   </div>
                 ))}

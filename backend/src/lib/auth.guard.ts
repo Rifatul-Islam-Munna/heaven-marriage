@@ -42,6 +42,7 @@ export class AuthGuard implements CanActivate {
         try {
        
           const decoded = await this.jwtService.verifyAsync<jwts>(token,{secret:this.configService.get<string>('ACCESS_TOKEN')}); 
+
     
            
            if (!decoded) {
@@ -49,13 +50,14 @@ export class AuthGuard implements CanActivate {
         }
         this.logger.log("decoded->",decoded)
 
-        if (!decoded.email || !decoded.id || !decoded.role  ) {
+        if (!decoded.mobileNumber || !decoded.id || !decoded.role  ) {
             throw new Error('Incomplete JWT payload');
         }
           request.user = decoded;
          
           return true; 
-        } catch {
+        } catch (error) {
+          this.logger.debug("token-error->",error)
           throw new UnauthorizedException('Invalid or expired token');
         }
       }

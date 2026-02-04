@@ -6,7 +6,17 @@ import { Transform, Type } from 'class-transformer';
 export class UpdateUserDto extends PartialType(CreateUserDto) {
     @ApiProperty({example:"mongo id"})
     @IsMongoId()
+    @IsOptional()
     id:string;
+    @ApiProperty({example:"mongo id"})
+  
+    _v:string;
+    @ApiProperty({example:"mongo id"})
+   
+    updatedAt:string;
+    @ApiProperty({example:"mongo id"})
+   
+    createdAt:string;
 }
 
 
