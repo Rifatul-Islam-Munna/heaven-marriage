@@ -15,10 +15,11 @@ import { ConfigService } from '@nestjs/config';
 import { PricingService } from 'src/pricing/pricing.service';
 import { RequestNumberDto } from './dto/request-number.dto';
 import { RequestNumber, RequestNumberDocument } from './entities/RequestNumber.schema';
+import { TelegramChannel, TelegramService } from './telegram.service';
 @Injectable()
 export class UserService  {
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService){}
   
   async create(createUserDto: CreateUserDto) {
     
@@ -54,7 +55,7 @@ export class UserService  {
     if(!idAndUpdate){
       throw new HttpException('User not updated', 400);
     }
-
+   this.sendToUser(idAndUpdate)
     return {
       message:'User updated successfully',
       data:idAndUpdate
@@ -593,5 +594,191 @@ async getMyRequests (userId:string, query:PaginationDto){
   }
 
 }
+
+//bot 
+
+async sendToUser(user: UserDocument) {
+  // Helper function to safely get value or show "তথ্য নেই"
+  const getValue = (value: any): string => {
+    if (value === null || value === undefined || value === '') return 'তথ্য নেই';
+    if (typeof value === 'boolean') return value ? 'হ্যাঁ' : 'না';
+    return String(value);
+  };
+
+  // Determine if user is male or female
+  const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
+  const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
+
+  const message = `
+🎉 <b>${isMale ? 'পুরুষ' : isFemale ? 'মহিলা' : ''} ব্যবহারকারী</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 <b>মৌলিক তথ্য</b>
+👤 নাম: ${getValue(user.name)}
+🆔 ইউজার আইডি: ${getValue(user.userId)}
+📧 ইমেইল: ${getValue(user.email)}
+📱 ফোন: ${getValue(user.phoneNumber)}
+👥 ভূমিকা: ${getValue(user.role)}
+⚧ লিঙ্গ: ${getValue(user.gender)}
+💍 বৈবাহিক অবস্থা: ${getValue(user.maritalStatus)}
+🎂 বয়স: ${getValue(user.age)} বছর
+🩸 রক্তের গ্রুপ: ${getValue(user.bloodGroup)}
+⚖️ ওজন: ${getValue(user.weight)} কেজি
+🌍 জাতীয়তা: ${getValue(user.nationality)}
+🔗 কানেকশন: ${getValue(user.numberOfConnections)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 <b>ঠিকানা তথ্য</b>
+🏠 বর্তমান ঠিকানা: ${getValue(user.address?.presentAddress)}
+🏡 স্থায়ী ঠিকানা: ${getValue(user.address?.permanentAddress)}
+📌 জেলা: ${getValue(user.address?.district)}
+🗺 উপজেলা: ${getValue(user.address?.upazila)}
+ℹ️ অতিরিক্ত তথ্য: ${getValue(user.address?.extraInfo)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎓 <b>শিক্ষাগত তথ্য</b>
+📚 শিক্ষা পদ্ধতি: ${getValue(user.educationInfo?.educationMethod)}
+🏆 সর্বোচ্চ শিক্ষা: ${getValue(user.educationInfo?.highestEducation)}
+📋 বোর্ড: ${getValue(user.educationInfo?.highestEducationBoard)}
+📖 বিভাগ: ${getValue(user.educationInfo?.highestEducationGroup)}
+📅 পাশের বছর: ${getValue(user.educationInfo?.highestEducationPassingYear)}
+📝 বর্তমানে পড়াশোনা: ${getValue(user.educationInfo?.currentlyDoingHightEducation)}
+
+<i>এসএসসি তথ্য:</i>
+📅 পাশের বছর: ${getValue(user.educationInfo?.sSCPassingYear)}
+📖 বিভাগ: ${getValue(user.educationInfo?.sSCPassingGroup)}
+🎯 ফলাফল: ${getValue(user.educationInfo?.sSCResult)}
+
+<i>এইচএসসি তথ্য:</i>
+📅 পাশের বছর: ${getValue(user.educationInfo?.hSCPassingYear)}
+📖 বিভাগ: ${getValue(user.educationInfo?.hSCPassingGroup)}
+🎯 ফলাফল: ${getValue(user.educationInfo?.hSCResult)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👨‍👩‍👧‍👦 <b>পারিবারিক তথ্য</b>
+👨 পিতা জীবিত: ${getValue(user.familyInfo?.isFatherAlive)}
+💼 পিতার পেশা: ${getValue(user.familyInfo?.fathersProfession)}
+👩 মাতা জীবিত: ${getValue(user.familyInfo?.isMotherAlive)}
+💼 মাতার পেশা: ${getValue(user.familyInfo?.mothersProfession)}
+👬 ভাই সংখ্যা: ${getValue(user.familyInfo?.brotherCount)}
+ℹ️ ভাইদের তথ্য: ${getValue(user.familyInfo?.brotherInformation)}
+👭 বোন সংখ্যা: ${getValue(user.familyInfo?.sisterCount)}
+ℹ️ বোনদের তথ্য: ${getValue(user.familyInfo?.sisterInformation)}
+💰 পারিবারিক আর্থিক অবস্থা: ${getValue(user.familyInfo?.familyFinancial)}
+🏠 পারিবারিক সম্পদ: ${getValue(user.familyInfo?.familyAssetDetails)}
+☪️ পারিবারিক ধর্মীয় অবস্থা: ${getValue(user.familyInfo?.familyReligiousCondition)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧑 <b>ব্যক্তিগত তথ্য</b>
+👔 বাইরের পোশাক: ${getValue(user.personalInformation?.outsideClothes)}
+${isFemale ? `🧕 নিকাব বছর: ${getValue(user.personalInformation?.womenNiqbYear)}` : ''}
+${isMale ? `🧔 দাড়ি: ${getValue(user.personalInformation?.manBeard)}` : ''}
+${isMale ? `👖 টাখনুর উপরে কাপড়: ${getValue(user.personalInformation?.manClothAboveAnkels)}` : ''}
+🕌 পাঁচ ওয়াক্ত নামাজ: ${getValue(user.personalInformation?.prayerFiverTimeFrom)}
+⏰ নামাজ মিস: ${getValue(user.personalInformation?.MissPrayerTime)}
+👥 মাহরাম-নন মাহরাম: ${getValue(user.personalInformation?.maharaNonMahram)}
+📖 কুরআন তেলাওয়াত: ${getValue(user.personalInformation?.reciteQuran)}
+⚖️ ফিকহ অনুসরণ: ${getValue(user.personalInformation?.fiqhFollow)}
+📱 ডিজিটাল মিডিয়া: ${getValue(user.personalInformation?.digitalMedia)}
+🏥 মানসিক/শারীরিক সমস্যা: ${getValue(user.personalInformation?.mentalOrPhysicalIssue)}
+✨ দ্বীনের বিশেষ কাজ: ${getValue(user.personalInformation?.specialWorkOfDeen)}
+🎯 মাজার বিশ্বাস: ${getValue(user.personalInformation?.majarBeliveStatus)}
+📚 ইসলামিক বই: ${getValue(user.personalInformation?.islamicBookName)}
+👨‍🏫 আলেম নাম: ${getValue(user.personalInformation?.islamicScholarsName)}
+🎨 শখ: ${getValue(user.personalInformation?.extraInfoHobby)}
+📏 উচ্চতা: ${getValue(user.personalInformation?.height)} ফুট
+🎨 গায়ের রং: ${getValue(user.personalInformation?.skinTone)}
+📖 ইসলামিক পড়াশোনা: ${getValue(user.personalInformation?.islamicStudy)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💼 <b>পেশাগত তথ্য</b>
+👔 পেশা: ${getValue(user.occupational?.profession)}
+📋 কাজের বিবরণ: ${getValue(user.occupational?.workingDetails)}
+💰 বেতন: ${getValue(user.occupational?.salary)}
+
+${isFemale && user.marriageInformationWomen ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
+👨‍👩‍👧 অভিভাবক রাজি: ${getValue(user.marriageInformationWomen.isGuardiansAgreed)}
+💼 বিয়ের পর চাকরি: ${getValue(user.marriageInformationWomen.jobAfterMarriage)}
+📚 বিয়ের পর পড়াশোনা: ${getValue(user.marriageInformationWomen.studyAfterMarriage)}
+💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationWomen.thoughtsOnMarriage)}
+` : ''}
+
+${isMale && user.marriageInformationMan ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
+👨‍👩‍👧 অভিভাবক রাজি: ${getValue(user.marriageInformationMan.isGuardiansAgreed)}
+🧕 স্ত্রীর পর্দা: ${getValue(user.marriageInformationMan.wifeVailAfterMarriage)}
+📚 স্ত্রীর পড়াশোনা: ${getValue(user.marriageInformationMan.allowWifeStudyAfterMarriage)}
+💼 স্ত্রীর চাকরি: ${getValue(user.marriageInformationMan.wifeJobAfterMarriage)}
+🏠 বসবাসের স্থান: ${getValue(user.marriageInformationMan.livingPlaceAfterMarriage)}
+🎁 উপহার প্রত্যাশা: ${getValue(user.marriageInformationMan.expectedAnyGiftFromMarriage)}
+💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationMan.thoughtsOnMarriage)}
+` : ''}
+
+${user.expectedLifePartner ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💕 <b>প্রত্যাশিত জীবনসঙ্গী</b>
+🎂 বয়স: ${getValue(user.expectedLifePartner.age)}
+🎨 গায়ের রং: ${getValue(user.expectedLifePartner.complexion)}
+📏 উচ্চতা: ${getValue(user.expectedLifePartner.height)}
+🎓 শিক্ষা: ${getValue(user.expectedLifePartner.education)}
+📌 জেলা: ${getValue(user.expectedLifePartner.district)}
+🗺 উপজেলা: ${getValue(user.expectedLifePartner.upazila)}
+💍 বৈবাহিক অবস্থা: ${getValue(user.expectedLifePartner.maritalStatus)}
+💼 পেশা: ${getValue(user.expectedLifePartner.profession)}
+💰 আর্থিক অবস্থা: ${getValue(user.expectedLifePartner.financialCondition)}
+✨ প্রত্যাশিত গুণাবলী: ${getValue(user.expectedLifePartner.expectedQuality)}
+` : ''}
+
+${user.pledge ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>অঙ্গীকার</b>
+👨‍👩‍👧 অভিভাবক জানেন: ${getValue(user.pledge.youGordianKnowsThis)}
+✓ সকল তথ্য সত্য: ${getValue(user.pledge.allTheInformationTrue)}
+⚠️ ভুল তথ্যের দায়িত্ব: ${getValue(user.pledge.anyMisInformationWeAreNotKnowing)}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ <b> সময়:</b> ${new Date().toLocaleString('bn-BD', { 
+    timeZone: 'Asia/Dhaka',
+    dateStyle: 'full',
+    timeStyle: 'short'
+  })}
+  `.trim();
+
+  try {
+    const sendToTelegram = await this.telegramService.sendToChannel({
+      channel: TelegramChannel.NEW_USER,
+      message: message,
+      isHTML: true,
+    });
+
+    if (sendToTelegram) {
+      this.logger.log(`User ${user.userId} info sent to Telegram successfully`);
+      return true;
+    } else {
+      this.logger.warn(`Failed to send user ${user.userId} info to Telegram`);
+      return false;
+    }
+  } catch (error) {
+    this.logger.error(`Error sending to Telegram: ${error.message}`);
+    return false;
+  }
+}
+
+
 
 }

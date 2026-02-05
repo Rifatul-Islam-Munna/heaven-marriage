@@ -209,10 +209,11 @@ const User = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      অ্যাকাউন্ট আইডি
+                      কানেকশন
                     </p>
                     <p className="text-lg font-semibold text-gray-900 break-all font-mono text-sm">
-                      {user?.userId || "তথ্য নেই"}
+                      {user?.numberOfConnections?.toLocaleString("bn-BD") ||
+                        "নেই"}
                     </p>
                   </div>
                 </div>
