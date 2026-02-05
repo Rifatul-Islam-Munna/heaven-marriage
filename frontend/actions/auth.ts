@@ -34,3 +34,20 @@ export const getUser = async ()=>{
 
     return UserData;
 }
+
+export const requestNumber = async (payoad:{userId:string, requestUserId:string}) => {
+    const [data, error] = await PostRequestAxios("/user/request-for-number",payoad);
+    console.log("requestNumberdata",data);
+    if(data){
+        const cookie = await cookies();
+
+        cookie.set("user", JSON.stringify(data?.userData) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+    }
+    return {data,error};
+}
+
+export const setUserData = async (data:Record<string,any>) =>{
+     const cookie = await cookies();
+
+        cookie.set("user", JSON.stringify(data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+}

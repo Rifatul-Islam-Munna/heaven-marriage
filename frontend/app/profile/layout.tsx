@@ -29,6 +29,10 @@ const data = {
           title: "শর্টলিস্ট",
           url: "/profile/short-list",
         },
+        {
+          title: "রিকোয়েস্ট তালিকা",
+          url: "/profile/numbers",
+        },
       ],
     },
     {

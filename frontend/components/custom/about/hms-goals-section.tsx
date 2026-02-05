@@ -60,7 +60,7 @@ export default function HMSGoalsSection() {
 
             <div className="mb-6">
               <p className="mb-2 text-lg font-semibold text-pink-600 md:text-xl">
-                🔹 HMS – Heaven Marriage Solutions
+                🔹 HMS – niqaha Solutions
               </p>
               <p className="text-base italic text-muted-foreground md:text-lg">
                 হালাল ভালোবাসার পথে এক বিশ্বস্ত রাহবার

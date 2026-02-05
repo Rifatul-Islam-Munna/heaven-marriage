@@ -58,7 +58,7 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <Heart className="h-8 w-8 fill-pink-500 text-pink-500" />
               <span className="font-heading text-2xl font-bold text-primary">
-                Heaven Marriage
+                niqaha
               </span>
             </div>
           </Link>
@@ -145,7 +145,7 @@ export default function Navbar() {
                   <SheetTitle className="flex items-center gap-2">
                     <Heart className="h-6 w-6 fill-pink-500 text-pink-500" />
                     <span className="font-heading text-xl font-bold text-primary">
-                      Heaven Marriage
+                      niqaha
                     </span>
                   </SheetTitle>
                 </SheetHeader>

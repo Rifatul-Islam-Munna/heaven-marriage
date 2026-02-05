@@ -26,6 +26,7 @@ import { User } from "@/@types/user";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import {
+  countries,
   economicStatusOptions,
   educationMediumOptions,
   fiqhOptions,
@@ -36,6 +37,10 @@ import {
 } from "@/staticData/all-data";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
+import { useUser } from "@/lib/useUser";
+import { useMutation } from "@tanstack/react-query";
+import { requestNumber } from "@/actions/auth";
+import { toast } from "sonner";
 
 interface ProfileViewProps {
   id: string;
@@ -104,7 +109,9 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const { data: userData, isLoading } = useQueryWrapper<User>(
     ["get-user", id],
     `/user/get-one-user?id=${id}`,
-    { enabled: !!id },
+    { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
+    1000,
+    "bio-data-info",
   );
   const { mutate, isPending } = useCommonMutationApi({
     method: "POST",
@@ -112,6 +119,21 @@ export default function ProfileView({ id }: ProfileViewProps) {
     mutationKey: ["add-to-shortlist"],
     successMessage: "Added to shortlist",
   });
+
+  const { mutate: RequestPhoneNumber, isPending: isLoadingNumber } =
+    useMutation({
+      mutationKey: ["request-number"],
+      mutationFn: (payload: { userId: string; requestUserId: string }) =>
+        requestNumber(payload),
+      onSuccess: (data) => {
+        if (data?.data) {
+          toast.success("Successfully requested for number");
+          return;
+        }
+        toast.error(data?.error?.message);
+      },
+    });
+  const { user } = useUser();
 
   if (isLoading) {
     return (
@@ -133,6 +155,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
       </div>
     );
   }
+
+  const handelRequestForNumber = () => {
+    RequestPhoneNumber({
+      userId: user?._id,
+      requestUserId: userData._id,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -163,7 +192,14 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 )}
                 Shortlist
               </Button>
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
+              <Button
+                disabled={isLoadingNumber}
+                onClick={handelRequestForNumber}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isLoadingNumber ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}{" "}
                 <Phone className="w-4 h-4 mr-2" />
                 Ask for Number
               </Button>
@@ -207,8 +243,11 @@ export default function ProfileView({ id }: ProfileViewProps) {
           />
           <QuickInfoCard
             icon={Flag}
-            label="জাতীয়তা"
-            value={userData?.nationality}
+            label="জাতীয়তা/দেশ"
+            value={
+              countries.find((item) => item.en.trim() === userData?.nationality)
+                ?.bn || userData?.nationality
+            }
           />
         </div>
 

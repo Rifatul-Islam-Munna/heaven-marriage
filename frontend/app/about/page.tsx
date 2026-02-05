@@ -28,7 +28,7 @@ export default function AboutPage() {
 
             {/* Main Title */}
             <h1 className="mb-6 font-heading text-4xl font-bold leading-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
-              Heaven Marriage সম্পর্কে
+              niqaha সম্পর্কে
             </h1>
 
             {/* Subtitle */}

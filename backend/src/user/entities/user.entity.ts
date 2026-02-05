@@ -39,6 +39,7 @@ export class User {
     bloodGroup:string 
     @Prop()
     weight:number 
+    
     @Prop()
     nationality:string 
 
@@ -53,6 +54,8 @@ export class User {
 
     @Prop()
     isSubscriber:boolean
+    @Prop()
+    numberOfConnections:number
 
 
     // up those for the account creation 

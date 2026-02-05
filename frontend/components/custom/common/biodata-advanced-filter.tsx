@@ -71,6 +71,7 @@ import {
   religiousEducationOptions,
   skinColorOptions,
 } from "@/staticData/all-data";
+
 // Filter Data
 const genderOptions = [
   { value: "all", label: "সকল" },
@@ -137,6 +138,7 @@ function FilterContent({
   useEffect(() => {
     setFilters({ ...filters, ageMin: newAge.min, ageMax: newAge.max });
   }, [newAge]);
+
   useEffect(() => {
     setFilters({
       ...filters,
@@ -308,7 +310,7 @@ function FilterContent({
                           onSelect={() => {
                             setFilters({
                               districtId:
-                                filters.districtId === d.id ? null : d.id,
+                                filters.districtId === d.name ? null : d.name,
                               upazilaId: null, // Reset upazila when district changes
                             });
                             setDistrictOpen(false);
@@ -318,7 +320,7 @@ function FilterContent({
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4 text-pink-600",
-                              filters.districtId === d.id
+                              filters.districtId === d.name
                                 ? "opacity-100"
                                 : "opacity-0",
                             )}
@@ -369,9 +371,9 @@ function FilterContent({
                           onSelect={() => {
                             setFilters({
                               upazilaId:
-                                filters.upazilaId === upazila.id
+                                filters.upazilaId === upazila.name
                                   ? null
-                                  : upazila.id,
+                                  : upazila.name,
                             });
                             setUpazilaOpen(false);
                           }}
@@ -380,7 +382,7 @@ function FilterContent({
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4 text-pink-600",
-                              filters.upazilaId === upazila.id
+                              filters.upazilaId === upazila.name
                                 ? "opacity-100"
                                 : "opacity-0",
                             )}
@@ -750,8 +752,8 @@ export default function BiodataAdvancedFilter() {
     maritalStatus: parseAsArrayOf(parseAsString).withDefault([]),
     ageMin: parseAsInteger.withDefault(18),
     ageMax: parseAsInteger.withDefault(40),
-    districtId: parseAsString, // Changed from permanentDistrict/currentDistrict
-    upazilaId: parseAsString, // Added upazila
+    districtId: parseAsString, // Will store district NAME (not actual id)
+    upazilaId: parseAsString, // Will store upazila NAME (not actual id)
     educationMedium: parseAsArrayOf(parseAsString).withDefault([]),
     religiousEducation: parseAsArrayOf(parseAsString).withDefault([]),
     heightMin: parseAsInteger.withDefault(4),
@@ -762,9 +764,10 @@ export default function BiodataAdvancedFilter() {
     economicStatus: parseAsArrayOf(parseAsString).withDefault([]),
     category: parseAsArrayOf(parseAsString).withDefault([]),
     query: parseAsString.withDefault(""),
+    country: parseAsString.withDefault(""),
   });
 
-  // Collapsible sections state - ALL CLOSED BY DEFAULT
+  // Collapsible sections state
   const [openSections, setOpenSections] = useState({
     primary: true,
     address: true,
@@ -809,17 +812,18 @@ export default function BiodataAdvancedFilter() {
       economicStatus: [],
       category: [],
       query: "",
+      country: "",
     });
   };
 
-  // Get available upazilas based on selected district
-  const availableUpazilas = filters.districtId
-    ? upazilas.filter((upazila) => upazila.district_id === filters.districtId)
-    : [];
+  // Get selected district and upazila objects by NAME
+  const selectedDistrict = districts.find((d) => d.name === filters.districtId);
+  const selectedUpazila = upazilas.find((u) => u.name === filters.upazilaId);
 
-  // Get selected district and upazila objects
-  const selectedDistrict = districts.find((d) => d.id === filters.districtId);
-  const selectedUpazila = upazilas.find((u) => u.id === filters.upazilaId);
+  // Get available upazilas based on selected district
+  const availableUpazilas = selectedDistrict
+    ? upazilas.filter((upazila) => upazila.district_id === selectedDistrict.id)
+    : [];
 
   const hasActiveFilters =
     filters.gender !== "all" ||
@@ -844,7 +848,7 @@ export default function BiodataAdvancedFilter() {
       <div className="lg:hidden">
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            <Button className=" h-14 w-14 rounded-full bg-pink-600 shadow-lg hover:bg-pink-700">
+            <Button className="h-14 w-14 rounded-full bg-pink-600 shadow-lg hover:bg-pink-700">
               <Filter className="h-6 w-6" />
             </Button>
           </SheetTrigger>

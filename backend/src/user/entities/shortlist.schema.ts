@@ -9,7 +9,7 @@ export class Shortlist {
 userId: mongoose.Types.ObjectId
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: User.name }] })
-shortlistedUserId: User[]
+shortlistedUserId:  mongoose.Types.ObjectId[]
 }
 
 export const ShortlistSchema = SchemaFactory.createForClass(Shortlist);

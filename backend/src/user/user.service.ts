@@ -10,10 +10,15 @@ import { JwtService } from '@nestjs/jwt';
 import ShortUniqueId from 'short-unique-id';
 import { Shortlist, ShortlistDocument } from './entities/shortlist.schema';
 import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
+import { BkashService } from './bkash.service';
+import { ConfigService } from '@nestjs/config';
+import { PricingService } from 'src/pricing/pricing.service';
+import { RequestNumberDto } from './dto/request-number.dto';
+import { RequestNumber, RequestNumberDocument } from './entities/RequestNumber.schema';
 @Injectable()
 export class UserService  {
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>){}
   
   async create(createUserDto: CreateUserDto) {
     
@@ -44,7 +49,7 @@ export class UserService  {
   }
 
   async updatedFullUserInformation (updated:UpdateUserDto,userId:string){
-    const {password,phoneNumber,isOtpVerified,isSubscriber, role, otpNumber, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
+    const {password,phoneNumber,isOtpVerified,isSubscriber, role, otpNumber, numberOfConnections, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
     const idAndUpdate =  await this.userModel.findOneAndUpdate({_id:userId},{$set:payload},{new:true}).lean();
     if(!idAndUpdate){
       throw new HttpException('User not updated', 400);
@@ -64,7 +69,7 @@ export class UserService  {
      if(!phoneNumber || !password){
        throw new HttpException('All fields are required', 400);
      }
-     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId").lean();
+     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
      if(!findOneUser){
        throw new HttpException('User not found', 400);
      }
@@ -104,6 +109,7 @@ export class UserService  {
     religiousEducation,
     skinColor,
     upazilaId,
+    country
   } = userQuery;
 
   console.log('Received query params:', userQuery);
@@ -164,6 +170,9 @@ export class UserService  {
 
   if (upazilaId) {
     matchConditions['address.upazila'] = upazilaId;
+  }
+  if(country){
+    matchConditions.nationality = country
   }
 
   if (educationMedium && educationMedium.length > 0) {
@@ -482,6 +491,107 @@ async userDeleteAdmin(id:string) {
   }
   
   return findOne;
+}
+
+
+async createPayment(pkgId: string,id:string){
+  this.logger.debug("pkgId->",pkgId)
+   const finOneUser = await this.userModel.findById(id).lean();
+   const findOnePackage = await this.pricingService.findOne(pkgId);
+   if(!finOneUser || !findOnePackage){
+     throw new HttpException('User not found', 400);
+   }
+   this.logger.debug("findOnePackage->",findOnePackage)
+   const finalPrice = findOnePackage?.discountPrice ? findOnePackage.discountPrice : findOnePackage.originalPrice ?? 100 ;
+   const userIdWithConnections = `${finOneUser._id.toString()}-${findOnePackage.numberOfConnections}`
+   const createPayment = await this.bkash.createPayment(finalPrice,userIdWithConnections.toString());
+   return createPayment
+}
+
+async executePayment(paymentId:string){
+  try{
+const executePayment = await this.bkash.executePayment(paymentId);
+      this.logger.log('Execute response:', executePayment);
+           const BKASH_COMPLETE = this.configService.get('BKASH_COMPLETE');
+           if (executePayment.transactionStatus === BKASH_COMPLETE) {
+                  const parts = executePayment.payerReference.split('-');
+            const findOne = await this.userModel.findByIdAndUpdate(parts[0],{$inc:{numberOfConnections:Number(parts[1])}}).lean();
+            if(!findOne) {
+              return {
+                failure: true,
+                success: false
+              };
+            }
+            this.logger.debug("success-----of---this----era")
+            return {
+              success: true,
+              failure: false
+            }
+
+           }
+           this.logger.debug("fail-----of---this----era")
+           return {
+            failure: true,
+            success: false}
+  }catch(error){
+      this.logger.debug("fail-----of---this----era",error)
+    return {
+      failure: true,
+      success: false}
+  }
+  
+  
+
+
+}
+
+async createRequestNumber(payload:RequestNumberDto){
+  const finUser = await this.userModel.findById(payload.userId).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
+  if(!finUser){
+    throw new HttpException('User not found', 400);
+  }
+  if(finUser?.numberOfConnections <=0){
+    throw new HttpException('Not enough connections', 400);
+  }
+  const isAlreadyInRequest = await this.requestNumberModel.findOne({userId:payload.userId,requestUserId:payload.requestUserId}).lean();
+  if(isAlreadyInRequest){
+    throw new HttpException('Phone Number already requested', 400);
+  }
+  const requestUser = await this.userModel.findById(payload.requestUserId).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
+  if(!requestUser?.phoneNumber){
+    throw new HttpException('User not found', 400);
+  }
+  const [updatedUser,createdUser] = await Promise.all([
+    await this.userModel.findByIdAndUpdate(payload.userId,{$inc:{numberOfConnections:-1}},{new:true}).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean(),
+    await this.requestNumberModel.create({userId:payload.userId,requestUserId:payload.requestUserId})
+  ])
+return {
+  userData:updatedUser,
+  message:"Request number created successfully"
+}
+
+}
+
+async getMyRequests (userId:string, query:PaginationDto){
+
+  const {page = 1, limit = 10} = query
+  const skip = (page - 1) * limit;
+  const findShortlist = await this.requestNumberModel.find({userId}).populate({
+    path:'requestUserId',
+    select:"email phoneNumber name   isOtpVerified userId "
+  }).skip(skip).limit(limit).lean();
+  const totalItems = await this.requestNumberModel.countDocuments({userId});
+  const totalPages = Math.ceil(totalItems / limit);
+  return {
+    data:findShortlist,
+    page,
+    limit,
+    totalItems,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  }
+
 }
 
 }

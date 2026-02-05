@@ -9,13 +9,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProfileStore } from "@/zustan/useProfileStore";
-import { marriedStatus } from "@/staticData/all-data";
+import { countries, marriedStatus } from "@/staticData/all-data";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 export function BasicInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateField = useProfileStore((state) => state.updateField);
   const filterOutstatus = marriedStatus.filter((item) => item.id !== 1);
-
+  const [countryOpen, setCountryOpen] = useState(false);
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-4">
@@ -118,13 +134,65 @@ export function BasicInfoStep() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="nationality">জাতীয়তা</Label>
-          <Input
+          <Label htmlFor="nationality">জাতীয়তা/দেশ</Label>
+          {/* <Input
             id="nationality"
             value={formData.nationality || ""}
             onChange={(e) => updateField("nationality", e.target.value)}
             placeholder="বাংলাদেশী"
-          />
+          /> */}
+          <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={countryOpen}
+                className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
+              >
+                <span className="truncate">
+                  {countries.find((c) => c.en === formData.nationality)?.bn ||
+                    "দেশ নির্বাচন করুন"}
+                </span>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[200px] p-0 sm:w-[260px]"
+              align="start"
+            >
+              <Command>
+                <CommandInput placeholder="দেশ খুঁজুন..." className="h-10" />
+                <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
+                <CommandGroup className="max-h-48 overflow-y-auto">
+                  {countries.map((country) => (
+                    <CommandItem
+                      key={country.id}
+                      value={country.bn}
+                      onSelect={(value) => {
+                        updateField(
+                          "nationality",
+                          countries.find((c) => c.bn === value)!.en,
+                        );
+
+                        setCountryOpen(false);
+                      }}
+                      className="py-2.5 sm:py-3"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4 text-pink-600",
+                          formData.nationality === country.en
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {country.bn}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>

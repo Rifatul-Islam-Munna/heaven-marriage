@@ -134,6 +134,7 @@ export interface User {
   pledge?: Pledge;
   createdAt?: Date;
   updatedAt?: Date;
+  numberOfConnections?:number
 }
 export interface UserInfo {
   _id:string
@@ -144,6 +145,7 @@ export interface UserInfo {
   phoneNumber: string;        // "+8801712345678"
   password: string;           // "securePassword123"
   isOtpVerified: boolean; 
+  numberOfConnections?:number
    // true
 }
 

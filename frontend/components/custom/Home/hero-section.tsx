@@ -136,7 +136,7 @@ export default function HeroSection() {
             style={{ animationDelay: "0.2s", animationFillMode: "both" }}
           >
             <h1 className="font-heading text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
-              Heaven Marriage
+              niqaha
             </h1>
             <h2 className="font-heading text-5xl font-bold leading-tight tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
               <span className="bg-gradient-to-r from-pink-400 via-pink-500 to-pink-600 bg-clip-text text-transparent">

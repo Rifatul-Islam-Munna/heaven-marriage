@@ -11,6 +11,7 @@ import {
   Heart,
   MapPin,
   Home,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ import {
 } from "@/components/ui/popover";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
+import { marriedStatus } from "@/staticData/all-data";
+import { countries } from "@/staticData/all-data";
 
 // Data
 const genderOptions = [
@@ -37,39 +40,32 @@ const genderOptions = [
   { value: "male", label: "ছেলে", icon: User },
 ];
 
-const maritalStatusOptions = [
-  { value: "all", label: "সকল", icon: Heart },
-  { value: "unmarried", label: "অবিবাহিত", icon: Heart },
-  { value: "divorced", label: "ডিভোর্সড", icon: Heart },
-  { value: "widowed", label: "বিধবা/বিপত্নীক", icon: Heart },
-];
-
 export default function BiodataFilter() {
   const router = useRouter();
 
   const [gender, setGender] = useState("all");
   const [maritalStatus, setMaritalStatus] = useState("all");
-  const [districtName, setDistrictName] = useState(""); // Store district name
-  const [upazilaName, setUpazilaName] = useState(""); // Store upazila name
+  const [districtName, setDistrictName] = useState("");
+  const [upazilaName, setUpazilaName] = useState("");
+  const [countryName, setCountryName] = useState("");
   const [query, setQuery] = useState("");
 
   const [genderOpen, setGenderOpen] = useState(false);
   const [maritalOpen, setMaritalOpen] = useState(false);
   const [districtOpen, setDistrictOpen] = useState(false);
   const [upazilaOpen, setUpazilaOpen] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
 
   const handleSearch = () => {
-    // Build URL search params
     const params = new URLSearchParams();
 
-    // Add filters only if they're not default values
     if (gender !== "all") params.set("gender", gender);
     if (maritalStatus !== "all") params.set("maritalStatus", maritalStatus);
-    if (districtName) params.set("district", districtName); // Use 'district' not 'districtId'
-    if (upazilaName) params.set("upazila", upazilaName); // Use 'upazila' not 'upazilaId'
+    if (districtName) params.set("districtId", districtName);
+    if (upazilaName) params.set("upazilaId", upazilaName);
+    if (countryName) params.set("country", countryName);
     if (query.trim()) params.set("query", query.trim());
 
-    // Navigate to biodata page with filters
     const searchString = params.toString();
     router.push(`/biodata${searchString ? `?${searchString}` : ""}`);
   };
@@ -79,10 +75,10 @@ export default function BiodataFilter() {
     setMaritalStatus("all");
     setDistrictName("");
     setUpazilaName("");
+    setCountryName("");
     setQuery("");
   };
 
-  // Filter upazilas based on selected district's ID
   const selectedDistrictData = districts.find((d) => d.name === districtName);
   const availableUpazilas = selectedDistrictData
     ? upazilas.filter(
@@ -95,13 +91,12 @@ export default function BiodataFilter() {
     maritalStatus !== "all" ||
     districtName ||
     upazilaName ||
+    countryName ||
     query.trim();
 
-  // Get selected district object
   const selectedDistrict = districts.find((d) => d.name === districtName);
-
-  // Get selected upazila object
   const selectedUpazila = upazilas.find((u) => u.name === upazilaName);
+  const selectedCountry = countries.find((c) => c.en === countryName);
 
   return (
     <section className="w-full bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white py-8 md:py-12 lg:py-16">
@@ -142,7 +137,7 @@ export default function BiodataFilter() {
             </div>
 
             {/* Filter Grid */}
-            <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-5">
               {/* Gender Filter */}
               <div className="group">
                 <label className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -218,9 +213,8 @@ export default function BiodataFilter() {
                       className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
                     >
                       <span className="flex items-center gap-2 truncate">
-                        {maritalStatusOptions.find(
-                          (o) => o.value === maritalStatus,
-                        )?.label || "নির্বাচন করুন"}
+                        {marriedStatus.find((o) => o.en === maritalStatus)
+                          ?.bn || "নির্বাচন করুন"}
                       </span>
                       <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -233,10 +227,10 @@ export default function BiodataFilter() {
                       <CommandInput placeholder="খুঁজুন..." className="h-10" />
                       <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup>
-                        {maritalStatusOptions.map((option) => (
+                        {marriedStatus.map((option) => (
                           <CommandItem
-                            key={option.value}
-                            value={option.value}
+                            key={option.en}
+                            value={option.en}
                             onSelect={(value) => {
                               setMaritalStatus(value);
                               setMaritalOpen(false);
@@ -246,12 +240,74 @@ export default function BiodataFilter() {
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4 text-pink-600",
-                                maritalStatus === option.value
+                                maritalStatus === option.en
                                   ? "opacity-100"
                                   : "opacity-0",
                               )}
                             />
-                            {option.label}
+                            {option.bn}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Country Filter */}
+              <div className="group">
+                <label className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600 transition-colors group-hover:bg-pink-200">
+                    <Globe className="h-4 w-4" />
+                  </div>
+                  <span>দেশ</span>
+                </label>
+                <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={countryOpen}
+                      className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
+                    >
+                      <span className="truncate">
+                        {selectedCountry?.bn || "দেশ নির্বাচন করুন"}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[200px] p-0 sm:w-[260px]"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput
+                        placeholder="দেশ খুঁজুন..."
+                        className="h-10"
+                      />
+                      <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
+                      <CommandGroup className="max-h-48 overflow-y-auto">
+                        {countries.map((country) => (
+                          <CommandItem
+                            key={country.id}
+                            value={country.bn}
+                            onSelect={() => {
+                              setCountryName(
+                                countryName === country.en ? "" : country.en,
+                              );
+                              setCountryOpen(false);
+                            }}
+                            className="py-2.5 sm:py-3"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-pink-600",
+                                countryName === country.en
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {country.bn}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -301,7 +357,7 @@ export default function BiodataFilter() {
                               setDistrictName(
                                 districtName === d.name ? "" : d.name,
                               );
-                              setUpazilaName(""); // Reset upazila when district changes
+                              setUpazilaName("");
                               setDistrictOpen(false);
                             }}
                             className="py-2.5 sm:py-3"
@@ -433,16 +489,21 @@ export default function BiodataFilter() {
                     />
                   </span>
                 )}
-                {maritalStatus !== "all" && (
+                {maritalStatus.trim() !== "all" && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
-                    {
-                      maritalStatusOptions.find(
-                        (o) => o.value === maritalStatus,
-                      )?.label
-                    }
+                    {marriedStatus.find((o) => o.en === maritalStatus)?.bn}
                     <X
                       className="h-3 w-3 cursor-pointer hover:text-pink-900"
                       onClick={() => setMaritalStatus("all")}
+                    />
+                  </span>
+                )}
+                {countryName && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
+                    {selectedCountry?.bn}
+                    <X
+                      className="h-3 w-3 cursor-pointer hover:text-pink-900"
+                      onClick={() => setCountryName("")}
                     />
                   </span>
                 )}

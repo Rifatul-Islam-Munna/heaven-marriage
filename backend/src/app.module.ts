@@ -11,11 +11,20 @@ import { GuidelinesModule } from './guidelines/guidelines.module';
 import { ContactModule } from './contact/contact.module';
 import { ImageModule } from './image/image.module';
 import { WebDataModule } from './web-data/web-data.module';
+import { PricingModule } from './pricing/pricing.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
+import { ThrottlerModule } from '@nestjs/throttler';
 @Module({
   imports: [
-
+   ThrottlerModule.forRoot({
+     throttlers: [
+       {
+        ttl: 60,
+        limit: 120
+       }
+     ]
+   }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -50,6 +59,7 @@ import virtuals from "mongoose-lean-virtuals"
     ContactModule,
     ImageModule,
     WebDataModule,
+    PricingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

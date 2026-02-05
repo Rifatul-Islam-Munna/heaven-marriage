@@ -56,7 +56,7 @@ export default function RegistrationSection() {
             className="group h-12 bg-pink-600 px-8 font-heading text-base font-semibold  shadow-pink-600/30 transition-all hover:scale-105 hover:bg-pink-700"
             asChild
           >
-            <Link href="/register" className="inline-flex items-center gap-2">
+            <Link href="/contact" className="inline-flex items-center gap-2">
               রেজিস্ট্রেশন
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Link>

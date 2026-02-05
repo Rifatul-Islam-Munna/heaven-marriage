@@ -45,7 +45,7 @@ export default function Footer() {
               <Heart className="h-8 w-8 fill-pink-600 text-pink-600" />
               <div>
                 <h3 className="font-heading text-2xl font-bold text-foreground">
-                  Heaven Marriage
+                  niqaha
                 </h3>
                 <p className="text-sm text-pink-700">হেভেন ম্যারেজ</p>
               </div>
@@ -130,8 +130,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="mt-8 border-t border-pink-200 pt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            কপিরাইট © {new Date().getFullYear()} Heaven Marriage - সমস্ত অধিকার
-            সংরক্ষিত
+            কপিরাইট © {new Date().getFullYear()} niqaha - সমস্ত অধিকার সংরক্ষিত
           </p>
         </div>
       </div>

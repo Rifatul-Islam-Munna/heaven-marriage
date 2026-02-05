@@ -17,6 +17,11 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     @ApiProperty({example:"mongo id"})
    
     createdAt:string;
+    @ApiProperty({example:"5"})
+    @Transform(({ value }) => parseInt(value, 10))
+    @IsInt() 
+   
+    numberOfConnections:number;
 }
 
 
@@ -242,6 +247,14 @@ export class UserFilterDto {
   @IsOptional()
   @IsString()
   districtId?: string;
+  // Location filters
+  @ApiPropertyOptional({
+    description: 'District ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsOptional()
+  @IsString()
+  country?: string;
 
   @ApiPropertyOptional({
     description: 'Upazila ID',

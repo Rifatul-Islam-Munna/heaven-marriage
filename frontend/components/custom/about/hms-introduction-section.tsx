@@ -46,7 +46,7 @@ export default function HMSIntroductionSectionV2() {
                         ইসলামী শরিয়াহ-সম্মত দায়িত্বশীল প্ল্যাটফর্ম
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Heaven Marriage Solutions
+                        niqaha Solutions
                       </p>
                     </div>
                   </div>

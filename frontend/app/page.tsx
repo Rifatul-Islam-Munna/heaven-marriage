@@ -7,6 +7,7 @@ import HMSBenefitsSection from "@/components/custom/Home/hms-benefits-section";
 import IslamicMarriageSection from "@/components/custom/Home/islamic-marriage-section";
 import MarriageBenefitsSection from "@/components/custom/Home/marriage-benefits-section";
 import OfficeHoursSection from "@/components/custom/Home/office-hours-section";
+import PricingSection from "@/components/custom/Home/PricingSection";
 import RegistrationSection from "@/components/custom/Home/registration-section";
 
 export default function Page() {
@@ -14,6 +15,7 @@ export default function Page() {
     <main className=" w-full min-h-dvh">
       <HeroSection />
       <BiodataFilter />
+      <PricingSection />
       <AboutSection />
       <IslamicMarriageSection />
       <EarlyMarriageSection />
