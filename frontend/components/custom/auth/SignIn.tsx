@@ -17,6 +17,7 @@ import { loginUser } from "@/actions/auth";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
+import LoginWithGoogle from "./GoogleLogin";
 
 export default function SignIn() {
   const { refetch } = useUser();
@@ -126,6 +127,9 @@ export default function SignIn() {
                   )}
                 </Button>
               </div>
+            </div>
+            <div className=" w-full mx-auto">
+              <LoginWithGoogle />
             </div>
 
             <Button

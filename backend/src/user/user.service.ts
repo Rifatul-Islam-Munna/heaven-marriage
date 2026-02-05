@@ -16,6 +16,7 @@ import { PricingService } from 'src/pricing/pricing.service';
 import { RequestNumberDto } from './dto/request-number.dto';
 import { RequestNumber, RequestNumberDocument } from './entities/RequestNumber.schema';
 import { TelegramChannel, TelegramService } from './telegram.service';
+import {OAuth2Client } from "google-auth-library"
 @Injectable()
 export class UserService  {
   private logger = new Logger(UserService.name)
@@ -23,9 +24,12 @@ export class UserService  {
   
   async create(createUserDto: CreateUserDto) {
     
- 
+    if(!createUserDto.phoneNumber || !createUserDto.password){
+      throw new HttpException('All fields are required', 400);
+    }
 
   const findIsUserThere = await this.userModel.exists({phoneNumber:createUserDto.phoneNumber}).exec();
+
   if(findIsUserThere){
     throw new HttpException('User already exists', 400);
   }
@@ -89,6 +93,35 @@ export class UserService  {
      
       user:findOneUser
     }
+  }
+
+  async loginWithGoogle(tokenId:string){
+     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+       const ticket = await client.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID
+    })
+   const googlePayload = ticket.getPayload();
+   this.logger.debug('googlePayload',googlePayload)
+   const {email,name,picture,} = googlePayload as {email:string,name:string,picture:string}
+
+   let finUserByEmail = await this.userModel.findOne({email:email});
+   if(!finUserByEmail){
+     finUserByEmail = await this.userModel.create({
+      email:email,
+      name:name,
+      isOtpVerified:true,
+
+     })
+   }
+     const access_token = this.jwtService.sign({email:finUserByEmail.email,id:finUserByEmail._id,role:finUserByEmail.role,mobileNumber:finUserByEmail.phoneNumber},{expiresIn:"10d",secret:process.env.ACCESS_TOKEN});
+     return{
+       message:'User logged in successfully',
+      access_token,
+     
+      user:finUserByEmail
+     }
+
   }
 
  async findAll(userQuery: UserFilterDto) {

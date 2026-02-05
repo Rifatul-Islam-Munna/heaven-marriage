@@ -51,3 +51,24 @@ export const setUserData = async (data:Record<string,any>) =>{
 
         cookie.set("user", JSON.stringify(data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
 }
+
+export const loginWithGoogle = async (idToken:string)=>{
+
+    const [data, error] = await PostRequestAxios<userData>("/user/login-user-with-google",{id:idToken});
+    if(data){
+    const cookie = await cookies();
+   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+   const userSaveData = {
+    _id:data?.user?._id,
+    name:data?.user?.name,
+    email:data?.user?.email,
+    phoneNumber:data?.user?.phoneNumber,
+    isOtpVerified:data?.user?.isOtpVerified,
+    numberOfConnections:data?.user?.numberOfConnections,
+    role:data?.user?.role
+   }
+   cookie.set("user", JSON.stringify(userSaveData) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+    }
+   
+   return {data,error};
+}

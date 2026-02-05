@@ -274,6 +274,12 @@ export class FindOneDto {
   @IsMongoId()
   id: string;
 }
+export class FindOneTokenDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+ 
+  id: string;
+}
 
 export class ResetPasswordDto{
     @ApiProperty({ example: '507f1f77bcf86cd799439011' })

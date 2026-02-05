@@ -21,10 +21,10 @@ export class User {
 
     @Prop()
     email:string
-    @Prop({required:true,unique:true})
+    @Prop({unique:true})
     phoneNumber:string;
 
-    @Prop({required:true})
+    @Prop()
     password:string;
 
     @Prop()
