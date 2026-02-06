@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 
 interface BiodataCardProps {
   id: string;
@@ -84,16 +85,33 @@ export default function BiodataCard({
         <div className="mb-3 flex items-start justify-between">
           {/* Avatar & ID */}
           <div className="flex items-center gap-2.5">
-            <div
-              className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-full",
-                gender === "female"
-                  ? "bg-pink-100 text-pink-600"
-                  : "bg-purple-100 text-purple-600",
-              )}
-            >
-              <User2 className="h-6 w-6" />
-            </div>
+            {gender ? (
+              <Image
+                src={
+                  gender === "male"
+                    ? "/male.png"
+                    : gender === "female"
+                      ? "/female.png"
+                      : ""
+                }
+                width={200}
+                height={200}
+                className="w-12 h-12 object-contain"
+                alt="gender-image"
+              />
+            ) : (
+              <div
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-full",
+                  gender === "female"
+                    ? "bg-pink-100 text-pink-600"
+                    : "bg-purple-100 text-purple-600",
+                )}
+              >
+                <User2 className="h-6 w-6" />
+              </div>
+            )}
+
             <div>
               <div className="flex items-center gap-1.5">
                 <h3 className="font-heading text-base font-bold text-gray-900">

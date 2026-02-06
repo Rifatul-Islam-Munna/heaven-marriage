@@ -41,6 +41,19 @@ import { useUser } from "@/lib/useUser";
 import { useMutation } from "@tanstack/react-query";
 import { requestNumber } from "@/actions/auth";
 import { toast } from "sonner";
+import Image from "next/image";
+import { ShareButton } from "./ShareButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ProfileViewProps {
   id: string;
@@ -169,16 +182,31 @@ export default function ProfileView({ id }: ProfileViewProps) {
         {/* Header Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 md:p-8 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <Badge className="mb-3 bg-pink-100 text-pink-700 hover:bg-pink-200 border-0">
+            <div className=" flex justify-center items-center gap-1">
+              <Image
+                src={
+                  userData?.gender === "male"
+                    ? "/male.png"
+                    : userData?.gender === "female"
+                      ? "/female.png"
+                      : ""
+                }
+                width={200}
+                height={200}
+                className="w-12 h-12 object-contain"
+                alt="gender-image"
+              />
+              {/* <Badge className="mb-3 bg-pink-100 text-pink-700 hover:bg-pink-200 border-0">
                 {userData?.gender === "male" ? "Brother" : "Sister"}
-              </Badge>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-                প্রোফাইল বিস্তারিত
-              </h1>
-              <p className="text-gray-600 text-sm">
-                আল্লাহ আপনাকে সঠিক পথে পরিচালিত করুন।
-              </p>
+              </Badge> */}
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+                  প্রোফাইল বিস্তারিত
+                </h1>
+                <p className="text-gray-600 text-sm">
+                  আল্লাহ আপনাকে সঠিক পথে পরিচালিত করুন।
+                </p>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
               <Button
@@ -190,19 +218,51 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 ) : (
                   <Heart className="w-4 h-4 mr-2" />
                 )}
-                Shortlist
+                শর্টলিস্ট
               </Button>
-              <Button
-                disabled={isLoadingNumber}
-                onClick={handelRequestForNumber}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isLoadingNumber ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : null}{" "}
-                <Phone className="w-4 h-4 mr-2" />
-                Ask for Number
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    disabled={isLoadingNumber}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isLoadingNumber ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    <Phone className="w-4 h-4 mr-2" />
+                    মোবাইল নাম্বার
+                  </Button>
+                </AlertDialogTrigger>
+
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>কানেকশন ব্যবহার করুন</AlertDialogTitle>
+                    <AlertDialogDescription className="text-base space-y-2">
+                      <p>
+                        এই বায়োডাটার নম্বর দেখতে আপনার{" "}
+                        <span className="font-bold text-green-600">
+                          ১টি কানেকশন
+                        </span>{" "}
+                        খরচ হবে।
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        আপনি কি এগিয়ে যেতে চান?
+                      </p>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>না, বাতিল করুন</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handelRequestForNumber}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      হ্যাঁ, নিশ্চিত করুন
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <ShareButton />
             </div>
           </div>
         </div>
@@ -220,14 +280,18 @@ export default function ProfileView({ id }: ProfileViewProps) {
           <QuickInfoCard
             icon={Calendar}
             label="বয়স"
-            value={userData?.age ? `${userData.age} years` : undefined}
+            value={
+              userData?.age
+                ? `${userData?.age?.toLocaleString("bn-BD")} `
+                : undefined
+            }
           />
           <QuickInfoCard
             icon={Ruler}
             label="উচ্চতা"
             value={
               userData?.personalInformation?.height
-                ? `${userData.personalInformation.height} ft`
+                ? `${userData.personalInformation.height?.toLocaleString("bn-BD")} ft`
                 : undefined
             }
           />
@@ -239,7 +303,11 @@ export default function ProfileView({ id }: ProfileViewProps) {
           <QuickInfoCard
             icon={Weight}
             label="ওজন"
-            value={userData?.weight ? `${userData.weight} kg` : undefined}
+            value={
+              userData?.weight
+                ? `${userData.weight?.toLocaleString("bn-BD")} kg`
+                : undefined
+            }
           />
           <QuickInfoCard
             icon={Flag}

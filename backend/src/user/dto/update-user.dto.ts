@@ -20,6 +20,7 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     @ApiProperty({example:"5"})
     @Transform(({ value }) => parseInt(value, 10))
     @IsInt() 
+    @IsOptional()
    
     numberOfConnections:number;
 }

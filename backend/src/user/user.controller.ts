@@ -60,7 +60,7 @@ export class UserController {
     return this.userService.findAll(query);
   }
   @Get("get-shortlist-user")
-    @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard)
   async getMyShortList(@Req() req:ExpressRequest,@Query() query: PaginationDto) {
     return this.userService.getShortlist(req?.user?.id,query);
   }

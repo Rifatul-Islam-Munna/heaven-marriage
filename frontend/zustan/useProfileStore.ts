@@ -8,7 +8,8 @@ interface ProfileStore {
   
   // Current step
   currentStep: number;
-  
+    shouldShowEmail: boolean;
+  shouldShowPhoneNumber: boolean;
   // Actions
   setCurrentStep: (step: number) => void;
   updateField: (field: keyof User, value: any) => void;
@@ -132,6 +133,8 @@ const getInitialFormData = (): Partial<User> => ({
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   formData: getInitialFormData(),
   currentStep: 0,
+  shouldShowEmail: false,
+  shouldShowPhoneNumber: false,
 
   setCurrentStep: (step) => set({ currentStep: step }),
 
@@ -161,6 +164,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         ...getInitialFormData(),
         ...data
       },
+      shouldShowEmail: !data.email,           
+      shouldShowPhoneNumber: !data.phoneNumber,
       currentStep: 0
     }),
 

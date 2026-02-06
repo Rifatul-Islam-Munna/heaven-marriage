@@ -47,7 +47,7 @@ export default function Footer() {
                 <h3 className="font-heading text-2xl font-bold text-foreground">
                   niqaha
                 </h3>
-                <p className="text-sm text-pink-700">হেভেন ম্যারেজ</p>
+                <p className="text-sm hidden text-pink-700">হেভেন ম্যারেজ</p>
               </div>
             </Link>
 

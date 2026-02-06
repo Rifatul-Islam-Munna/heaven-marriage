@@ -31,6 +31,12 @@ export function BasicInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateField = useProfileStore((state) => state.updateField);
   const filterOutstatus = marriedStatus.filter((item) => item.id !== 1);
+  const shouldShowEmail = useProfileStore((state) => state.shouldShowEmail); // ✅
+  const shouldShowPhoneNumber = useProfileStore(
+    (state) => state.shouldShowPhoneNumber,
+  );
+
+  console.log("shouldShowEmail", shouldShowEmail);
   const [countryOpen, setCountryOpen] = useState(false);
   return (
     <div className="space-y-6">
@@ -44,15 +50,28 @@ export function BasicInfoStep() {
             placeholder="আপনার পূর্ণ নাম"
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="name">ইমেইল </Label>
-          <Input
-            id="name"
-            value={formData.email || ""}
-            onChange={(e) => updateField("email", e.target.value)}
-            placeholder="আপনার পূর্ণ ইমেইল"
-          />
-        </div>
+        {shouldShowEmail && (
+          <div className="space-y-2">
+            <Label htmlFor="name">ইমেইল </Label>
+            <Input
+              id="name"
+              value={formData.email || ""}
+              onChange={(e) => updateField("email", e.target.value)}
+              placeholder="আপনার পূর্ণ ইমেইল"
+            />
+          </div>
+        )}
+        {shouldShowPhoneNumber && (
+          <div className="space-y-2">
+            <Label htmlFor="name">মোবাইল নম্বর </Label>
+            <Input
+              id="name"
+              value={formData.phoneNumber || ""}
+              onChange={(e) => updateField("phoneNumber", e.target.value)}
+              placeholder="আপনার পূর্ণ মোবাইল নম্বর"
+            />
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="gender">লিঙ্গ *</Label>

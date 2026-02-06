@@ -38,7 +38,7 @@ const User = () => {
   };
 
   const handleVisitProfile = () => {
-    console.log("Visit profile");
+    router.push(`/biodata/${user?._id}`);
   };
 
   return (

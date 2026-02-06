@@ -21,7 +21,7 @@ export default function Page() {
       <EarlyMarriageSection />
       <MarriageBenefitsSection />
       <HMSBenefitsSection />
-      <RegistrationSection />
+      {/*     <RegistrationSection /> */}
       {/*  <OfficeHoursSection /> */}
     </main>
   );

@@ -54,7 +54,7 @@ export class UserService  {
   }
 
   async updatedFullUserInformation (updated:UpdateUserDto,userId:string){
-    const {password,phoneNumber,isOtpVerified,isSubscriber, role, otpNumber, numberOfConnections, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
+    const {password,isOtpVerified,isSubscriber, role, otpNumber, numberOfConnections, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
     const idAndUpdate =  await this.userModel.findOneAndUpdate({_id:userId},{$set:payload},{new:true}).lean();
     if(!idAndUpdate){
       throw new HttpException('User not updated', 400);
@@ -86,7 +86,9 @@ export class UserService  {
        if(!isMatch){
       throw new HttpException('Invalid credentials', 400);
     }
-    const access_token = this.jwtService.sign({email:findOneUser.email,id:findOneUser._id,role:findOneUser.role,mobileNumber:findOneUser.phoneNumber},{expiresIn:"10d",secret:process.env.ACCESS_TOKEN});
+      const secret = this.configService.get<string>('ACCESS_TOKEN');
+  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
+    const access_token = await this.jwtService.sign({email:findOneUser.email ?? "",id:findOneUser._id,role:findOneUser.role,mobileNumber:findOneUser.phoneNumber},{expiresIn:"10d",secret:secret});
      return{
       message:'User logged in successfully',
       access_token,
@@ -114,10 +116,12 @@ export class UserService  {
 
      })
    }
-     const access_token = this.jwtService.sign({email:finUserByEmail.email,id:finUserByEmail._id,role:finUserByEmail.role,mobileNumber:finUserByEmail.phoneNumber},{expiresIn:"10d",secret:process.env.ACCESS_TOKEN});
+       const secret = this.configService.get<string>('ACCESS_TOKEN');
+  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
+     const access_token = await this.jwtService.sign({email:finUserByEmail.email ?? "",id:finUserByEmail._id ?? "",role:finUserByEmail?.role ?? "",mobileNumber:finUserByEmail?.phoneNumber ?? ""},{expiresIn:"10d",secret:secret});
      return{
        message:'User logged in successfully',
-      access_token,
+      access_token:access_token,
      
       user:finUserByEmail
      }
