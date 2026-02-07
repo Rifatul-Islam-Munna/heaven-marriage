@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 const navItems = [
   { label: "হোম", href: "/" },
@@ -32,7 +33,8 @@ export default function Footer() {
       className={cn(
         `w-full border-t bg-gradient-to-br from-pink-50 to-purple-50`,
         {
-          hidden: pathName.includes("/profile"),
+          hidden:
+            pathName.includes("/profile") || pathName.includes("/dashboard"),
         },
       )}
     >
@@ -42,13 +44,13 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
-              <Heart className="h-8 w-8 fill-pink-600 text-pink-600" />
-              <div>
-                <h3 className="font-heading text-2xl font-bold text-foreground">
-                  niqaha
-                </h3>
-                <p className="text-sm hidden text-pink-700">হেভেন ম্যারেজ</p>
-              </div>
+              <Image
+                src={"/footer_image.png"}
+                width={120}
+                height={120}
+                alt="footer_logo"
+                className=" w-20 h-20 md:w-24 md:h-24 object-contain"
+              />
             </Link>
 
             <p className="mb-4 max-w-md text-sm leading-relaxed text-muted-foreground">

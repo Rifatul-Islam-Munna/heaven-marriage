@@ -40,6 +40,10 @@ import {
   Mail,
   Phone,
   User as UserIcon,
+  Check,
+  X,
+  Edit,
+  Users,
 } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -57,6 +61,7 @@ interface User {
   maritalStatus: string;
   isSubscriber: boolean;
   isOtpVerified: boolean;
+  numberOfConnections: number;
 }
 
 interface PaginatedUsersResponse {
@@ -76,6 +81,10 @@ export default function AdminUsersTable() {
   const [gender, setGender] = useState("all");
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [text] = useDebounce(searchQuery, 1000);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
+    null,
+  );
+  const [connectionValue, setConnectionValue] = useState<string>("");
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
@@ -84,7 +93,6 @@ export default function AdminUsersTable() {
   );
 
   // Delete user mutation
-
   const deleteMutation = useCommonMutationApi({
     method: "DELETE",
     url: `/user/delete-user-admin`,
@@ -92,14 +100,26 @@ export default function AdminUsersTable() {
     onSuccess: () =>
       queryClient.refetchQueries({ queryKey: ["admin-users"], exact: false }),
   });
-  // Toggle subscriber mutation
 
+  // Toggle subscriber mutation
   const toggleSubscriberMutation = useCommonMutationApi({
     method: "PATCH",
     url: `/user/update-user-subscriber`,
     successMessage: "সাবস্ক্রাইবার স্ট্যাটাস আপডেট করা হয়েছে",
     onSuccess: () =>
       queryClient.refetchQueries({ queryKey: ["admin-users"], exact: false }),
+  });
+
+  // Update connections mutation
+  const updateConnectionsMutation = useCommonMutationApi({
+    method: "PATCH",
+    url: `/user/update-user-admin`,
+    successMessage: "সংযোগ সংখ্যা আপডেট করা হয়েছে",
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ["admin-users"], exact: false });
+      setEditingConnectionId(null);
+      setConnectionValue("");
+    },
   });
 
   const handleSearch = (value: string) => {
@@ -110,6 +130,28 @@ export default function AdminUsersTable() {
   const handleGenderFilter = (value: string) => {
     setGender(value);
     setPage(1);
+  };
+
+  const startEditingConnections = (userId: string, currentValue: number) => {
+    setEditingConnectionId(userId);
+    setConnectionValue(currentValue.toString());
+  };
+
+  const cancelEditingConnections = () => {
+    setEditingConnectionId(null);
+    setConnectionValue("");
+  };
+
+  const saveConnections = (userId: string) => {
+    const numValue = parseInt(connectionValue);
+    if (isNaN(numValue) || numValue < 0) {
+      toast.error("অনুগ্রহ করে সঠিক সংখ্যা লিখুন");
+      return;
+    }
+    updateConnectionsMutation.mutate({
+      id: userId,
+      numberOfConnections: numValue,
+    });
   };
 
   // Loading skeleton
@@ -189,6 +231,9 @@ export default function AdminUsersTable() {
                 বৈবাহিক অবস্থা
               </TableHead>
               <TableHead className="font-heading font-semibold text-center">
+                সংযোগ
+              </TableHead>
+              <TableHead className="font-heading font-semibold text-center">
                 OTP যাচাই
               </TableHead>
               <TableHead className="font-heading font-semibold text-center">
@@ -202,7 +247,7 @@ export default function AdminUsersTable() {
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <p className="text-muted-foreground font-heading">
                     কোন ব্যবহারকারী পাওয়া যায়নি
                   </p>
@@ -216,6 +261,56 @@ export default function AdminUsersTable() {
                   <TableCell>{user.phoneNumber}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{user.maritalStatus}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {editingConnectionId === user._id ? (
+                      <div className="flex items-center justify-center gap-1">
+                        <Input
+                          type="number"
+                          value={connectionValue}
+                          onChange={(e) => setConnectionValue(e.target.value)}
+                          className="w-16 h-8 text-center"
+                          min="0"
+                          autoFocus
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-green-600 hover:text-green-700"
+                          onClick={() => saveConnections(user._id)}
+                          disabled={updateConnectionsMutation.isPending}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-red-600 hover:text-red-700"
+                          onClick={cancelEditingConnections}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge variant="secondary" className="font-semibold">
+                          {user.numberOfConnections}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() =>
+                            startEditingConnections(
+                              user._id,
+                              user.numberOfConnections,
+                            )
+                          }
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     {user.isOtpVerified ? (
@@ -304,6 +399,64 @@ export default function AdminUsersTable() {
                     <Phone className="h-4 w-4 flex-shrink-0" />
                     <span>{user.phoneNumber}</span>
                   </div>
+                </div>
+
+                {/* Connections */}
+                <div className="flex items-center justify-between p-2 bg-pink-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-pink-600" />
+                    <span className="text-sm font-heading font-semibold">
+                      সংযোগ:
+                    </span>
+                  </div>
+                  {editingConnectionId === user._id ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={connectionValue}
+                        onChange={(e) => setConnectionValue(e.target.value)}
+                        className="w-16 h-8 text-center"
+                        min="0"
+                        autoFocus
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-green-600"
+                        onClick={() => saveConnections(user._id)}
+                        disabled={updateConnectionsMutation.isPending}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-red-600"
+                        onClick={cancelEditingConnections}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="font-semibold">
+                        {user.numberOfConnections}
+                      </Badge>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() =>
+                          startEditingConnections(
+                            user._id,
+                            user.numberOfConnections,
+                          )
+                        }
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}

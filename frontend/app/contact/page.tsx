@@ -1,14 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Phone, User, MessageSquare, Send, MapPin } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  User,
+  MessageSquare,
+  Send,
+  MapPin,
+  Shield,
+} from "lucide-react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { toast } from "sonner";
+import {
+  loadCaptchaEnginge,
+  LoadCanvasTemplate,
+  validateCaptcha,
+} from "react-simple-captcha";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -17,6 +30,12 @@ export default function ContactPage() {
     mobile: "",
     description: "",
   });
+  const [captchaInput, setCaptchaInput] = useState("");
+
+  // Load captcha on component mount
+  useEffect(() => {
+    loadCaptchaEnginge(6);
+  }, []);
 
   // Submit contact mutation
   const contactMutation = useCommonMutationApi({
@@ -25,6 +44,8 @@ export default function ContactPage() {
     successMessage: "আপনার বার্তা সফলভাবে পাঠানো হয়েছে",
     onSuccess: () => {
       setFormData({ name: "", email: "", mobile: "", description: "" });
+      setCaptchaInput("");
+      loadCaptchaEnginge(6); // Reload captcha
     },
   });
 
@@ -56,6 +77,20 @@ export default function ContactPage() {
       return;
     }
 
+    // CAPTCHA validation
+    if (!captchaInput.trim()) {
+      toast.error("অনুগ্রহ করে CAPTCHA লিখুন");
+      return;
+    }
+
+    if (validateCaptcha(captchaInput) !== true) {
+      toast.error("CAPTCHA সঠিক নয়। আবার চেষ্টা করুন");
+      setCaptchaInput("");
+      loadCaptchaEnginge(6); // Reload captcha
+      return;
+    }
+
+    // Submit form
     contactMutation.mutate(formData);
   };
 
@@ -268,6 +303,31 @@ export default function ContactPage() {
                     </p>
                   </div>
 
+                  {/* CAPTCHA */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-pink-600" />
+                      যাচাইকরণ <span className="text-red-500">*</span>
+                    </Label>
+
+                    {/* CAPTCHA Canvas */}
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border-2 border-gray-200">
+                      <div className="captcha-canvas">
+                        <LoadCanvasTemplate />
+                      </div>
+                    </div>
+
+                    {/* CAPTCHA Input */}
+                    <Input
+                      type="text"
+                      placeholder="উপরের কোডটি লিখুন"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      required
+                      className="h-12 border-2 border-gray-200 focus:border-pink-500 focus:ring-0"
+                    />
+                  </div>
+
                   {/* Submit Button */}
                   <Button
                     type="submit"
@@ -292,6 +352,14 @@ export default function ContactPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Styles for CAPTCHA */}
+      <style jsx global>{`
+        .captcha-canvas canvas {
+          border-radius: 8px;
+          border: 2px solid #e5e7eb;
+        }
+      `}</style>
     </div>
   );
 }

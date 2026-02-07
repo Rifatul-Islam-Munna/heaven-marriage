@@ -81,8 +81,7 @@ const genderOptions = [
 
 const categoryOptions = [
   { value: "general", label: "সাধারণ" },
-  { value: "special", label: "বিশেষ" },
-  { value: "urgent", label: "জরুরি" },
+
   { value: "verified", label: "ভেরিফাইড" },
 ];
 

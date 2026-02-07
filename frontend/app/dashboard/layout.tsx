@@ -22,38 +22,38 @@ const data = {
       url: "/dashboard",
       items: [
         {
-          title: "users",
+          title: "ব্যবহারকারী",
           url: "/dashboard",
         },
         {
-          title: "faq",
+          title: "প্রশ্নোত্তর",
           url: "/dashboard/faq",
         },
         {
-          title: "guideline",
+          title: "নির্দেশিকা",
           url: "/dashboard/guideline",
         },
         {
-          title: "contact",
+          title: "যোগাযোগ",
           url: "/dashboard/contact",
         },
         {
-          title: "Images",
+          title: "ছবি",
           url: "/dashboard/images",
         },
         {
-          title: "pricing",
+          title: "মূল্য",
           url: "/dashboard/pricing",
         },
       ],
     },
     {
       title: "সেটিংস",
-      url: "/profile/settings",
+      url: "/dashboard/settings",
       items: [
         {
           title: "প্রোফাইল সেটিংস",
-          url: "/profile/settings",
+          url: "/dashboard/settings",
         },
       ],
     },

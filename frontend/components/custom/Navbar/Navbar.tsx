@@ -22,7 +22,7 @@ import {
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
 import { useUser } from "@/lib/useUser";
 import { UserNav } from "./UserNav";
-
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Navigation items array
@@ -56,7 +56,13 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <Heart className="h-8 w-8 fill-pink-500 text-pink-500" />
+              <Image
+                src={"/logo.png"}
+                width={50}
+                height={50}
+                alt="logo"
+                className=" w-10 h-10 md:w-14 md:h-14 object-contain"
+              />
               <span className="font-heading text-2xl font-bold text-primary">
                 niqaha
               </span>

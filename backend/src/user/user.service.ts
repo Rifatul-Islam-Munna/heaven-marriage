@@ -147,7 +147,8 @@ export class UserService  {
     religiousEducation,
     skinColor,
     upazilaId,
-    country
+    country,
+    
   } = userQuery;
 
   console.log('Received query params:', userQuery);
@@ -243,9 +244,19 @@ export class UserService  {
     matchConditions['familyInfo.familyFinancial'] = { $in: economicStatus };
   }
 
-  if (category && category.length > 0) {
-    matchConditions.role = { $in: category };
+ if (category && category.length > 0) {
+  const hasVerified = category.includes('verified');
+  const hasGeneral = category.includes('general');
+  this.logger.log(`hasVerified: ${hasVerified}, hasGeneral: ${hasGeneral}`);
+  if(hasVerified && hasGeneral){
+    matchConditions.isSubscriber = { $in: [true, false] };
   }
+  else if (hasVerified && !hasGeneral) {
+    matchConditions.isSubscriber = true;
+  } else if (hasGeneral && !hasVerified) {
+    matchConditions.isSubscriber = false;
+  } 
+}
 
   // Add $match stage if conditions exist
   if (Object.keys(matchConditions).length > 0) {
@@ -489,7 +500,7 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified')
+      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }) // Latest users first
