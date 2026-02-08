@@ -177,7 +177,7 @@ async findUserAndUpdated() {
      if(!phoneNumber || !password){
        throw new HttpException('All fields are required', 400);
      }
-     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
+     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId numberOfConnections gender").lean();
      if(!findOneUser){
        throw new HttpException('User not found', 400);
      }

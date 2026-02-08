@@ -47,7 +47,16 @@ export function UserNav({ user }: { user: UserInfo | null }) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={user?.image} alt={user?.name || "User"} />
+            <AvatarImage
+              src={
+                user?.gender === "male"
+                  ? "/male.png"
+                  : user?.gender === "female"
+                    ? "/female.png"
+                    : ""
+              }
+              alt={user?.name || "User"}
+            />
             <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
           </Avatar>
         </Button>

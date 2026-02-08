@@ -28,6 +28,7 @@ const PaymentSuccessPage = () => {
         password: data?.password || "",
         isOtpVerified: data?.isOtpVerified || "",
         numberOfConnections: data?.numberOfConnections || "",
+        gender: data?.gender || "",
       };
       const saveData = async () => {
         await setUserData(Payload);

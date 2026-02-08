@@ -146,6 +146,7 @@ export interface UserInfo {
   password: string;           // "securePassword123"
   isOtpVerified: boolean; 
   numberOfConnections?:number
+  gender?:string
    // true
 }
 
