@@ -17,33 +17,84 @@ import { RequestNumberDto } from './dto/request-number.dto';
 import { RequestNumber, RequestNumberDocument } from './entities/RequestNumber.schema';
 import { TelegramChannel, TelegramService } from './telegram.service';
 import {OAuth2Client } from "google-auth-library"
+import { Cron,CronExpression } from '@nestjs/schedule';
+import { OtpService } from './otp.service';
+import { SmsService } from './sms.service';
 @Injectable()
-export class UserService  {
+export class UserService  implements OnModuleInit{
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService){}
-  
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService){}
+   async onModuleInit() {
+    const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
+    if(!findOneAdmin){
+     const createAdmin = await this.userModel.create({
+       phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
+       password: this.configService.get<string>('ADMIN_PASSWORD') as string,
+       role: 'admin',
+     })
+    }
+   }
   async create(createUserDto: CreateUserDto) {
     
     if(!createUserDto.phoneNumber || !createUserDto.password){
       throw new HttpException('All fields are required', 400);
     }
 
-  const findIsUserThere = await this.userModel.exists({phoneNumber:createUserDto.phoneNumber}).exec();
+  const findIsUserThere = await this.userModel.findOne({phoneNumber:createUserDto.phoneNumber}).lean().exec();
 
-  if(findIsUserThere){
-    throw new HttpException('User already exists', 400);
+  if(findIsUserThere ){
+    if (findIsUserThere.isOtpVerified) {
+      throw new HttpException('User already exists', 400);
+    }
+      const now = new Date();
+    const otpExpiry = new Date(findIsUserThere.otpValidatedAt);
+     if (otpExpiry > now) {
+      return {
+        message: 'OTP has already been sent to your mobile number',
+        data: {
+          phoneNumber: findIsUserThere.phoneNumber,
+          otpExpiresAt: otpExpiry,
+        },
+      };
+    }
+       const newOtp = await this.otpService.generateUniqueOTP();
+    const newOtpExpiry = new Date(Date.now() + 26 * 60 * 1000);
+
+    await this.userModel.updateOne(
+      { phoneNumber: createUserDto.phoneNumber },
+      {
+        $set: {
+          otpNumber: newOtp,
+          otpValidatedAt: newOtpExpiry,
+        },
+      }
+    );
+    this.smsService.sendOtpSms(createUserDto.phoneNumber,newOtp)
+    return {
+      message: 'OTP has been sent to your mobile number',
+      data: {
+        phoneNumber: findIsUserThere.phoneNumber,
+        otpExpiresAt: newOtpExpiry,
+      },
+    };
+
   }
   const passwordHash = await bcrypt.hash(createUserDto.password, 10);
   const userId = new ShortUniqueId({ length: 10,dictionary:"alphanum_lower" })
   const id = userId.randomUUID()
   const {phoneNumber,name} = createUserDto
+  const getOtp = await this.otpService.generateUniqueOTP()
     const finalData ={
       phoneNumber,
       name,
       password:passwordHash,
-      userId:id
+      userId:id,
+      otpNumber:getOtp,
+      gender:createUserDto.gender,
     
+      otpValidatedAt: new Date(Date.now() + 26 * 60 * 1000),
     }
+    this.smsService.sendOtpSms(phoneNumber,getOtp)
     const create = await this.userModel.create(finalData);
     if(!create){
       throw new HttpException('User not created', 400);
@@ -52,6 +103,49 @@ export class UserService  {
 
     return {message:'User created successfully',data:create};
   }
+
+
+  async verifyOtp(otp:string){
+    const findOneAndUpdated = await this.userModel.findOneAndUpdate({otpNumber:otp},{isOtpVerified:true,otpValidatedAt:null, otpNumber:null}).lean();
+    if(!findOneAndUpdated){
+      throw new HttpException('User not found', 400);
+    }
+    return {message:'User verified successfully',data:findOneAndUpdated};
+    
+  }
+  
+
+
+
+
+ @Cron(CronExpression.EVERY_10_MINUTES)
+async findUserAndUpdated() {
+  
+    // Find all users where:
+    // 1. otpValidatedAt exists (not null/undefined)
+    // 2. otpValidatedAt is less than current time (expired)
+    const result = await this.userModel.updateMany(
+      {
+        otpValidatedAt: {
+          $ne: null, // Not null
+          $exists: true, // Field exists
+          $lt: new Date(), // Less than current time (expired)
+        },
+        isOtpVerified:false
+      },
+      {
+        $set: {
+          otpValidatedAt: null,
+          otpNumber: null,
+        },
+      }
+    );
+
+    console.log(`Cleared ${result.modifiedCount} expired OTPs`);
+    return { success: true, clearedCount: result.modifiedCount };
+  
+}
+
 
   async updatedFullUserInformation (updated:UpdateUserDto,userId:string){
     const {password,isOtpVerified,isSubscriber, role, otpNumber, numberOfConnections, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
@@ -572,6 +666,7 @@ const executePayment = await this.bkash.executePayment(paymentId);
               };
             }
             this.logger.debug("success-----of---this----era")
+            this.findUserAndSendToTelegram(parts[0])
             return {
               success: true,
               failure: false
@@ -595,7 +690,7 @@ const executePayment = await this.bkash.executePayment(paymentId);
 }
 
 async createRequestNumber(payload:RequestNumberDto){
-  const finUser = await this.userModel.findById(payload.userId).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
+  const finUser = await this.userModel.findById(payload.userId).select("email id role phoneNumber name gender email password isOtpVerified userId numberOfConnections").lean();
   if(!finUser){
     throw new HttpException('User not found', 400);
   }
@@ -606,7 +701,7 @@ async createRequestNumber(payload:RequestNumberDto){
   if(isAlreadyInRequest){
     throw new HttpException('Phone Number already requested', 400);
   }
-  const requestUser = await this.userModel.findById(payload.requestUserId).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
+  const requestUser = await this.userModel.findById(payload.requestUserId).select("email id role gender phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
   if(!requestUser?.phoneNumber){
     throw new HttpException('User not found', 400);
   }
@@ -614,6 +709,23 @@ async createRequestNumber(payload:RequestNumberDto){
     await this.userModel.findByIdAndUpdate(payload.userId,{$inc:{numberOfConnections:-1}},{new:true}).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean(),
     await this.requestNumberModel.create({userId:payload.userId,requestUserId:payload.requestUserId})
   ])
+  const UserReqNumber = {
+    from:{
+      name:finUser.name,
+      email:finUser.email,
+      phoneNumber:finUser.phoneNumber,
+      userId:finUser.userId,
+      gender:finUser.gender
+    },
+    toUser:{
+      name:requestUser.name,
+      email:requestUser.email,
+      phoneNumber:requestUser.phoneNumber,
+      userId:requestUser.userId,
+      gender:requestUser.gender
+    }
+  }
+  this.NumberRequest(UserReqNumber)
 return {
   userData:updatedUser,
   message:"Request number created successfully"
@@ -809,7 +921,7 @@ ${user.pledge ? `
 
   try {
     const sendToTelegram = await this.telegramService.sendToChannel({
-      channel: TelegramChannel.NEW_USER,
+      channel: isMale ? TelegramChannel.MALE : isFemale ? TelegramChannel.FEMALE : TelegramChannel.MALE,
       message: message,
       isHTML: true,
     });
@@ -826,6 +938,248 @@ ${user.pledge ? `
     return false;
   }
 }
+async findUserAndSendToTelegram(id: string) {
+  const user = await this.userModel.findById(id).exec();
+  if(!user) return;
+  const getValue = (value: any): string => {
+    if (value === null || value === undefined || value === '') return 'তথ্য নেই';
+    if (typeof value === 'boolean') return value ? 'হ্যাঁ' : 'না';
+    return String(value);
+  };
+
+  // Determine if user is male or female
+  const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
+  const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
+
+  const message = `
+🎉 <b>${isMale ? 'পুরুষ' : isFemale ? 'মহিলা' : ''} ব্যবহারকারী</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 <b>মৌলিক তথ্য</b>
+👤 নাম: ${getValue(user.name)}
+🆔 ইউজার আইডি: ${getValue(user.userId)}
+📧 ইমেইল: ${getValue(user.email)}
+📱 ফোন: ${getValue(user.phoneNumber)}
+👥 ভূমিকা: ${getValue(user.role)}
+⚧ লিঙ্গ: ${getValue(user.gender)}
+💍 বৈবাহিক অবস্থা: ${getValue(user.maritalStatus)}
+🎂 বয়স: ${getValue(user.age)} বছর
+🩸 রক্তের গ্রুপ: ${getValue(user.bloodGroup)}
+⚖️ ওজন: ${getValue(user.weight)} কেজি
+🌍 জাতীয়তা: ${getValue(user.nationality)}
+🔗 কানেকশন: ${getValue(user.numberOfConnections)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 <b>ঠিকানা তথ্য</b>
+🏠 বর্তমান ঠিকানা: ${getValue(user.address?.presentAddress)}
+🏡 স্থায়ী ঠিকানা: ${getValue(user.address?.permanentAddress)}
+📌 জেলা: ${getValue(user.address?.district)}
+🗺 উপজেলা: ${getValue(user.address?.upazila)}
+ℹ️ অতিরিক্ত তথ্য: ${getValue(user.address?.extraInfo)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎓 <b>শিক্ষাগত তথ্য</b>
+📚 শিক্ষা পদ্ধতি: ${getValue(user.educationInfo?.educationMethod)}
+🏆 সর্বোচ্চ শিক্ষা: ${getValue(user.educationInfo?.highestEducation)}
+📋 বোর্ড: ${getValue(user.educationInfo?.highestEducationBoard)}
+📖 বিভাগ: ${getValue(user.educationInfo?.highestEducationGroup)}
+📅 পাশের বছর: ${getValue(user.educationInfo?.highestEducationPassingYear)}
+📝 বর্তমানে পড়াশোনা: ${getValue(user.educationInfo?.currentlyDoingHightEducation)}
+
+<i>এসএসসি তথ্য:</i>
+📅 পাশের বছর: ${getValue(user.educationInfo?.sSCPassingYear)}
+📖 বিভাগ: ${getValue(user.educationInfo?.sSCPassingGroup)}
+🎯 ফলাফল: ${getValue(user.educationInfo?.sSCResult)}
+
+<i>এইচএসসি তথ্য:</i>
+📅 পাশের বছর: ${getValue(user.educationInfo?.hSCPassingYear)}
+📖 বিভাগ: ${getValue(user.educationInfo?.hSCPassingGroup)}
+🎯 ফলাফল: ${getValue(user.educationInfo?.hSCResult)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👨‍👩‍👧‍👦 <b>পারিবারিক তথ্য</b>
+👨 পিতা জীবিত: ${getValue(user.familyInfo?.isFatherAlive)}
+💼 পিতার পেশা: ${getValue(user.familyInfo?.fathersProfession)}
+👩 মাতা জীবিত: ${getValue(user.familyInfo?.isMotherAlive)}
+💼 মাতার পেশা: ${getValue(user.familyInfo?.mothersProfession)}
+👬 ভাই সংখ্যা: ${getValue(user.familyInfo?.brotherCount)}
+ℹ️ ভাইদের তথ্য: ${getValue(user.familyInfo?.brotherInformation)}
+👭 বোন সংখ্যা: ${getValue(user.familyInfo?.sisterCount)}
+ℹ️ বোনদের তথ্য: ${getValue(user.familyInfo?.sisterInformation)}
+💰 পারিবারিক আর্থিক অবস্থা: ${getValue(user.familyInfo?.familyFinancial)}
+🏠 পারিবারিক সম্পদ: ${getValue(user.familyInfo?.familyAssetDetails)}
+☪️ পারিবারিক ধর্মীয় অবস্থা: ${getValue(user.familyInfo?.familyReligiousCondition)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧑 <b>ব্যক্তিগত তথ্য</b>
+👔 বাইরের পোশাক: ${getValue(user.personalInformation?.outsideClothes)}
+${isFemale ? `🧕 নিকাব বছর: ${getValue(user.personalInformation?.womenNiqbYear)}` : ''}
+${isMale ? `🧔 দাড়ি: ${getValue(user.personalInformation?.manBeard)}` : ''}
+${isMale ? `👖 টাখনুর উপরে কাপড়: ${getValue(user.personalInformation?.manClothAboveAnkels)}` : ''}
+🕌 পাঁচ ওয়াক্ত নামাজ: ${getValue(user.personalInformation?.prayerFiverTimeFrom)}
+⏰ নামাজ মিস: ${getValue(user.personalInformation?.MissPrayerTime)}
+👥 মাহরাম-নন মাহরাম: ${getValue(user.personalInformation?.maharaNonMahram)}
+📖 কুরআন তেলাওয়াত: ${getValue(user.personalInformation?.reciteQuran)}
+⚖️ ফিকহ অনুসরণ: ${getValue(user.personalInformation?.fiqhFollow)}
+📱 ডিজিটাল মিডিয়া: ${getValue(user.personalInformation?.digitalMedia)}
+🏥 মানসিক/শারীরিক সমস্যা: ${getValue(user.personalInformation?.mentalOrPhysicalIssue)}
+✨ দ্বীনের বিশেষ কাজ: ${getValue(user.personalInformation?.specialWorkOfDeen)}
+🎯 মাজার বিশ্বাস: ${getValue(user.personalInformation?.majarBeliveStatus)}
+📚 ইসলামিক বই: ${getValue(user.personalInformation?.islamicBookName)}
+👨‍🏫 আলেম নাম: ${getValue(user.personalInformation?.islamicScholarsName)}
+🎨 শখ: ${getValue(user.personalInformation?.extraInfoHobby)}
+📏 উচ্চতা: ${getValue(user.personalInformation?.height)} ফুট
+🎨 গায়ের রং: ${getValue(user.personalInformation?.skinTone)}
+📖 ইসলামিক পড়াশোনা: ${getValue(user.personalInformation?.islamicStudy)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💼 <b>পেশাগত তথ্য</b>
+👔 পেশা: ${getValue(user.occupational?.profession)}
+📋 কাজের বিবরণ: ${getValue(user.occupational?.workingDetails)}
+💰 বেতন: ${getValue(user.occupational?.salary)}
+
+${isFemale && user.marriageInformationWomen ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
+👨‍👩‍👧 অভিভাবক রাজি: ${getValue(user.marriageInformationWomen.isGuardiansAgreed)}
+💼 বিয়ের পর চাকরি: ${getValue(user.marriageInformationWomen.jobAfterMarriage)}
+📚 বিয়ের পর পড়াশোনা: ${getValue(user.marriageInformationWomen.studyAfterMarriage)}
+💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationWomen.thoughtsOnMarriage)}
+` : ''}
+
+${isMale && user.marriageInformationMan ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
+👨‍👩‍👧 অভিভাবক রাজি: ${getValue(user.marriageInformationMan.isGuardiansAgreed)}
+🧕 স্ত্রীর পর্দা: ${getValue(user.marriageInformationMan.wifeVailAfterMarriage)}
+📚 স্ত্রীর পড়াশোনা: ${getValue(user.marriageInformationMan.allowWifeStudyAfterMarriage)}
+💼 স্ত্রীর চাকরি: ${getValue(user.marriageInformationMan.wifeJobAfterMarriage)}
+🏠 বসবাসের স্থান: ${getValue(user.marriageInformationMan.livingPlaceAfterMarriage)}
+🎁 উপহার প্রত্যাশা: ${getValue(user.marriageInformationMan.expectedAnyGiftFromMarriage)}
+💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationMan.thoughtsOnMarriage)}
+` : ''}
+
+${user.expectedLifePartner ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💕 <b>প্রত্যাশিত জীবনসঙ্গী</b>
+🎂 বয়স: ${getValue(user.expectedLifePartner.age)}
+🎨 গায়ের রং: ${getValue(user.expectedLifePartner.complexion)}
+📏 উচ্চতা: ${getValue(user.expectedLifePartner.height)}
+🎓 শিক্ষা: ${getValue(user.expectedLifePartner.education)}
+📌 জেলা: ${getValue(user.expectedLifePartner.district)}
+🗺 উপজেলা: ${getValue(user.expectedLifePartner.upazila)}
+💍 বৈবাহিক অবস্থা: ${getValue(user.expectedLifePartner.maritalStatus)}
+💼 পেশা: ${getValue(user.expectedLifePartner.profession)}
+💰 আর্থিক অবস্থা: ${getValue(user.expectedLifePartner.financialCondition)}
+✨ প্রত্যাশিত গুণাবলী: ${getValue(user.expectedLifePartner.expectedQuality)}
+` : ''}
+
+${user.pledge ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>অঙ্গীকার</b>
+👨‍👩‍👧 অভিভাবক জানেন: ${getValue(user.pledge.youGordianKnowsThis)}
+✓ সকল তথ্য সত্য: ${getValue(user.pledge.allTheInformationTrue)}
+⚠️ ভুল তথ্যের দায়িত্ব: ${getValue(user.pledge.anyMisInformationWeAreNotKnowing)}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ <b> সময়:</b> ${new Date().toLocaleString('bn-BD', { 
+    timeZone: 'Asia/Dhaka',
+    dateStyle: 'full',
+    timeStyle: 'short'
+  })}
+  `.trim();
+
+  try {
+    const sendToTelegram = await this.telegramService.sendToChannel({
+      channel: TelegramChannel.SUBSCRIBER,
+      message: message,
+      isHTML: true,
+    });
+
+    if (sendToTelegram) {
+      this.logger.log(`User ${user.userId} info sent to Telegram successfully`);
+      return true;
+    } else {
+      this.logger.warn(`Failed to send user ${user.userId} info to Telegram`);
+      return false;
+    }
+  } catch (error) {
+    this.logger.error(`Error sending to Telegram: ${error.message}`);
+    return false;
+  }
+}
+
+async NumberRequest(payload: {
+    from: {
+        name: string;
+        email: string;
+        phoneNumber: string;
+        userId: string;
+        gender: string;
+    };
+    toUser: {
+        name: string;
+        email: string;
+        phoneNumber: string;
+        userId: string;
+        gender: string;
+    };
+}) {
+    const genderBangla = {
+        male: "পুরুষ",
+        female: "মহিলা"
+    };
+
+    const message = `
+🔔 <b>নতুন নম্বর অনুরোধ</b> 🔔
+
+━━━━━━━━━━━━━━━━━━━━
+
+👤 <b>অনুরোধকারী:</b>
+   📛 নাম: <b>${payload.from.name}</b>
+   📞 ফোন: <code>${payload.from.phoneNumber}</code>
+   📧 ইমেইল: <code>${payload.from.email}</code>
+   🆔 ইউজার আইডি: <code>${payload.from.userId}</code>
+   👥 লিঙ্গ: ${genderBangla[payload.from.gender as 'male' | 'female']}
+
+━━━━━━━━━━━━━━━━━━━━
+
+👤 <b>যার নম্বর চাওয়া হয়েছে:</b>
+   📛 নাম: <b>${payload.toUser.name}</b>
+   📞 ফোন: <code>${payload.toUser.phoneNumber}</code>
+   📧 ইমেইল: <code>${payload.toUser.email}</code>
+   🆔 ইউজার আইডি: <code>${payload.toUser.userId}</code>
+   👥 লিঙ্গ: ${genderBangla[payload.toUser.gender as 'male' | 'female']}
+
+━━━━━━━━━━━━━━━━━━━━
+
+⏰ সময়: ${new Date().toLocaleString('bn-BD', { 
+        dateStyle: 'full', 
+        timeStyle: 'short',
+        timeZone: 'Asia/Dhaka' 
+    })}
+
+    `.trim();
+
+  const sendToTelegram = await this.telegramService.sendToChannel({
+      channel: TelegramChannel.NUMBERREQUEST,
+      message: message,
+      isHTML: true,
+    });
+}
+
 
 
 

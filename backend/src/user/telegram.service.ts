@@ -5,10 +5,10 @@ import { lastValueFrom } from 'rxjs';
 import { AxiosResponse } from 'axios';
 
 export enum TelegramChannel {
-  NEW_USER = 'NEW_USER',
-  PAYMENT = 'PAYMENT',
-  ERROR = 'ERROR',
-  GENERAL = 'GENERAL',
+  MALE = 'NEW_USER',
+  FEMALE = 'PAYMENT',
+  SUBSCRIBER = 'ERROR',
+  NUMBERREQUEST = 'GENERAL',
 }
 
 interface SendMessageOptions {
@@ -34,20 +34,20 @@ export class TelegramService {
     // Initialize channel mappings from environment variables
     this.channelIds = new Map([
       [
-        TelegramChannel.NEW_USER,
-        this.configService.get<string>('TELEGRAM_CHANNEL_NEW_USER') as string,
+        TelegramChannel.MALE,
+        this.configService.get<string>('TELEGRAM_CHANNEL_MALE') as string,
       ],
       [
-        TelegramChannel.PAYMENT,
-        this.configService.get<string>('TELEGRAM_CHANNEL_PAYMENT')  as string,
+        TelegramChannel.FEMALE,
+        this.configService.get<string>('TELEGRAM_CHANNEL_FEMALE')  as string,
       ],
       [
-        TelegramChannel.ERROR,
-        this.configService.get<string>('TELEGRAM_CHANNEL_ERROR')  as string,
+        TelegramChannel.SUBSCRIBER,
+        this.configService.get<string>('TELEGRAM_CHANNEL_SUBSCRIBER')  as string,
       ],
       [
-        TelegramChannel.GENERAL,
-        this.configService.get<string>('TELEGRAM_CHANNEL_GENERAL')  as string,
+        TelegramChannel.NUMBERREQUEST,
+        this.configService.get<string>('TELEGRAM_CHANNEL_NUMBERREQUEST')  as string,
       ],
     ]);
 

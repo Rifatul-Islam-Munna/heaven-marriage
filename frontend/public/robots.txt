@@ -1,0 +1,9 @@
+# public/robots.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /profile/
+
+Sitemap: https://niqaha.com/sitemap.xml

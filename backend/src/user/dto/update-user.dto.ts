@@ -326,3 +326,10 @@ export class AdminUserDto{
   @IsString()
   gender?: string = 'all';
 }
+
+
+export class OtpstringDto{
+    @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  otp: string;
+}

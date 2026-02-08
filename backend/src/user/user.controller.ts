@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, Logger, Res, BadRequestException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, OtpstringDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
 import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
 import { RolesGuard } from 'src/lib/roles.guard';
@@ -15,9 +15,15 @@ export class UserController {
   private logger = new Logger(UserController.name)
   constructor(private readonly userService: UserService) {}
 
-  @Post()
+    @Post()
+    @Throttle({default:{limit:3,ttl:1800}}) 
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
+  }
+  @Post('verify-otp')
+  @Throttle({default:{limit:30,ttl:1800}}) 
+  verifyOtp(@Body() createUserDto: OtpstringDto) {
+    return this.userService.verifyOtp(createUserDto.otp);
   }
   @Throttle({default:{limit:3,ttl:60}}) 
   @Post('login-user')

@@ -250,8 +250,13 @@ export const countries = [
     "en": "Australia"
   },
   {
-    "id": 31,
+    "id": 32,
     "bn": "নিউজিল্যান্ড",
     "en": "New Zealand"
+  },
+  {
+    "id": 31,
+    "bn": "অন্যান্য",
+    "en": "other"
   }
 ];

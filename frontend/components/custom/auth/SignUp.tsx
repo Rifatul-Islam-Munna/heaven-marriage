@@ -11,24 +11,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Heart } from "lucide-react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
-
+import Image from "next/image";
 export default function SignUp() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
     password: "",
+    gender: "",
   });
+
   const { mutate, isPending } = useCommonMutationApi({
     url: "/user",
     method: "POST",
-    successMessage: "user created successfully",
+    successMessage: "আপনার মোবাইল নম্বরে OTP পাঠানো হয়েছে",
     mutationKey: ["user-created"],
     onSuccess: () => {
-      router.push("/login");
+      router.push("/otp");
     },
   });
 
@@ -36,7 +39,6 @@ export default function SignUp() {
     e.preventDefault();
     mutate(formData);
     console.log("Signup Data:", formData);
-    // Handle signup logic here
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,31 +48,38 @@ export default function SignUp() {
     });
   };
 
+  const handleGenderChange = (value: string) => {
+    setFormData({
+      ...formData,
+      gender: value,
+    });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 p-4">
-      <Card className="w-full max-w-md  border-pink-200">
+      <Card className="w-full max-w-md border-pink-200">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
-            <Heart className="w-8 h-8 text-white fill-white" />
+          <div className="mx-auto w-16 h-16  flex items-center justify-center ">
+            <Image src={"/logo.png"} width={64} height={64} alt="logo" />
           </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
-            Create Account
+            অ্যাকাউন্ট তৈরি করুন
           </CardTitle>
           <CardDescription className="text-base text-gray-600">
-            Begin your halal journey to find your perfect match
+            আপনার নিখুঁত জীবনসঙ্গী খুঁজে পেতে হালাল যাত্রা শুরু করুন
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-gray-700 font-medium">
-                Full Name
+                পুরো নাম
               </Label>
               <Input
                 id="name"
                 name="name"
                 type="text"
-                placeholder="Enter your full name"
+                placeholder="আপনার পুরো নাম লিখুন"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -83,13 +92,13 @@ export default function SignUp() {
                 htmlFor="phoneNumber"
                 className="text-gray-700 font-medium"
               >
-                Phone Number
+                মোবাইল নম্বর
               </Label>
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
                 type="tel"
-                placeholder="+880 1XXX-XXXXXX"
+                placeholder="০১৭১২৩৪৫৬৭৮"
                 value={formData.phoneNumber}
                 onChange={handleChange}
                 required
@@ -97,15 +106,50 @@ export default function SignUp() {
               />
             </div>
 
+            {/* Gender Field */}
+            <div className="space-y-3">
+              <Label className="text-gray-700 font-medium">লিঙ্গ</Label>
+              <RadioGroup
+                value={formData.gender}
+                onValueChange={handleGenderChange}
+                required
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem
+                    value="male"
+                    id="male"
+                    className="border-pink-300 text-pink-600"
+                  />
+                  <Label htmlFor="male" className="cursor-pointer font-normal">
+                    পুরুষ
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem
+                    value="female"
+                    id="female"
+                    className="border-pink-300 text-pink-600"
+                  />
+                  <Label
+                    htmlFor="female"
+                    className="cursor-pointer font-normal"
+                  >
+                    মহিলা
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-gray-700 font-medium">
-                Password
+                পাসওয়ার্ড
               </Label>
               <Input
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Create a strong password"
+                placeholder="একটি শক্তিশালী পাসওয়ার্ড তৈরি করুন"
                 value={formData.password}
                 onChange={handleChange}
                 required
@@ -118,16 +162,16 @@ export default function SignUp() {
               className="w-full h-12 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={isPending}
             >
-              {isPending ? "Sign Up..." : "Sign Up"}
+              {isPending ? "সাইন আপ হচ্ছে..." : "সাইন আপ করুন"}
             </Button>
 
             <p className="text-center text-sm text-gray-600 pt-2">
-              Already have an account?{" "}
+              ইতিমধ্যে একটি অ্যাকাউন্ট আছে?{" "}
               <a
                 href="/login"
                 className="text-pink-600 hover:text-pink-700 font-semibold hover:underline"
               >
-                Sign In
+                লগইন করুন
               </a>
             </p>
           </form>

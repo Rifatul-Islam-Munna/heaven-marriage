@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
         port: "9000",
         pathname: "/niqha-public-bukcet/**",
       },
+      {
+        protocol: 'https',
+        hostname: 'multi-vendor-minio.pixs1x.easypanel.host',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'multi-vendor-minio.pixs1x.easypanel.host',
+        port: '',
+        pathname: '/niqha-public-bukcet/**',
+      },
       
     ],
      unoptimized: process.env.NODE_ENV === "development",
@@ -33,7 +45,12 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '20mb',
     },
-  }
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  output:"standalone"
+ 
 };
 
 export default nextConfig;

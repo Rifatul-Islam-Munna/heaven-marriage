@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 import LoginWithGoogle from "./GoogleLogin";
+import Image from "next/image";
 
 export default function SignIn() {
   const { refetch } = useUser();
@@ -33,8 +34,10 @@ export default function SignIn() {
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
     onSuccess: (data) => {
       if (data.data) {
-        router.push("/");
-        return toast.success("User logged in successfully");
+        data?.data?.user?.role === "admin"
+          ? router.push("/dashboard")
+          : router.push("/profile");
+        return toast.success("সফলভাবে লগইন হয়েছে");
       }
       return toast.error(data?.error?.message);
     },
@@ -59,14 +62,14 @@ export default function SignIn() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 p-4">
       <Card className="w-full max-w-md border-pink-200">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
-            <Heart className="w-8 h-8 text-white fill-white" />
+          <div className="mx-auto w-16 h-16  rounded-full flex items-center justify-center ">
+            <Image src={"/logo.png"} width={64} height={64} alt="logo" />
           </div>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
-            Welcome Back
+            স্বাগতম
           </CardTitle>
           <CardDescription className="text-base text-gray-600">
-            Sign in to continue your journey
+            আপনার যাত্রা চালিয়ে যেতে লগইন করুন
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -76,13 +79,13 @@ export default function SignIn() {
                 htmlFor="phoneNumber"
                 className="text-gray-700 font-medium"
               >
-                Phone Number
+                মোবাইল নম্বর
               </Label>
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
                 type="tel"
-                placeholder="+880 1XXX-XXXXXX"
+                placeholder="০১৭১২৩৪৫৬৭৮"
                 value={formData.phoneNumber}
                 onChange={handleChange}
                 required
@@ -93,13 +96,13 @@ export default function SignIn() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-gray-700 font-medium">
-                  Password
+                  পাসওয়ার্ড
                 </Label>
                 <a
                   href="/forgot-password"
                   className="text-sm text-pink-600 hover:text-pink-700 hover:underline"
                 >
-                  Forgot?
+                  ভুলে গেছেন?
                 </a>
               </div>
               <div className="relative">
@@ -107,7 +110,7 @@ export default function SignIn() {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder="আপনার পাসওয়ার্ড লিখুন"
                   value={formData.password}
                   onChange={handleChange}
                   required
@@ -128,7 +131,8 @@ export default function SignIn() {
                 </Button>
               </div>
             </div>
-            <div className=" w-full mx-auto">
+
+            <div className="w-full mx-auto">
               <LoginWithGoogle />
             </div>
 
@@ -137,16 +141,16 @@ export default function SignIn() {
               className="w-full h-12 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={isPending}
             >
-              {isPending ? "Signing In..." : "Sign In"}
+              {isPending ? "লগইন হচ্ছে..." : "লগইন করুন"}
             </Button>
 
             <p className="text-center text-sm text-gray-600 pt-2">
-              Don't have an account?{" "}
+              অ্যাকাউন্ট নেই?{" "}
               <a
                 href="/signup"
                 className="text-pink-600 hover:text-pink-700 font-semibold hover:underline"
               >
-                Sign Up
+                সাইন আপ করুন
               </a>
             </p>
           </form>

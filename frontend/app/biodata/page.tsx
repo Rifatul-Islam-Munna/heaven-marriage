@@ -1,6 +1,7 @@
-// app/biodatas/page.tsx
+"use client";
 import BiodataAdvancedFilter from "@/components/custom/common/biodata-advanced-filter";
 import BiodataGrid from "@/components/custom/common/biodata-grid";
+import { Suspense } from "react";
 
 export default function BiodatasPage() {
   // Sample data - replace with your API call
@@ -92,15 +93,21 @@ export default function BiodatasPage() {
         <div className="flex gap-6">
           {/* Filter on Left - Hidden on mobile (< md) */}
           <div className="hidden lg:block">
-            <BiodataAdvancedFilter />
+            <Suspense>
+              <BiodataAdvancedFilter />
+            </Suspense>
           </div>
 
           {/* Content on Right - Full width on mobile */}
           <div className="min-w-0 flex-1">
             <div className=" w-full  flex lg:hidden justify-end py-2">
-              <BiodataAdvancedFilter />
+              <Suspense>
+                <BiodataAdvancedFilter />
+              </Suspense>
             </div>
-            <BiodataGrid biodatas={biodatas} />
+            <Suspense>
+              <BiodataGrid biodatas={biodatas} />
+            </Suspense>
           </div>
         </div>
       </div>

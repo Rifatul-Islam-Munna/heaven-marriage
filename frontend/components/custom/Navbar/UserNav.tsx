@@ -15,16 +15,10 @@ import { User, Settings, LogOut, Heart } from "lucide-react";
 import { logOutUser } from "@/actions/auth";
 import { useUser } from "@/lib/useUser";
 import { useRouter } from "next/navigation";
+import { UserInfo } from "@/@types/user";
+import { cn } from "@/lib/utils";
 
-interface UserNavProps {
-  user: {
-    name?: string;
-    email?: string;
-    image?: string;
-  };
-}
-
-export function UserNav({ user }: UserNavProps) {
+export function UserNav({ user }: { user: UserInfo | null }) {
   const { refetch } = useUser();
   const router = useRouter();
   const getInitials = (name?: string) => {
@@ -44,7 +38,10 @@ export function UserNav({ user }: UserNavProps) {
       window.location.href = "/";
     }
   };
-
+  const url = user?.role === "admin" ? "/dashboard" : "/profile";
+  const settings =
+    user?.role === "admin" ? "/dashboard/settings" : "/profile/settings";
+  const idAdmin = user?.role === "admin";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -69,19 +66,24 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="cursor-pointer">
+            <Link href={url} className="cursor-pointer">
               <User className="mr-2 h-4 w-4" />
               <span className="font-heading">ড্যাশবোর্ড</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem
+            className={cn("", {
+              hidden: idAdmin,
+            })}
+            asChild
+          >
             <Link href="/profile/short-list" className="cursor-pointer">
               <Heart className="mr-2 h-4 w-4" />
               <span className="font-heading">শর্টলিস্ট</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/profile/settings" className="cursor-pointer">
+            <Link href={settings} className="cursor-pointer">
               <Settings className="mr-2 h-4 w-4" />
               <span className="font-heading">সেটিংস</span>
             </Link>
