@@ -130,7 +130,7 @@ export default function HMSMembersSection() {
               🌿 HMS-এর এই দীপ্ত কাফেলায় আপনার স্থানও রয়েছে।
             </p>
             <Link
-              href="https://heaven-marriage-solutions.com"
+              href="/contact"
               className="inline-flex items-center gap-2 rounded-full border-2 border-pink-500 bg-pink-500 px-6 py-3 font-heading text-base font-semibold text-white transition-all hover:bg-pink-600 hover:border-pink-600"
             >
               <span>রেজিস্ট্রেশন করুন</span>
