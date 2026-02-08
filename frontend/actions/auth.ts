@@ -33,7 +33,8 @@ export const loginWithGoogle = async (idToken:string)=>{
     phoneNumber:data?.user?.phoneNumber,
     isOtpVerified:data?.user?.isOtpVerified,
     numberOfConnections:data?.user?.numberOfConnections,
-    role:data?.user?.role
+    role:data?.user?.role,
+    gender:data?.user?.gender
    }
    cookie.set("user", JSON.stringify(userSaveData) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
     }
