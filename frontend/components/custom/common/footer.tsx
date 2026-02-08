@@ -8,6 +8,7 @@ import {
   Instagram,
   MessageCircle,
   Linkedin,
+  FacebookIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -176,6 +177,15 @@ export default function Footer() {
                   aria-label="LinkedIn Rifatul Islam"
                 >
                   <Linkedin className="h-4 w-4" />
+                </a>
+                <a
+                  href="https://www.facebook.com/munna.rifat.3/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
+                  aria-label="LinkedIn Rifatul Islam"
+                >
+                  <FacebookIcon className="h-4 w-4" />
                 </a>
               </div>
             </div>
