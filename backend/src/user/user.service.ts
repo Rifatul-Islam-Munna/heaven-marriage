@@ -28,6 +28,7 @@ export class UserService  implements OnModuleInit{
     const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
     if(!findOneAdmin){
      const createAdmin = await this.userModel.create({
+      name:"admin",
        phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
        password: this.configService.get<string>('ADMIN_PASSWORD') as string,
        role: 'admin',
