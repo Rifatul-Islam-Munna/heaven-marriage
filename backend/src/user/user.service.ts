@@ -27,11 +27,14 @@ export class UserService  implements OnModuleInit{
    async onModuleInit() {
     const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
     if(!findOneAdmin){
+      const rewPAssword =  this.configService.get<string>('ADMIN_PASSWORD') as string
+      const passwordHash = await bcrypt.hash(rewPAssword, 10)
      const createAdmin = await this.userModel.create({
       name:"admin",
        phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
-       password: this.configService.get<string>('ADMIN_PASSWORD') as string,
+       password: passwordHash,
        role: 'admin',
+       isOtpVerified:true
      })
     }
    }
