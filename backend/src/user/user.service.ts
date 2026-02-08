@@ -718,7 +718,7 @@ async createRequestNumber(payload:RequestNumberDto){
     throw new HttpException('User not found', 400);
   }
   const [updatedUser,createdUser] = await Promise.all([
-    await this.userModel.findByIdAndUpdate(payload.userId,{$inc:{numberOfConnections:-1}},{new:true}).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections").lean(),
+    await this.userModel.findByIdAndUpdate(payload.userId,{$inc:{numberOfConnections:-1}},{new:true}).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections gender").lean(),
     await this.requestNumberModel.create({userId:payload.userId,requestUserId:payload.requestUserId})
   ])
   const UserReqNumber = {
