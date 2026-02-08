@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 export default function WhatsAppFloat() {
   const [isHovered, setIsHovered] = useState(false);
-  const phoneNumber = "8801712345678"; // Replace with your number
+  const phoneNumber = "8801748919251"; // Replace with your number
   const message = "আসসালামু আলাইকুম! আমি Niqaha সম্পর্কে জানতে চাই।";
 
   const handleWhatsAppClick = () => {

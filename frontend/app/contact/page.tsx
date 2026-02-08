@@ -129,29 +129,65 @@ export default function ContactPage() {
                       ইমেইল
                     </h3>
                     <a
-                      href="mailto:info@heavenmarriage.com"
+                      href="niqahabd@gmail.com "
                       className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
                     >
-                      info@heavenmarriage.com
+                      niqahabd@gmail.com
                     </a>
                   </div>
                 </div>
 
-                {/* Phone */}
+                {/* Phone Numbers */}
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Phone className="h-6 w-6 text-pink-600" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                      ফোন
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                      ফোন (WhatsApp)
                     </h3>
-                    <a
-                      href="tel:+8801712345678"
-                      className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
-                    >
-                      +880 1712-345678
-                    </a>
+                    {/* General Inquiries */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">
+                        রেনডম জিজ্ঞাসাবাদ বা তথ্যের জন্য
+                      </p>
+                      <a
+                        href="https://wa.me/8801748919251"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
+                      >
+                        01748919251
+                      </a>
+                    </div>
+                    {/* For Grooms */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">
+                        পাত্রদের জন্য
+                      </p>
+                      <a
+                        href="https://wa.me/8801927877581"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
+                      >
+                        01927877581
+                      </a>
+                    </div>
+                    {/* For Brides */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">
+                        পাত্রীদের জন্য
+                      </p>
+                      <a
+                        href="https://wa.me/8801610371038"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
+                      >
+                        01610371038
+                      </a>
+                    </div>
                   </div>
                 </div>
 
@@ -164,7 +200,9 @@ export default function ContactPage() {
                     <h3 className="text-sm font-semibold text-gray-900 mb-1">
                       ঠিকানা
                     </h3>
-                    <p className="text-sm text-gray-600">ঢাকা, বাংলাদেশ</p>
+                    <p className="text-sm text-gray-600">
+                      চট্টগ্রাম, আগ্রাবাদ, লাকি প্লাজা ৩য় তলা
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -181,7 +219,7 @@ export default function ContactPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">শনি - শুক্র </span>
                   <span className="font-semibold text-gray-900">
-                    ০৯:০০ - ২১:০০
+                    সকাল ০৯:০০ - রাত ০৯:০০
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

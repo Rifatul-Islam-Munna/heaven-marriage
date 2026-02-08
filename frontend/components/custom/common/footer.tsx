@@ -7,6 +7,7 @@ import {
   Facebook,
   Instagram,
   MessageCircle,
+  Linkedin,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -21,9 +22,17 @@ const navItems = [
 ];
 
 const socialLinks = [
-  { name: "Facebook", href: "#", icon: Facebook },
-  { name: "WhatsApp", href: "#", icon: MessageCircle },
-  { name: "Instagram", href: "#", icon: Instagram },
+  {
+    name: "Facebook",
+    href: "https://www.facebook.com/share/18CQA5bDtn/",
+    icon: Facebook,
+  },
+  { name: "WhatsApp", href: "https://wa.me/01748919251", icon: MessageCircle },
+  {
+    name: "Instagram",
+    href: "https://www.instagram.com/niqaha.combd?igsh=MWw3dzVyYXE5cjY2MQ==",
+    icon: Instagram,
+  },
 ];
 
 export default function Footer() {
@@ -60,18 +69,18 @@ export default function Footer() {
 
             <div className="space-y-2 text-sm text-muted-foreground">
               <a
-                href="mailto:heaven-marriage-solutions.com"
+                href="mailto:niqahabd@gmail.com"
                 className="flex items-center gap-2 transition-colors hover:text-pink-600"
               >
                 <Mail className="h-4 w-4" />
-                <span>heaven-marriage-solutions.com</span>
+                <span>niqahabd@gmail.com </span>
               </a>
               <a
-                href="tel:+8801234567890"
+                href="tel:+8801748919251"
                 className="flex items-center gap-2 transition-colors hover:text-pink-600"
               >
                 <Phone className="h-4 w-4" />
-                <span>+880 1234-567890</span>
+                <span>01748919251 </span>
               </a>
             </div>
           </div>
@@ -122,7 +131,7 @@ export default function Footer() {
                 অফিস টাইম
               </h5>
               <p className="text-xs text-muted-foreground">
-                শনি - শুক্র: ০৯:০০ - ২১:০০
+                শনি - শুক্র: সকাল ০৯:০০ - রাত ০৯:০০
               </p>
               <p className="text-xs text-pink-600">সোমবার বন্ধ</p>
             </div>
@@ -130,10 +139,47 @@ export default function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="mt-8 border-t border-pink-200 pt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            কপিরাইট © {new Date().getFullYear()} niqaha - সমস্ত অধিকার সংরক্ষিত
-          </p>
+        <div className="mt-8 border-t border-pink-200 pt-6">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <p className="text-sm text-muted-foreground">
+              কপিরাইট © {new Date().getFullYear()} niqaha - সমস্ত অধিকার
+              সংরক্ষিত
+            </p>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                Developed by{" "}
+                <span className="font-semibold text-foreground">
+                  Rifatul Islam
+                </span>
+              </span>
+              <div className="flex gap-2">
+                <a
+                  href="mailto:munnarifat20@gmail.com"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
+                  aria-label="Email Rifatul Islam"
+                >
+                  <Mail className="h-4 w-4" />
+                </a>
+                <a
+                  href="tel:+8801907565617"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
+                  aria-label="Call Rifatul Islam"
+                >
+                  <Phone className="h-4 w-4" />
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/rifatul-islam-munna/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
+                  aria-label="LinkedIn Rifatul Islam"
+                >
+                  <Linkedin className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
