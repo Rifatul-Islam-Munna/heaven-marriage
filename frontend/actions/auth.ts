@@ -73,3 +73,13 @@ export const setUserData = async (data:Record<string,any>) =>{
         cookie.set("user", JSON.stringify(data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
 }
 
+export const setOtpData = async (payoad:Record<string,any>) =>{
+    const [data, error] = await PostRequestAxios("/user/verify-otp",payoad);
+    if(data){
+        const cookie = await cookies();
+        cookie.set("user", JSON.stringify(data?.data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+           cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+    }
+    console.log("setOtpdata--------------> dadad ------------>",data);
+    return {data,error};
+}

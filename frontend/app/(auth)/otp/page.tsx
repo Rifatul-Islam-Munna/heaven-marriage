@@ -11,18 +11,31 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { setOtpData } from "@/actions/auth";
 
 function OTP() {
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const router = useRouter();
 
-  const { mutate, isPending } = useCommonMutationApi({
+  /*  const { mutate, isPending } = useCommonMutationApi({
     method: "POST",
     url: "/user/verify-otp",
     successMessage: "OTP যাচাই সফল হয়েছে!",
     onSuccess: () => {
       router.push("/login");
+    },
+  }); */
+  const { mutate, isPending } = useMutation({
+    mutationKey: ["verify-otp"],
+    mutationFn: (payoad: Record<string, any>) => setOtpData(payoad),
+    onSuccess: (data) => {
+      if (data?.error) {
+        toast.error(data?.error?.message);
+        return;
+      }
+      router.push("/profile/my-profile");
     },
   });
   // Function to verify OTP

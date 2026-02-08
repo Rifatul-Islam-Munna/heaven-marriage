@@ -20,10 +20,11 @@ import {OAuth2Client } from "google-auth-library"
 import { Cron,CronExpression } from '@nestjs/schedule';
 import { OtpService } from './otp.service';
 import { SmsService } from './sms.service';
+import { Counter, CounterDocument } from './entities/counter.schema';
 @Injectable()
 export class UserService  implements OnModuleInit{
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>){}
    async onModuleInit() {
     const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
     if(!findOneAdmin){
@@ -84,15 +85,16 @@ export class UserService  implements OnModuleInit{
 
   }
   const passwordHash = await bcrypt.hash(createUserDto.password, 10);
-  const userId = new ShortUniqueId({ length: 10,dictionary:"alphanum_lower" })
-  const id = userId.randomUUID()
+
   const {phoneNumber,name} = createUserDto
+  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{id:1}},{new:true, upsert: true }).lean();
+  const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
   const getOtp = await this.otpService.generateUniqueOTP()
     const finalData ={
       phoneNumber,
       name,
       password:passwordHash,
-      userId:id,
+      userId:userIdCount,
       otpNumber:getOtp,
       gender:createUserDto.gender,
     
@@ -114,7 +116,10 @@ export class UserService  implements OnModuleInit{
     if(!findOneAndUpdated){
       throw new HttpException('User not found', 400);
     }
-    return {message:'User verified successfully',data:findOneAndUpdated};
+          const secret = this.configService.get<string>('ACCESS_TOKEN');
+  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
+    const access_token = await this.jwtService.sign({email:findOneAndUpdated.email ?? "",id:findOneAndUpdated._id,role:findOneAndUpdated.role,mobileNumber:findOneAndUpdated.phoneNumber},{expiresIn:"10d",secret:secret});
+    return {message:'User verified successfully',data:findOneAndUpdated,access_token:access_token};
     
   }
   
@@ -206,11 +211,14 @@ async findUserAndUpdated() {
    const {email,name,picture,} = googlePayload as {email:string,name:string,picture:string}
 
    let finUserByEmail = await this.userModel.findOne({email:email});
+  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{id:1}},{new:true, upsert: true }).lean();
+  const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
    if(!finUserByEmail){
      finUserByEmail = await this.userModel.create({
       email:email,
       name:name,
       isOtpVerified:true,
+      userId:userIdCount
 
      })
    }
