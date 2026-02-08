@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { FaWhatsapp } from "react-icons/fa";
 
 export default function WhatsAppFloat() {
   const [isHovered, setIsHovered] = useState(false);
@@ -40,7 +41,7 @@ export default function WhatsAppFloat() {
           className="relative h-16 w-16 rounded-full bg-green-500 hover:bg-green-600 shadow-2xl hover:shadow-green-500/50 transition-all duration-300"
           size="icon"
         >
-          <Phone className="h-8 w-8 text-white" fill="white" />
+          <FaWhatsapp size={35} className="h-12 w-12 text-white" fill="white" />
         </Button>
 
         {/* Tooltip */}

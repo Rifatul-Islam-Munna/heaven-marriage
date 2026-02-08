@@ -71,6 +71,13 @@ import {
   religiousEducationOptions,
   skinColorOptions,
 } from "@/staticData/all-data";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Filter Data
 const genderOptions = [
@@ -278,121 +285,259 @@ function FilterContent({
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 px-1 pt-3">
             {/* District Combobox */}
+            {/* District - Dialog for Mobile, Popover for Desktop */}
             <div>
               <Label className="mb-1.5 block text-xs font-medium">জেলা</Label>
-              <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={districtOpen}
-                    className="h-9 w-full justify-between text-sm"
-                  >
-                    <span className="truncate">
-                      {selectedDistrict?.bn_name || "জেলা নির্বাচন করুন"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[260px] p-0" align="start">
-                  <Command>
-                    <CommandInput
-                      placeholder="জেলা খুঁজুন..."
-                      className="h-9"
-                    />
-                    <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
-                    <CommandGroup className="max-h-48 overflow-y-auto">
-                      {districts.map((d) => (
-                        <CommandItem
-                          key={d.id}
-                          value={d.bn_name}
-                          onSelect={() => {
-                            setFilters({
-                              districtId:
-                                filters.districtId === d.name ? null : d.name,
-                              upazilaId: null, // Reset upazila when district changes
-                            });
-                            setDistrictOpen(false);
-                          }}
-                          className="text-sm"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4 text-pink-600",
-                              filters.districtId === d.name
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                          {d.bn_name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+
+              {/* Mobile: Use Dialog */}
+              <div className="lg:hidden">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-9 w-full justify-between text-sm"
+                    >
+                      <span className="truncate">
+                        {selectedDistrict?.bn_name || "জেলা নির্বাচন করুন"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[90vw] p-0">
+                    <DialogHeader className="p-4 pb-2">
+                      <DialogTitle>জেলা নির্বাচন করুন</DialogTitle>
+                    </DialogHeader>
+                    <Command className="rounded-none">
+                      <CommandInput
+                        placeholder="জেলা খুঁজুন..."
+                        className="h-9"
+                      />
+                      <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                      <CommandGroup className="max-h-[50vh] overflow-y-auto">
+                        {districts.map((d) => (
+                          <CommandItem
+                            key={d.id}
+                            value={d.bn_name}
+                            onSelect={() => {
+                              setFilters({
+                                districtId:
+                                  filters.districtId === d.name ? null : d.name,
+                                upazilaId: null,
+                              });
+                              // Close dialog - you'll need to manage this state
+                              document
+                                .querySelector('[data-state="open"]')
+                                ?.querySelector('button[aria-label="Close"]')
+                                ?.click();
+                            }}
+                            className="text-sm"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-pink-600",
+                                filters.districtId === d.name
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {d.bn_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Desktop: Use Popover */}
+              <div className="hidden lg:block">
+                <Popover
+                  open={districtOpen}
+                  onOpenChange={setDistrictOpen}
+                  modal={false}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={districtOpen}
+                      className="h-9 w-full justify-between text-sm"
+                    >
+                      <span className="truncate">
+                        {selectedDistrict?.bn_name || "জেলা নির্বাচন করুন"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[260px] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="জেলা খুঁজুন..."
+                        className="h-9"
+                      />
+                      <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                      <CommandGroup className="max-h-48 overflow-y-auto">
+                        {districts.map((d) => (
+                          <CommandItem
+                            key={d.id}
+                            value={d.bn_name}
+                            onSelect={() => {
+                              setFilters({
+                                districtId:
+                                  filters.districtId === d.name ? null : d.name,
+                                upazilaId: null,
+                              });
+                              setDistrictOpen(false);
+                            }}
+                            className="text-sm"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-pink-600",
+                                filters.districtId === d.name
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {d.bn_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
-            {/* Upazila Combobox */}
+            {/* Upazila - Dialog for Mobile, Popover for Desktop */}
             <div
               className={cn(
                 !filters.districtId && "opacity-50 pointer-events-none",
               )}
             >
               <Label className="mb-1.5 block text-xs font-medium">উপজেলা</Label>
-              <Popover open={upazilaOpen} onOpenChange={setUpazilaOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={upazilaOpen}
-                    disabled={!filters.districtId}
-                    className="h-9 w-full justify-between text-sm disabled:cursor-not-allowed"
-                  >
-                    <span className="truncate">
-                      {selectedUpazila?.bn_name || "উপজেলা নির্বাচন করুন"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[260px] p-0" align="start">
-                  <Command>
-                    <CommandInput
-                      placeholder="উপজেলা খুঁজুন..."
-                      className="h-9"
-                    />
-                    <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
-                    <CommandGroup className="max-h-48 overflow-y-auto">
-                      {availableUpazilas.map((upazila) => (
-                        <CommandItem
-                          key={upazila.id}
-                          value={upazila.bn_name}
-                          onSelect={() => {
-                            setFilters({
-                              upazilaId:
+
+              {/* Mobile: Use Dialog */}
+              <div className="lg:hidden">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!filters.districtId}
+                      className="h-9 w-full justify-between text-sm disabled:cursor-not-allowed"
+                    >
+                      <span className="truncate">
+                        {selectedUpazila?.bn_name || "উপজেলা নির্বাচন করুন"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[90vw] p-0">
+                    <DialogHeader className="p-4 pb-2">
+                      <DialogTitle>উপজেলা নির্বাচন করুন</DialogTitle>
+                    </DialogHeader>
+                    <Command className="rounded-none">
+                      <CommandInput
+                        placeholder="উপজেলা খুঁজুন..."
+                        className="h-9"
+                      />
+                      <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
+                      <CommandGroup className="max-h-[50vh] overflow-y-auto">
+                        {availableUpazilas.map((upazila) => (
+                          <CommandItem
+                            key={upazila.id}
+                            value={upazila.bn_name}
+                            onSelect={() => {
+                              setFilters({
+                                upazilaId:
+                                  filters.upazilaId === upazila.name
+                                    ? null
+                                    : upazila.name,
+                              });
+                              document
+                                .querySelector('[data-state="open"]')
+                                ?.querySelector('button[aria-label="Close"]')
+                                ?.click();
+                            }}
+                            className="text-sm"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-pink-600",
                                 filters.upazilaId === upazila.name
-                                  ? null
-                                  : upazila.name,
-                            });
-                            setUpazilaOpen(false);
-                          }}
-                          className="text-sm"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4 text-pink-600",
-                              filters.upazilaId === upazila.name
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                          {upazila.bn_name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {upazila.bn_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Desktop: Use Popover */}
+              <div className="hidden lg:block">
+                <Popover
+                  open={upazilaOpen}
+                  onOpenChange={setUpazilaOpen}
+                  modal={false}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={upazilaOpen}
+                      disabled={!filters.districtId}
+                      className="h-9 w-full justify-between text-sm disabled:cursor-not-allowed"
+                    >
+                      <span className="truncate">
+                        {selectedUpazila?.bn_name || "উপজেলা নির্বাচন করুন"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[260px] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="উপজেলা খুঁজুন..."
+                        className="h-9"
+                      />
+                      <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
+                      <CommandGroup className="max-h-48 overflow-y-auto">
+                        {availableUpazilas.map((upazila) => (
+                          <CommandItem
+                            key={upazila.id}
+                            value={upazila.bn_name}
+                            onSelect={() => {
+                              setFilters({
+                                upazilaId:
+                                  filters.upazilaId === upazila.name
+                                    ? null
+                                    : upazila.name,
+                              });
+                              setUpazilaOpen(false);
+                            }}
+                            className="text-sm"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4 text-pink-600",
+                                filters.upazilaId === upazila.name
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                            {upazila.bn_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </CollapsibleContent>
         </Collapsible>

@@ -9,11 +9,12 @@ import {
   MessageCircle,
   Linkedin,
   FacebookIcon,
+  ChevronRight,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-
+import { FaWhatsapp } from "react-icons/fa";
 const navItems = [
   { label: "হোম", href: "/" },
   { label: "আমাদের সম্পর্কে", href: "/about" },
@@ -28,7 +29,11 @@ const socialLinks = [
     href: "https://www.facebook.com/share/18CQA5bDtn/",
     icon: Facebook,
   },
-  { name: "WhatsApp", href: "https://wa.me/01748919251", icon: MessageCircle },
+  {
+    name: "WhatsApp",
+    href: "https://wa.me/01748919251",
+    icon: FaWhatsapp, // Using lucide's MessageCircle instead
+  },
   {
     name: "Instagram",
     href: "https://www.instagram.com/niqaha.combd?igsh=MWw3dzVyYXE5cjY2MQ==",
@@ -52,18 +57,18 @@ export default function Footer() {
         {/* Main Footer */}
         <div className="grid gap-8 md:grid-cols-3 lg:grid-cols-4">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 text-center md:text-left">
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
               <Image
                 src={"/footer_image.png"}
                 width={120}
                 height={120}
                 alt="footer_logo"
-                className=" w-20 h-20 md:w-24 md:h-24 object-contain"
+                className="w-20 h-20 md:w-24 md:h-24 object-contain"
               />
             </Link>
 
-            <p className="mb-4 max-w-md text-sm leading-relaxed text-muted-foreground">
+            <p className="mb-4 max-w-md mx-auto md:mx-0 text-sm leading-relaxed text-muted-foreground">
               ইসলামিক মূল্যবোধ ও আধুনিক প্রযুক্তির সমন্বয়ে বিশ্বস্ত বিবাহ সেবা
               প্রদানকারী প্ল্যাটফর্ম।
             </p>
@@ -71,23 +76,23 @@ export default function Footer() {
             <div className="space-y-2 text-sm text-muted-foreground">
               <a
                 href="mailto:niqahabd@gmail.com"
-                className="flex items-center gap-2 transition-colors hover:text-pink-600"
+                className="flex items-center justify-center md:justify-start gap-2 transition-colors hover:text-pink-600"
               >
                 <Mail className="h-4 w-4" />
-                <span>niqahabd@gmail.com </span>
+                <span>niqahabd@gmail.com</span>
               </a>
               <a
                 href="tel:+8801748919251"
-                className="flex items-center gap-2 transition-colors hover:text-pink-600"
+                className="flex items-center justify-center md:justify-start gap-2 transition-colors hover:text-pink-600"
               >
                 <Phone className="h-4 w-4" />
-                <span>01748919251 </span>
+                <span>01748919251</span>
               </a>
             </div>
           </div>
 
           {/* Navigation */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="mb-4 font-heading text-lg font-semibold text-foreground">
               দ্রুত লিংক
             </h4>
@@ -96,8 +101,9 @@ export default function Footer() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-pink-600"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-pink-600 group"
                   >
+                    <ChevronRight className="h-4 w-4 text-pink-600 group-hover:translate-x-1 transition-transform" />
                     {item.label}
                   </Link>
                 </li>
@@ -106,18 +112,20 @@ export default function Footer() {
           </div>
 
           {/* Social */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="mb-4 font-heading text-lg font-semibold text-foreground">
               যোগাযোগ করুন
             </h4>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 justify-center md:justify-start">
               {socialLinks.map((social) => {
                 const Icon = social.icon;
                 return (
                   <a
                     key={social.name}
                     href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
                     aria-label={social.name}
                   >
@@ -127,7 +135,7 @@ export default function Footer() {
               })}
             </div>
 
-            <div className="mt-6 rounded-lg bg-white/60 p-4">
+            <div className="mt-6 rounded-lg bg-white/60 p-4 mx-auto md:mx-0 max-w-xs md:max-w-none">
               <h5 className="mb-2 text-sm font-semibold text-foreground">
                 অফিস টাইম
               </h5>
@@ -142,7 +150,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="mt-8 border-t border-pink-200 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground text-center sm:text-left">
               কপিরাইট © {new Date().getFullYear()} niqaha - সমস্ত অধিকার
               সংরক্ষিত
             </p>
@@ -183,7 +191,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white transition-transform hover:scale-110 hover:bg-pink-700"
-                  aria-label="LinkedIn Rifatul Islam"
+                  aria-label="Facebook Rifatul Islam"
                 >
                   <FacebookIcon className="h-4 w-4" />
                 </a>
