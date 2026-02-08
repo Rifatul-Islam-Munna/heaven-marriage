@@ -85,7 +85,7 @@ export default function Navbar() {
           {/* Desktop Actions */}
           <div className="hidden items-center gap-4 md:flex">
             {/* Language Selector */}
-            <Select value={currentLang} onValueChange={setCurrentLang}>
+            {/*    <Select value={currentLang} onValueChange={setCurrentLang}>
               <SelectTrigger className="w-[100px] border-none">
                 <SelectValue />
               </SelectTrigger>
@@ -96,7 +96,7 @@ export default function Navbar() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select> */}
 
             {/* Login Button */}
             {user ? (
@@ -115,7 +115,7 @@ export default function Navbar() {
           {/* Mobile Menu */}
           <div className="flex items-center gap-2 md:hidden">
             {/* Mobile Language Selector */}
-            <Select value={currentLang} onValueChange={setCurrentLang}>
+            {/*  <Select value={currentLang} onValueChange={setCurrentLang}>
               <SelectTrigger className="w-[80px] border-none">
                 <SelectValue />
               </SelectTrigger>
@@ -126,7 +126,7 @@ export default function Navbar() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select> */}
             <div className="flex  md:hidden">
               {user && <UserNav user={user} />}
             </div>
