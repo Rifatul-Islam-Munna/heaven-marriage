@@ -147,7 +147,7 @@ export default function Footer() {
               সংরক্ষিত
             </p>
 
-            <div className="flex items-center pb-9 md:pb-0.5 gap-3">
+            <div className="flex items-center pb-14 md:pb-0.5 gap-3">
               <span className="text-sm text-muted-foreground">
                 Developed by{" "}
                 <span className="font-semibold text-foreground">
