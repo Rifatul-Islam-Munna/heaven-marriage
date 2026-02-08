@@ -134,3 +134,8 @@
     @apply font-heading; /* Cormorant applied to all headings */
   }
 }
+
+html,
+body {
+  overflow-x: hidden;
+}
