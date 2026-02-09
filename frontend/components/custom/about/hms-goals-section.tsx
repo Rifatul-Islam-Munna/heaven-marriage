@@ -55,12 +55,12 @@ export default function HMSGoalsSection() {
           {/* Header */}
           <div className="mb-12 text-center">
             <h2 className="mb-4 font-heading text-3xl font-bold text-foreground md:text-4xl">
-              HMS এর লক্ষ্য ও উদ্দেশ্য
+              Niqaha এর লক্ষ্য ও উদ্দেশ্য
             </h2>
 
             <div className="mb-6">
               <p className="mb-2 text-lg font-semibold text-pink-600 md:text-xl">
-                🔹 HMS – niqaha Solutions
+                🔹 Niqaha – niqaha Solutions
               </p>
               <p className="text-base italic text-muted-foreground md:text-lg">
                 হালাল ভালোবাসার পথে এক বিশ্বস্ত রাহবার

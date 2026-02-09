@@ -116,7 +116,7 @@ export default function ProfileUpdateForm() {
               <span className="text-sm font-medium text-gray-700">
                 ধাপ {currentStep + 1} / {steps.length}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-sm  font-semibold text-gray-800">
                 {steps[currentStep]}
               </span>
             </div>

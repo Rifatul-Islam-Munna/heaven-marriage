@@ -25,6 +25,7 @@ export interface EducationInfo {
   hSCPassingYear: string;
   hSCPassingGroup: string;
   hSCResult: string;
+  educationBackground?:string
 }
 
 export interface FamilyInfo {

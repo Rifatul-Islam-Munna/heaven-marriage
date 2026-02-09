@@ -18,7 +18,7 @@ export default function HMSIntroductionSectionV2() {
           {/* Title with Underline */}
           <div className="mb-10 text-center">
             <h2 className="mb-3 font-heading text-3xl font-bold text-foreground md:text-4xl">
-              HMS এর পরিচিতি
+              Niqaha এর পরিচিতি
             </h2>
             <div className="mx-auto h-1 w-32 rounded-full bg-gradient-to-r from-transparent via-pink-500 to-transparent" />
           </div>
@@ -58,7 +58,7 @@ export default function HMSIntroductionSectionV2() {
             <div className="mx-auto max-w-4xl">
               <div className="rounded-2xl border-l-4 border-l-pink-500 bg-gradient-to-br from-pink-50/50 to-background p-6  md:p-8">
                 <p className="mb-4 text-base leading-relaxed text-muted-foreground md:text-lg">
-                  <span className="font-semibold text-foreground">HMS</span>{" "}
+                  <span className="font-semibold text-foreground">Niqaha</span>{" "}
                   কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়। এটি ইসলামী শরিয়াহ-সম্মত
                   দায়িত্বশীল প্ল্যাটফর্ম। যেখানে বিবাহ, তালাক ও দম্পত্য জীবনের
                   পরামর্শ সমাধান প্রদান করা হয়।

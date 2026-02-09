@@ -5,7 +5,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { WebData } from "@/@types/user";
 
 const features = [
-  "HMS কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়",
+  "Niqaha কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়",
   "ইসলামী শরিয়াহ-সম্মত দায়িত্বশীল প্ল্যাটফর্ম",
   "বিবাহ, তালাক ও দাম্পত্য জীবনের পরামর্শ সেবা",
   "সুখী, বরকতময় ও টেকসই দাম্পত্য জীবন গঠনে সহায়তা",
@@ -72,7 +72,7 @@ export default function WelcomeSectionWithImage() {
                   <span className="font-semibold text-foreground">
                     আসসালামু আলাইকুম।
                   </span>{" "}
-                  আপনারা ইতিপূর্বে অবগত আছেন যে HMS কোনো সাধারণ ঘটকালি
+                  আপনারা ইতিপূর্বে অবগত আছেন যে Niqaha কোনো সাধারণ ঘটকালি
                   প্রতিষ্ঠান নয়। এটি ইসলামী শরিয়াহ-সম্মত দায়িত্বশীল
                   প্ল্যাটফর্ম।
                 </p>

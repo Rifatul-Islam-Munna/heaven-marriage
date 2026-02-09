@@ -64,7 +64,8 @@ const getInitialFormData = (): Partial<User> => ({
     sSCResult: '',
     hSCPassingYear: '',
     hSCPassingGroup: '',
-    hSCResult: ''
+    hSCResult: '',
+    educationBackground: ''
   },
   familyInfo: {
     isFatherAlive: false,

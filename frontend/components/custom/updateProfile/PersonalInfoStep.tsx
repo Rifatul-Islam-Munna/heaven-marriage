@@ -90,34 +90,42 @@ export function PersonalInfoStep() {
           <Label htmlFor="prayerFiverTimeFrom">
             প্রতিদিন পাঁচ ওয়াক্ত নামাজ পড়েন?
           </Label>
-          <Input
-            id="prayerFiverTimeFrom"
+          <Select
             value={formData.personalInformation?.prayerFiverTimeFrom || ""}
-            onChange={(e) =>
+            onValueChange={(value) =>
               updateNestedField(
                 "personalInformation",
                 "prayerFiverTimeFrom",
-                e.target.value,
+                value,
               )
             }
-            placeholder="যেমন: ২০১৮ সাল থেকে"
-          />
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+              <SelectItem value="না">না</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="reciteQuran">কুরআন তিলওয়াত করতে পারেন?</Label>
-          <Input
-            id="reciteQuran"
+          <Select
             value={formData.personalInformation?.reciteQuran || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "reciteQuran",
-                e.target.value,
-              )
+            onValueChange={(value) =>
+              updateNestedField("personalInformation", "reciteQuran", value)
             }
-            placeholder="হ্যাঁ/না/শুদ্ধভাবে"
-          />
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+              <SelectItem value="না">না</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
@@ -180,7 +188,7 @@ export function PersonalInfoStep() {
 
         {formData.gender === "male" && (
           <>
-            <div className="space-y-2">
+            {/*  <div className="space-y-2">
               <Label htmlFor="manBeard">সুন্নতি দাড়ি আছে? কবে থেকে?</Label>
               <Input
                 id="manBeard"
@@ -193,7 +201,7 @@ export function PersonalInfoStep() {
                   )
                 }
               />
-            </div>
+            </div> */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="manClothAboveAnkels"
@@ -215,7 +223,7 @@ export function PersonalInfoStep() {
           </>
         )}
 
-        <div className="space-y-2">
+        {/*  <div className="space-y-2">
           <Label htmlFor="maharaNonMahram">মাহরাম/নন-মাহরাম মেনে চলেন?</Label>
           <Input
             id="maharaNonMahram"
@@ -228,8 +236,8 @@ export function PersonalInfoStep() {
               )
             }
           />
-        </div>
-
+        </div> */}
+        {/* 
         <div className="space-y-2">
           <Label htmlFor="MissPrayerTime">
             সপ্তাহে কত ওয়াক্ত নামায কাযা হয়?
@@ -245,9 +253,9 @@ export function PersonalInfoStep() {
               )
             }
           />
-        </div>
+        </div> */}
 
-        <div className="space-y-2">
+        {/*   <div className="space-y-2">
           <Label htmlFor="digitalMedia">নাটক/সিনেমা/গান দেখেন বা শুনেন?</Label>
           <Input
             id="digitalMedia"
@@ -260,7 +268,7 @@ export function PersonalInfoStep() {
               )
             }
           />
-        </div>
+        </div> */}
 
         <div className="space-y-2">
           <Label htmlFor="mentalOrPhysicalIssue">
@@ -280,7 +288,7 @@ export function PersonalInfoStep() {
         </div>
       </div>
 
-      <div className="space-y-2">
+      {/*  <div className="space-y-2">
         <Label htmlFor="specialWorkOfDeen">
           দ্বীনের কোন বিশেষ মেহনতে যুক্ত আছেন?
         </Label>
@@ -296,9 +304,9 @@ export function PersonalInfoStep() {
           }
           rows={2}
         />
-      </div>
+      </div> */}
 
-      <div className="space-y-2">
+      {/*   <div className="space-y-2">
         <Label htmlFor="islamicBookName">আপনার পড়া ইসলামি বইয়ের নাম</Label>
         <Textarea
           id="islamicBookName"
@@ -312,9 +320,9 @@ export function PersonalInfoStep() {
           }
           rows={2}
         />
-      </div>
+      </div> */}
 
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <Label htmlFor="islamicScholarsName">পছন্দের আলেমের নাম</Label>
         <Textarea
           id="islamicScholarsName"
@@ -328,9 +336,9 @@ export function PersonalInfoStep() {
           }
           rows={2}
         />
-      </div>
+      </div> */}
 
-      <div className="space-y-2">
+      {/*   <div className="space-y-2">
         <Label htmlFor="majarBeliveStatus">মাজার সম্পর্কে আপনার ধারণা</Label>
         <Input
           id="majarBeliveStatus"
@@ -343,7 +351,7 @@ export function PersonalInfoStep() {
             )
           }
         />
-      </div>
+      </div> */}
 
       <div className="space-y-2">
         <Label htmlFor="extraInfoHobby">শখ, পছন্দ-অপছন্দ</Label>

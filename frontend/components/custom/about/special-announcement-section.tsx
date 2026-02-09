@@ -47,8 +47,8 @@ export default function SpecialAnnouncementSection() {
             {/* Introduction */}
             <div className="mb-6 text-center">
               <p className="text-base leading-relaxed text-muted-foreground md:text-lg">
-                <span className="font-semibold text-pink-600">HMS</span> — এটি
-                একটি ইমানি বিশ্বাসের বন্ধন। সততা ও শরীয়াহর আলোকে পরিচালিত
+                <span className="font-semibold text-pink-600">Niqaha</span> —
+                এটি একটি ইমানি বিশ্বাসের বন্ধন। সততা ও শরীয়াহর আলোকে পরিচালিত
                 প্রতিটি সম্পর্ক এখানে পবিত্র।
               </p>
             </div>
@@ -93,7 +93,7 @@ export default function SpecialAnnouncementSection() {
             <div className="inline-flex items-center gap-2 rounded-full bg-pink-100 px-6 py-3">
               <span className="text-2xl">🌸</span>
               <p className="text-base font-medium text-pink-700">
-                HMS — আপনার জান্নাতের পথে হালাল ভালোবাসার সঙ্গী।
+                Niqaha — আপনার জান্নাতের পথে হালাল ভালোবাসার সঙ্গী।
               </p>
             </div>
           </div>

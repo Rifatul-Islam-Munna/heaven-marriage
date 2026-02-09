@@ -83,6 +83,8 @@ export class User {
         hSCPassingYear:string;
         hSCPassingGroup:string;
         hSCResult:string
+
+        educationBackground:string
     }
 
    @Prop({type:Object})

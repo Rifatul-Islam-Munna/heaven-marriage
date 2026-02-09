@@ -11,15 +11,51 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useProfileStore } from "@/zustan/useProfileStore";
-import { educationMediumOptions } from "@/staticData/all-data";
+import {
+  educationMediumOptions,
+  educationOptions,
+} from "@/staticData/all-data";
+import { useMemo } from "react";
 
 export function EducationStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateNestedField = useProfileStore((state) => state.updateNestedField);
 
+  // Filter education options based on gender
+  const userGender = formData.gender || formData.gender;
+  const filteredEducationOptions = useMemo(() => {
+    if (!userGender) return educationOptions;
+    return educationOptions.filter(
+      (option) => option.gender === userGender || option.gender === "both",
+    );
+  }, [userGender]);
+
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-4">
+        {/* NEW DROPDOWN - EDUCATION BACKGROUND */}
+        <div className="space-y-2">
+          <Label htmlFor="educationBackground">শিক্ষাগত পটভূমি *</Label>
+          <Select
+            value={formData.educationInfo?.educationBackground || ""}
+            onValueChange={(value) =>
+              updateNestedField("educationInfo", "educationBackground", value)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredEducationOptions.map((option) => (
+                <SelectItem key={option.bangla} value={option.bangla}>
+                  {option.bangla}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* EXISTING CODE - UNCHANGED */}
         <div className="space-y-2">
           <Label htmlFor="educationMethod">শিক্ষা মাধ্যম *</Label>
           <Select
@@ -126,102 +162,6 @@ export function EducationStep() {
       </div>
 
       <Separator />
-
-      <div>
-        <h4 className="font-semibold text-gray-700 mb-4">
-          এস.এস.সি / দাখিল তথ্য
-        </h4>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="sSCPassingYear">পাসের সন</Label>
-            <Input
-              id="sSCPassingYear"
-              value={formData.educationInfo?.sSCPassingYear || ""}
-              onChange={(e) =>
-                updateNestedField(
-                  "educationInfo",
-                  "sSCPassingYear",
-                  e.target.value,
-                )
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sSCPassingGroup">বিভাগ</Label>
-            <Input
-              id="sSCPassingGroup"
-              value={formData.educationInfo?.sSCPassingGroup || ""}
-              onChange={(e) =>
-                updateNestedField(
-                  "educationInfo",
-                  "sSCPassingGroup",
-                  e.target.value,
-                )
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="sSCResult">ফলাফল</Label>
-            <Input
-              id="sSCResult"
-              value={formData.educationInfo?.sSCResult || ""}
-              onChange={(e) =>
-                updateNestedField("educationInfo", "sSCResult", e.target.value)
-              }
-              placeholder="জিপিএ"
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <h4 className="font-semibold text-gray-700 mb-4">
-          এইচ.এস.সি / আলিম তথ্য
-        </h4>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="hSCPassingYear">পাসের সন</Label>
-            <Input
-              id="hSCPassingYear"
-              value={formData.educationInfo?.hSCPassingYear || ""}
-              onChange={(e) =>
-                updateNestedField(
-                  "educationInfo",
-                  "hSCPassingYear",
-                  e.target.value,
-                )
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="hSCPassingGroup">বিভাগ</Label>
-            <Input
-              id="hSCPassingGroup"
-              value={formData.educationInfo?.hSCPassingGroup || ""}
-              onChange={(e) =>
-                updateNestedField(
-                  "educationInfo",
-                  "hSCPassingGroup",
-                  e.target.value,
-                )
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="hSCResult">ফলাফল</Label>
-            <Input
-              id="hSCResult"
-              value={formData.educationInfo?.hSCResult || ""}
-              onChange={(e) =>
-                updateNestedField("educationInfo", "hSCResult", e.target.value)
-              }
-              placeholder="জিপিএ"
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

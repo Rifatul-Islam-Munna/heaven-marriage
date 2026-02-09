@@ -108,6 +108,10 @@ class EducationInfoDto {
   @IsString()
   @IsOptional()
   hSCResult?: string;
+  @ApiPropertyOptional({ example: 'A' })
+  @IsString()
+  @IsOptional()
+  educationBackground?: string;
 }
 
 class FamilyInfoDto {

@@ -48,16 +48,17 @@ export const marriedStatus = [
 
 
 export const educationMediumOptions = [
-  { value: "bangla", label: "বাংলা মাধ্যম" },
-  { value: "english", label: "ইংলিশ মাধ্যম" },
-  { value: "madrasa", label: "মাদ্রাসা" },
-  { value: "english-version", label: "ইংলিশ ভার্সন" },
+  { value: "Qawmi Madrasa", label: "কওমী মাদ্রাসা পড়ুয়া" },
+  { value: "Alia Madrasa", label: "আলিয়া মাদ্রাসা পড়ুয়া" },
+  { value: "General education", label: "জেনারেল শিক্ষিত" },
+  { value: "No formal education", label: "লেখাপড়া করা হয়নি" },
 ];
 export const skinColorOptions = [
-  { value: "fair", label: "ফর্সা" },
-  { value: "brown", label: "শ্যামলা" },
-  { value: "dark", label: "কালো" },
-  { value: "bright", label: "উজ্জ্বল" },
+  { value: "very_fair", label: "উজ্জ্বল ফর্সা", gender: "both" },
+  { value: "fair", label: "ফর্সা", gender: "both" },
+  { value: "bright_tan_male", label: "উজ্জ্বল শ্যামলা", gender: "male" },
+  { value: "tan_male", label: "শ্যামলা", gender: "male" },
+  { value: "dark", label: "কালো", gender: "both" },
 ];
 export const fiqhOptions = [
   { value: "hanafi", label: "হানাফি" },
@@ -74,10 +75,11 @@ export const religiousEducationOptions = [
   { value: "dawah", label: "দাঈ" },
 ];
 export const economicStatusOptions = [
-  { value: "upper", label: "উচ্চবিত্ত" },
-  { value: "upper-middle", label: "উচ্চ মধ্যবিত্ত" },
-  { value: "middle", label: "মধ্যবিত্ত" },
-  { value: "lower-middle", label: "নিম্ন মধ্যবিত্ত" },
+  { value: "upper", label: "উচ্চবিত্ত", gender: "both" },
+  { value: "upper_middle", label: "উচ্চ-মধ্যবিত্ত", gender: "both" },
+  { value: "middle", label: "মধ্যবিত্ত", gender: "both" },
+  { value: "lower_middle", label: "নিম্ন-মধ্যবিত্ত", gender: "both" },
+  { value: "lower", label: "নিম্নবিত্ত", gender: "both" },
 ];
 export const professionOptions = [
   { value: "doctor", label: "ডাক্তার" },
@@ -88,8 +90,41 @@ export const professionOptions = [
   { value: "private-job", label: "বেসরকারি চাকরি" },
   { value: "student", label: "ছাত্র/ছাত্রী" },
   { value: "housewife", label: "গৃহিণী" },
+  // --- New additions from the image ---
+  { value: "business", label: "ব্যবসা" },
+  { value: "job", label: "চাকরি" },
+  { value: "agriculture", label: "কৃষি" },
+  { value: "expatriate", label: "প্রবাস" },
+  { value: "freelance", label: "ফ্রিল্যান্স" },
+  { value: "technical", label: "কারিগরি" },
+  { value: "no-income", label: "আয় নেই" },
 ];
 
+
+export const educationOptions = [
+  // --- Male Options ---
+  { bangla: "মুফতি", english: "Mufti", gender: "male", type: "Religious" },
+  { bangla: "মুফাসসির", english: "Mufassir", gender: "male", type: "Religious" },
+  { bangla: "শায়খুল হাদিস", english: "Shaykh al-Hadith", gender: "male", type: "Religious" },
+  { bangla: "আলেম", english: "Alim", gender: "male", type: "Religious" },
+  { bangla: "হাফেজ", english: "Hafez", gender: "male", type: "Religious" },
+  { bangla: "আত্মশিক্ষিত", english: "Self-educated", gender: "male", type: "General" },
+
+  // --- Female Options ---
+  { bangla: "মুফতিয়া", english: "Muftiya", gender: "female", type: "Religious" },
+  { bangla: "মুফাসসিরা", english: "Mufassira", gender: "female", type: "Religious" },
+  { bangla: "শায়খাতুল হাদিস", english: "Shaykhatul Hadith", gender: "female", type: "Religious" },
+  { bangla: "আলেমা", english: "Alima", gender: "female", type: "Religious" },
+  { bangla: "হাফেজা", english: "Hafeza", gender: "female", type: "Religious" },
+  { bangla: "আত্মশিক্ষিতা", english: "Self-educated", gender: "female", type: "General" },
+
+  // --- Gender Neutral Options (Applicable to both) ---
+  { bangla: "মাস্টার্স", english: "Masters", gender: "both", type: "General" },
+  { bangla: "অনার্স", english: "Honours", gender: "both", type: "General" },
+  { bangla: "এইচ এস সি", english: "HSC", gender: "both", type: "General" },
+  { bangla: "এস এস সি", english: "SSC", gender: "both", type: "General" },
+  { bangla: "অষ্টম পাস", english: "Class 8 Pass", gender: "both", type: "General" }
+];
 
 export const countries = [
   {

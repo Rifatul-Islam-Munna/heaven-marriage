@@ -4,6 +4,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function MarriageInfoStep() {
   const formData = useProfileStore((state) => state.formData);
@@ -109,56 +116,76 @@ export function MarriageInfoStep() {
         <Label htmlFor="wifeVailAfterMarriage">
           বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন?
         </Label>
-        <Input
-          id="wifeVailAfterMarriage"
+        <Select
           value={formData.marriageInformationMan?.wifeVailAfterMarriage || ""}
-          onChange={(e) =>
+          onValueChange={(value) =>
             updateNestedField(
               "marriageInformationMan",
               "wifeVailAfterMarriage",
-              e.target.value,
+              value,
             )
           }
-          placeholder="হ্যাঁ/না"
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="নির্বাচন করুন" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+            <SelectItem value="না">না</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="allowWifeStudyAfterMarriage">
           স্ত্রীকে পড়াশোনা করতে দিতে চান?
         </Label>
-        <Input
-          id="allowWifeStudyAfterMarriage"
+        <Select
           value={
             formData.marriageInformationMan?.allowWifeStudyAfterMarriage || ""
           }
-          onChange={(e) =>
+          onValueChange={(value) =>
             updateNestedField(
               "marriageInformationMan",
               "allowWifeStudyAfterMarriage",
-              e.target.value,
+              value,
             )
           }
-          placeholder="হ্যাঁ/না/শর্তসাপেক্ষে"
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="নির্বাচন করুন" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+            <SelectItem value="না">না</SelectItem>
+            <SelectItem value="শর্তসাপেক্ষে">শর্তসাপেক্ষে</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="wifeJobAfterMarriage">
           স্ত্রীকে চাকরি করতে দিতে চান?
         </Label>
-        <Input
-          id="wifeJobAfterMarriage"
+        <Select
           value={formData.marriageInformationMan?.wifeJobAfterMarriage || ""}
-          onChange={(e) =>
+          onValueChange={(value) =>
             updateNestedField(
               "marriageInformationMan",
               "wifeJobAfterMarriage",
-              e.target.value,
+              value,
             )
           }
-          placeholder="হ্যাঁ/না/শর্তসাপেক্ষে"
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="নির্বাচন করুন" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+            <SelectItem value="না">না</SelectItem>
+            <SelectItem value="শর্তসাপেক্ষে">শর্তসাপেক্ষে</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
@@ -185,20 +212,26 @@ export function MarriageInfoStep() {
         <Label htmlFor="expectedAnyGiftFromMarriage">
           পাত্রীপক্ষের কাছে কোনো উপহার আশা করেন?
         </Label>
-        <Input
-          id="expectedAnyGiftFromMarriage"
+        <Select
           value={
             formData.marriageInformationMan?.expectedAnyGiftFromMarriage || ""
           }
-          onChange={(e) =>
+          onValueChange={(value) =>
             updateNestedField(
               "marriageInformationMan",
               "expectedAnyGiftFromMarriage",
-              e.target.value,
+              value,
             )
           }
-          placeholder="হ্যাঁ/না"
-        />
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="নির্বাচন করুন" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="হ্যাঁ">হ্যাঁ</SelectItem>
+            <SelectItem value="না">না</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">

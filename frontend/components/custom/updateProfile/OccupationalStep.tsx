@@ -19,7 +19,7 @@ export function OccupationalStep() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="profession">পেশা *</Label>
+        <Label htmlFor="profession">আপনার পেশা *</Label>
 
         <Select
           value={formData.occupational?.profession || ""}
@@ -30,7 +30,7 @@ export function OccupationalStep() {
           <SelectTrigger>
             <SelectValue placeholder="নির্বাচন করুন" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="">
             {professionOptions.map((option) => (
               <SelectItem key={option?.value} value={option?.value}>
                 {option?.label}

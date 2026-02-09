@@ -47,13 +47,13 @@ const benefits = [
     icon: Award,
     title: "শরিয়াহ সম্মত",
     description:
-      "HMS-এর মাধ্যমে স্বল্প খরচে শরিয়তসম্মত সুন্নাহ মোতাবেক বিবাহের সুযোগ",
+      "Niqaha-এর মাধ্যমে স্বল্প খরচে শরিয়তসম্মত সুন্নাহ মোতাবেক বিবাহের সুযোগ",
   },
   {
     icon: Sparkles,
     title: "সহজ ব্যবস্থাপনা",
     description:
-      "HMS-এর ওয়েবসাইটে পুরুষ ও নারীদের সিভি আলাদা আলাদা ক্যাটাগরাইজ অনুযায়ী হওয়ার কারণে খোঁজাখুঁজির ঝামেলা থেকে মুক্ত।",
+      "Niqaha-এর ওয়েবসাইটে পুরুষ ও নারীদের সিভি আলাদা আলাদা ক্যাটাগরাইজ অনুযায়ী হওয়ার কারণে খোঁজাখুঁজির ঝামেলা থেকে মুক্ত।",
   },
   {
     icon: CheckCircle2,
@@ -104,7 +104,7 @@ export default function HMSBenefitsSection() {
           </div>
 
           <h2 className="font-heading text-4xl font-bold leading-tight text-foreground sm:text-5xl md:text-6xl">
-            কেনো <span className="text-pink-600">HMS</span>
+            কেনো <span className="text-pink-600">Niqaha</span>
             -এর মাধ্যমে বিবাহ করবেন?
           </h2>
 

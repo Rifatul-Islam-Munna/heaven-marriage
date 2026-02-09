@@ -54,6 +54,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useRouter } from "next/navigation";
 
 interface ProfileViewProps {
   id: string;
@@ -126,6 +127,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
     1000,
     "bio-data-info",
   );
+  const router = useRouter();
+
   const { mutate, isPending } = useCommonMutationApi({
     method: "POST",
     url: "/user/add-to-shortlist",
@@ -170,6 +173,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
   }
 
   const handelRequestForNumber = () => {
+    if ((user?.numberOfConnections ?? 0) <= 0) return router.push("/#pricing");
     RequestPhoneNumber({
       userId: user?._id,
       requestUserId: userData._id,
@@ -218,7 +222,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 ) : (
                   <Heart className="w-4 h-4 mr-2" />
                 )}
-                শর্টলিস্ট
+                প্রিয়
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -230,7 +234,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : null}
                     <Phone className="w-4 h-4 mr-2" />
-                    মোবাইল নাম্বার
+                    মোবাইল নম্বর নিন
                   </Button>
                 </AlertDialogTrigger>
 
@@ -450,6 +454,10 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     <InfoRow
                       label="সর্বোচ্চ শিক্ষাগত যোগ্যতা"
                       value={userData?.educationInfo?.highestEducation}
+                    />
+                    <InfoRow
+                      label="শিক্ষাগত পটভূমি"
+                      value={userData?.educationInfo?.educationBackground}
                     />
                     <InfoRow
                       label="বিভাগ"
