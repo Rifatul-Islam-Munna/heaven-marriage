@@ -173,6 +173,12 @@ export class User {
     anyMisInformationWeAreNotKnowing:boolean;
   
    }
+   @Prop({
+  type: Map,
+  of: String,
+  default: {}
+})
+customFields?: Map<string, string>;
 
 
 }
@@ -206,22 +212,4 @@ UserSchema.index({
   }
 });
 
-UserSchema.pre('save', async function() {
-  const doc = this;
-  
-  // Only generate userId for new documents
-  if ( !doc.userId) {
-    // Get the Counter model
-    const Counter = this.db.model('Counter');
-    
-    // Increment the counter and get the new value
-    const counter = await Counter.findByIdAndUpdate(
-      { _id: 'userId' },
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-    
-    // Assign the userId (you can format it as needed)
-    doc.userId = `${String(counter.seq).padStart(6, '0')}`; // e.g., USER000001
-  }
-});
+

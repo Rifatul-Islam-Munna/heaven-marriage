@@ -8,12 +8,17 @@ interface ProfileStore {
   
   // Current step
   currentStep: number;
-    shouldShowEmail: boolean;
+  shouldShowEmail: boolean;
   shouldShowPhoneNumber: boolean;
+  
   // Actions
   setCurrentStep: (step: number) => void;
   updateField: (field: keyof User, value: any) => void;
   updateNestedField: (parent: keyof User, field: string, value: any) => void;
+  
+  // NEW: Custom fields actions ✅
+  updateCustomField: (questionKey: string, answer: string) => void;
+  setAllCustomFields: (customFields: Record<string, string>) => void;
   
   // Initialize with existing data
   initializeForm: (data: Partial<User>) => void;
@@ -36,6 +41,10 @@ const getInitialFormData = (): Partial<User> => ({
   bloodGroup: '',
   weight: undefined,
   nationality: '',
+  
+  // ADD THIS ✅
+  customFields: {},
+  
   address: {
     presentAddress: '',
     permanentAddress: '',
@@ -157,14 +166,37 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       }
     })),
 
+  // NEW: Update single custom field ✅
+  updateCustomField: (questionKey, answer) =>
+    set((state) => ({
+      formData: {
+        ...state.formData,
+        customFields: {
+          ...(state.formData.customFields || {}),
+          [questionKey]: answer
+        }
+      }
+    })),
+
+  // NEW: Set all custom fields at once ✅
+  setAllCustomFields: (customFields) =>
+    set((state) => ({
+      formData: {
+        ...state.formData,
+        customFields
+      }
+    })),
+
   // Load existing data into form
   initializeForm: (data) =>
     set({
       formData: {
         ...getInitialFormData(),
-        ...data
+        ...data,
+        // Ensure customFields is merged properly ✅
+        customFields: data.customFields || {}
       },
-      shouldShowEmail: !data.email,           
+      shouldShowEmail: !data.email,
       shouldShowPhoneNumber: !data.phoneNumber,
       currentStep: 0
     }),

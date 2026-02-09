@@ -134,7 +134,8 @@ export interface User {
   pledge?: Pledge;
   createdAt?: Date;
   updatedAt?: Date;
-  numberOfConnections?:number
+  numberOfConnections?:number;
+    customFields?: Record<string, string>;
 }
 export interface UserInfo {
   _id:string

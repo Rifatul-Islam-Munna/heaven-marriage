@@ -14,6 +14,7 @@ import {
   IsNotEmpty,
   Length,
   IsPhoneNumber,
+  IsObject,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserType } from '../entities/user.entity';
@@ -612,4 +613,15 @@ export class CreateUserDto {
     return value;
   })
   pledge?: PledgeDto;
+
+   @ApiPropertyOptional({
+    description: 'Dynamic custom fields as key-value pairs',
+    example: {
+      height: '5.8',
+      occupation: 'Engineer',
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, string>;
 }

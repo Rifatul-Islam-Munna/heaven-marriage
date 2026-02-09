@@ -45,6 +45,10 @@ const data = {
           title: "মূল্য",
           url: "/dashboard/pricing",
         },
+        {
+          title: "ব্যবহারকারীর প্রশ্ন",
+          url: "/dashboard/user-question",
+        },
       ],
     },
     {

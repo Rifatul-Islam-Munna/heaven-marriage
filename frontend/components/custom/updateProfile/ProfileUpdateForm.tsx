@@ -16,6 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useEffect } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
+import { CustomQuestionsStep } from "./CustomQuestionsStep";
 
 const steps = [
   "মৌলিক তথ্য",
@@ -26,6 +27,7 @@ const steps = [
   "পেশাগত তথ্য",
   "বিবাহ সম্পর্কিত তথ্য",
   "প্রত্যাশিত জীবনসঙ্গী",
+  "অতিরিক্ত তথ্য",
   "অঙ্গীকার",
 ];
 
@@ -95,6 +97,8 @@ export default function ProfileUpdateForm() {
       case 7:
         return <ExpectedPartnerStep />;
       case 8:
+        return <CustomQuestionsStep />;
+      case 9:
         return <PledgeStep />;
       default:
         return <BasicInfoStep />;

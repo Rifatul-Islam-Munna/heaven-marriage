@@ -15,6 +15,7 @@ import { PricingModule } from './pricing/pricing.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
 import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomQuestionModule } from './custom-question/custom-question.module';
 @Module({
   imports: [
    ThrottlerModule.forRoot({
@@ -60,6 +61,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     ImageModule,
     WebDataModule,
     PricingModule,
+    CustomQuestionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -820,6 +820,27 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Custom Questions Section - Add this anywhere in your grid */}
+            {userData?.customFields &&
+              Object.keys(userData.customFields).length > 0 && (
+                <Card className="shadow-none">
+                  <CardContent className="pt-6">
+                    <SectionHeader icon={Book} title="অতিরিক্ত তথ্য" />
+                    <div className="space-y-1">
+                      {Object.entries(userData.customFields).map(
+                        ([question, answer], index) => (
+                          <InfoRow
+                            key={index}
+                            label={question}
+                            value={answer}
+                          />
+                        ),
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
           </div>
         </div>
 
