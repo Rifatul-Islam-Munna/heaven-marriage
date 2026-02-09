@@ -293,7 +293,7 @@ const User = () => {
                 className="border-gray-300 text-gray-700 hover:bg-gray-100"
               >
                 <Eye className="w-4 h-4 mr-2" />
-                আমার প্রোফাইল দেখুন
+                নিজের প্রফাইল দেখুন
               </Button>
             </div>
           </div>

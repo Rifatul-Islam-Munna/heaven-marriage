@@ -78,7 +78,7 @@ export class UserController {
   }
   @Get('get-all-user-for-admin')
   @UseGuards(AuthGuard,RolesGuard)
- /*  @Roles(UserType.ADMIN) */
+  @Roles(UserType.ADMIN)
 
   getAllUserForAdmin(@Query() query: AdminUserDto) {
     return this.userService.getUserForAdmin(query);
@@ -136,7 +136,7 @@ export class UserController {
   }
   @Patch('update-user-subscriber')
     @UseGuards(AuthGuard,RolesGuard)
- /*  @Roles(UserType.ADMIN) */
+  @Roles(UserType.ADMIN)
   UpdateUserSubscriber( @Body() updateUserDto: FindOneDto) {
     return this.userService.toggleSubscription( updateUserDto.id);
   }
@@ -147,7 +147,7 @@ export class UserController {
   }
   @Delete('delete-user-admin')
   @UseGuards(AuthGuard,RolesGuard)
- /*  @Roles(UserType.ADMIN) */
+  @Roles(UserType.ADMIN)
   deleteUser(@Query() id: FindOneDto) {
     return this.userService.remove(id);
   }

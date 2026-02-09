@@ -87,7 +87,7 @@ export class UserService  implements OnModuleInit{
   const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
   const {phoneNumber,name} = createUserDto
-  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{id:1}},{new:true, upsert: true }).lean();
+  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
   const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
   const getOtp = await this.otpService.generateUniqueOTP()
     const finalData ={
@@ -211,7 +211,7 @@ async findUserAndUpdated() {
    const {email,name,picture,} = googlePayload as {email:string,name:string,picture:string}
 
    let finUserByEmail = await this.userModel.findOne({email:email});
-  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{id:1}},{new:true, upsert: true }).lean();
+  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
   const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
    if(!finUserByEmail){
      finUserByEmail = await this.userModel.create({

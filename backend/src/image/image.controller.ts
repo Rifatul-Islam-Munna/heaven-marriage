@@ -9,11 +9,15 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { cwd } from 'process';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { RolesGuard } from 'src/lib/roles.guard';
+import { Roles } from 'src/lib/roles.decorator';
+import { UserType } from 'src/user/entities/user.entity';
 @Controller('image')
 export class ImageController {
   constructor(private readonly imageService: ImageService) {}
   @Post("upload-image")
-    @UseGuards(AuthGuard)
+    @UseGuards(AuthGuard,RolesGuard)
+    @Roles(UserType.ADMIN)
   
      @ApiConsumes('multipart/form-data')
    @UseInterceptors(FileInterceptor("file",{
