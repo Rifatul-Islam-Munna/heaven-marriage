@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +10,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import {
@@ -17,29 +33,109 @@ import {
   skinColorOptions,
 } from "@/staticData/all-data";
 
+// Height options from 4'4" to 7'0"
+const generateHeightOptions = () => {
+  const heights = [];
+  const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+
+  const toBanglaNumber = (num: number) => {
+    return num
+      .toString()
+      .split("")
+      .map((digit) => banglaDigits[parseInt(digit)])
+      .join("");
+  };
+
+  for (let feet = 4; feet <= 7; feet++) {
+    const maxInches = feet === 7 ? 0 : 11;
+    for (let inches = 0; inches <= maxInches; inches++) {
+      if (feet === 4 && inches < 4) continue; // Start from 4'4"
+
+      // Value format: 5.6 (means 5 feet 6 inches)
+      const enValue = `${feet}.${inches}`;
+      const bnLabel = `${toBanglaNumber(feet)} ফুট ${toBanglaNumber(inches)} ইঞ্চি`;
+
+      heights.push({
+        value: enValue,
+        label: bnLabel,
+        searchText: `${feet} ${inches} ${feet}.${inches} ${bnLabel}`, // For better search
+      });
+    }
+  }
+
+  return heights;
+};
+
+const heightOptions = generateHeightOptions();
+
 export function PersonalInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateNestedField = useProfileStore((state) => state.updateNestedField);
+  const [heightOpen, setHeightOpen] = useState(false);
+
+  const bodyStructureOptions = [
+    { id: 1, label: "হালকা পাতলা গড়ন এর", value: "slim_thin" },
+    { id: 2, label: "মাঝারি স্বাস্থ্যধারী", value: "average_medium" },
+    { id: 3, label: "ভারীদেহী", value: "heavy_built" },
+  ];
 
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="height">উচ্চতা (ফুট)</Label>
-          <Input
-            id="height"
-            type="number"
-            step="0.1"
-            value={formData.personalInformation?.height || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "height",
-                parseFloat(e.target.value),
-              )
-            }
-            placeholder="৫.৫"
-          />
+          <Popover open={heightOpen} onOpenChange={setHeightOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={heightOpen}
+                className="w-full justify-between"
+              >
+                {formData.personalInformation?.height
+                  ? heightOptions.find(
+                      (option) =>
+                        option.value ===
+                        formData.personalInformation?.height?.toString(),
+                    )?.label
+                  : "উচ্চতা নির্বাচন করুন"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0">
+              <Command>
+                <CommandInput placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
+                <CommandEmpty>কোনো উচ্চতা পাওয়া যায়নি।</CommandEmpty>
+                <CommandGroup className="max-h-64 overflow-auto">
+                  {heightOptions.map((option) => (
+                    <CommandItem
+                      key={option.value}
+                      value={option.searchText}
+                      onSelect={() => {
+                        updateNestedField(
+                          "personalInformation",
+                          "height",
+                          option.value,
+                        );
+                        setHeightOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          formData.personalInformation?.height?.toString() ===
+                            option.value
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {option.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
@@ -55,7 +151,7 @@ export function PersonalInfoStep() {
             </SelectTrigger>
             <SelectContent>
               {skinColorOptions.map((item) => (
-                <SelectItem key={item?.value} value={item?.value}>
+                <SelectItem key={item?.value} value={item?.label}>
                   {item?.label}
                 </SelectItem>
               ))}
@@ -64,26 +160,49 @@ export function PersonalInfoStep() {
         </div>
 
         <div className="space-y-2">
-          <div className="space-y-2">
-            <Label htmlFor="মাদ্রাসা/স্বশিক্ষিত">দ্বীনের শিক্ষা</Label>
-            <Select
-              value={formData.personalInformation?.islamicStudy || ""}
-              onValueChange={(value) =>
-                updateNestedField("personalInformation", "islamicStudy", value)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="নির্বাচন করুন" />
-              </SelectTrigger>
-              <SelectContent>
-                {religiousEducationOptions.map((item) => (
-                  <SelectItem key={item?.value} value={item?.value}>
-                    {item?.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Label htmlFor="physicalStructure">শারীরিক কাঠামো?</Label>
+          <Select
+            value={formData.personalInformation?.physicalStructure || ""}
+            onValueChange={(value) =>
+              updateNestedField(
+                "personalInformation",
+                "physicalStructure",
+                value,
+              )
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {bodyStructureOptions.map((item) => (
+                <SelectItem key={item?.value} value={item?.label}>
+                  {item?.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="islamicStudy">দ্বীনের শিক্ষা</Label>
+          <Select
+            value={formData.personalInformation?.islamicStudy || ""}
+            onValueChange={(value) =>
+              updateNestedField("personalInformation", "islamicStudy", value)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {religiousEducationOptions.map((item) => (
+                <SelectItem key={item?.value} value={item?.label}>
+                  {item?.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
@@ -141,7 +260,7 @@ export function PersonalInfoStep() {
             </SelectTrigger>
             <SelectContent>
               {fiqhOptions.map((item) => (
-                <SelectItem key={item?.value} value={item?.value}>
+                <SelectItem key={item?.value} value={item?.label}>
                   {item?.label}
                 </SelectItem>
               ))}
@@ -188,20 +307,6 @@ export function PersonalInfoStep() {
 
         {formData.gender === "male" && (
           <>
-            {/*  <div className="space-y-2">
-              <Label htmlFor="manBeard">সুন্নতি দাড়ি আছে? কবে থেকে?</Label>
-              <Input
-                id="manBeard"
-                value={formData.personalInformation?.manBeard || ""}
-                onChange={(e) =>
-                  updateNestedField(
-                    "personalInformation",
-                    "manBeard",
-                    e.target.value,
-                  )
-                }
-              />
-            </div> */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="manClothAboveAnkels"
@@ -223,53 +328,6 @@ export function PersonalInfoStep() {
           </>
         )}
 
-        {/*  <div className="space-y-2">
-          <Label htmlFor="maharaNonMahram">মাহরাম/নন-মাহরাম মেনে চলেন?</Label>
-          <Input
-            id="maharaNonMahram"
-            value={formData.personalInformation?.maharaNonMahram || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "maharaNonMahram",
-                e.target.value,
-              )
-            }
-          />
-        </div> */}
-        {/* 
-        <div className="space-y-2">
-          <Label htmlFor="MissPrayerTime">
-            সপ্তাহে কত ওয়াক্ত নামায কাযা হয়?
-          </Label>
-          <Input
-            id="MissPrayerTime"
-            value={formData.personalInformation?.MissPrayerTime || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "MissPrayerTime",
-                e.target.value,
-              )
-            }
-          />
-        </div> */}
-
-        {/*   <div className="space-y-2">
-          <Label htmlFor="digitalMedia">নাটক/সিনেমা/গান দেখেন বা শুনেন?</Label>
-          <Input
-            id="digitalMedia"
-            value={formData.personalInformation?.digitalMedia || ""}
-            onChange={(e) =>
-              updateNestedField(
-                "personalInformation",
-                "digitalMedia",
-                e.target.value,
-              )
-            }
-          />
-        </div> */}
-
         <div className="space-y-2">
           <Label htmlFor="mentalOrPhysicalIssue">
             কোন শারীরিক/মানসিক সমস্যা আছে?
@@ -287,71 +345,6 @@ export function PersonalInfoStep() {
           />
         </div>
       </div>
-
-      {/*  <div className="space-y-2">
-        <Label htmlFor="specialWorkOfDeen">
-          দ্বীনের কোন বিশেষ মেহনতে যুক্ত আছেন?
-        </Label>
-        <Textarea
-          id="specialWorkOfDeen"
-          value={formData.personalInformation?.specialWorkOfDeen || ""}
-          onChange={(e) =>
-            updateNestedField(
-              "personalInformation",
-              "specialWorkOfDeen",
-              e.target.value,
-            )
-          }
-          rows={2}
-        />
-      </div> */}
-
-      {/*   <div className="space-y-2">
-        <Label htmlFor="islamicBookName">আপনার পড়া ইসলামি বইয়ের নাম</Label>
-        <Textarea
-          id="islamicBookName"
-          value={formData.personalInformation?.islamicBookName || ""}
-          onChange={(e) =>
-            updateNestedField(
-              "personalInformation",
-              "islamicBookName",
-              e.target.value,
-            )
-          }
-          rows={2}
-        />
-      </div> */}
-
-      {/* <div className="space-y-2">
-        <Label htmlFor="islamicScholarsName">পছন্দের আলেমের নাম</Label>
-        <Textarea
-          id="islamicScholarsName"
-          value={formData.personalInformation?.islamicScholarsName || ""}
-          onChange={(e) =>
-            updateNestedField(
-              "personalInformation",
-              "islamicScholarsName",
-              e.target.value,
-            )
-          }
-          rows={2}
-        />
-      </div> */}
-
-      {/*   <div className="space-y-2">
-        <Label htmlFor="majarBeliveStatus">মাজার সম্পর্কে আপনার ধারণা</Label>
-        <Input
-          id="majarBeliveStatus"
-          value={formData.personalInformation?.majarBeliveStatus || ""}
-          onChange={(e) =>
-            updateNestedField(
-              "personalInformation",
-              "majarBeliveStatus",
-              e.target.value,
-            )
-          }
-        />
-      </div> */}
 
       <div className="space-y-2">
         <Label htmlFor="extraInfoHobby">শখ, পছন্দ-অপছন্দ</Label>

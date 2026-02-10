@@ -62,6 +62,7 @@ export interface PersonalInformation {
   height: number;
   skinTone: string;
   islamicStudy: string;
+  physicalStructure: string;
 }
 
 export interface Occupational {
@@ -75,6 +76,11 @@ export interface MarriageInformationWomen {
   jobAfterMarriage: string;
   studyAfterMarriage: string;
   thoughtsOnMarriage: string;
+
+  //new value
+  polygamyConsentOptions: string;
+  caringforChildren: string;
+  childCustody: string;
 }
 
 export interface MarriageInformationMan {
@@ -136,7 +142,8 @@ export interface User {
   createdAt?: Date;
   updatedAt?: Date;
   numberOfConnections?:number;
-    customFields?: Record<string, string>;
+  customFields?: Record<string, string>;
+  howYouWannaGetMarried?: string;
 }
 export interface UserInfo {
   _id:string

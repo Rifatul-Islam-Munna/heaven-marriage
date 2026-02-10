@@ -299,9 +299,25 @@ async findUserAndUpdated() {
     matchConditions.gender = gender;
   }
 
-  if (maritalStatus && maritalStatus.length > 0) {
-    matchConditions.maritalStatus = { $in: maritalStatus };
+  if (maritalStatus && maritalStatus.length > 0 && maritalStatus[0] !== 'all') {
+  const hasPolygamy = maritalStatus.includes('yes');
+  const otherStatuses = maritalStatus.filter(status => status !== 'yes');
+  
+  if (hasPolygamy && otherStatuses.length > 0) {
+    // Both regular marital status and polygamy
+    matchConditions.$or = [
+      { maritalStatus: { $in: otherStatuses } },
+      { 'marriageInformationWomen.polygamyConsentOptions': 'yes' }
+    ];
+  } else if (hasPolygamy) {
+    // Only polygamy
+    matchConditions['marriageInformationWomen.polygamyConsentOptions'] = 'yes';
+  } else {
+    // Only regular marital status
+    matchConditions.maritalStatus = { $in: otherStatuses };
   }
+}
+
 
   if (ageMin !== undefined || ageMax !== undefined) {
     matchConditions.age = {};
@@ -328,11 +344,25 @@ async findUserAndUpdated() {
     matchConditions['personalInformation.islamicStudy'] = { $in: religiousEducation };
   }
 
-  if (heightMin !== undefined || heightMax !== undefined) {
-    matchConditions['personalInformation.height'] = {};
-    if (heightMin !== undefined) matchConditions['personalInformation.height'].$gte = heightMin;
-    if (heightMax !== undefined) matchConditions['personalInformation.height'].$lte = heightMax;
-  }
+ // After building matchConditions, add conversion for height
+if (heightMin !== undefined || heightMax !== undefined) {
+  // Add a stage to convert height string to number
+  pipeline.push({
+    $addFields: {
+      'personalInformation.heightNumeric': {
+        $toDouble: {
+          $ifNull: ['$personalInformation.height', 0]
+        }
+      }
+    }
+  });
+
+  // Now use the numeric field for comparison
+  matchConditions['personalInformation.heightNumeric'] = {};
+  if (heightMin !== undefined) matchConditions['personalInformation.heightNumeric'].$gte = heightMin;
+  if (heightMax !== undefined) matchConditions['personalInformation.heightNumeric'].$lte = heightMax;
+}
+
 
   if (skinColor && skinColor.length > 0) {
     matchConditions['personalInformation.skinTone'] = { $in: skinColor };
@@ -818,6 +848,7 @@ async sendToUser(user: UserDocument) {
 📖 বিভাগ: ${getValue(user.educationInfo?.highestEducationGroup)}
 📅 পাশের বছর: ${getValue(user.educationInfo?.highestEducationPassingYear)}
 📝 বর্তমানে পড়াশোনা: ${getValue(user.educationInfo?.currentlyDoingHightEducation)}
+📚 শিক্ষাগত পটভূমি: ${getValue(user.educationInfo?.educationBackground)}
 
 <i>এসএসসি তথ্য:</i>
 📅 পাশের বছর: ${getValue(user.educationInfo?.sSCPassingYear)}
@@ -866,6 +897,7 @@ ${isMale ? `👖 টাখনুর উপরে কাপড়: ${getValue(use
 📏 উচ্চতা: ${getValue(user.personalInformation?.height)} ফুট
 🎨 গায়ের রং: ${getValue(user.personalInformation?.skinTone)}
 📖 ইসলামিক পড়াশোনা: ${getValue(user.personalInformation?.islamicStudy)}
+🏋️ শারীরিক গঠন: ${getValue(user.personalInformation?.physicalStructure)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -882,6 +914,9 @@ ${isFemale && user.marriageInformationWomen ? `
 💼 বিয়ের পর চাকরি: ${getValue(user.marriageInformationWomen.jobAfterMarriage)}
 📚 বিয়ের পর পড়াশোনা: ${getValue(user.marriageInformationWomen.studyAfterMarriage)}
 💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationWomen.thoughtsOnMarriage)}
+👥 বহুবিবাহে সম্মতি: ${getValue(user.marriageInformationWomen.polygamyConsentOptions)}
+👶 সন্তান লালন-পালন: ${getValue(user.marriageInformationWomen.caringforChildren)}
+🤱 সন্তানের হেফাজত: ${getValue(user.marriageInformationWomen.childCustody)}
 ` : ''}
 
 ${isMale && user.marriageInformationMan ? `
@@ -922,9 +957,23 @@ ${user.pledge ? `
 ⚠️ ভুল তথ্যের দায়িত্ব: ${getValue(user.pledge.anyMisInformationWeAreNotKnowing)}
 ` : ''}
 
+${user.howYouWannaGetMarried ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⏰ <b> সময়:</b> ${new Date().toLocaleString('bn-BD', { 
+💑 <b>বিবাহের ধরন</b>
+💒 কীভাবে বিবাহ করতে চান: ${getValue(user.howYouWannaGetMarried)}
+` : ''}
+
+${user.customFields && user.customFields.size > 0 ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 <b>অতিরিক্ত তথ্য</b>
+${Array.from(user.customFields.entries()).map(([key, value]) => `${key}: ${getValue(value)}`).join('\n')}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ <b>সময়:</b> ${new Date().toLocaleString('bn-BD', { 
     timeZone: 'Asia/Dhaka',
     dateStyle: 'full',
     timeStyle: 'short'
@@ -950,6 +999,7 @@ ${user.pledge ? `
     return false;
   }
 }
+
 async findUserAndSendToTelegram(id: string) {
   const user = await this.userModel.findById(id).exec();
   if(!user) return;
@@ -963,7 +1013,7 @@ async findUserAndSendToTelegram(id: string) {
   const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
   const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
 
-  const message = `
+ const message = `
 🎉 <b>${isMale ? 'পুরুষ' : isFemale ? 'মহিলা' : ''} ব্যবহারকারী</b>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1000,6 +1050,7 @@ async findUserAndSendToTelegram(id: string) {
 📖 বিভাগ: ${getValue(user.educationInfo?.highestEducationGroup)}
 📅 পাশের বছর: ${getValue(user.educationInfo?.highestEducationPassingYear)}
 📝 বর্তমানে পড়াশোনা: ${getValue(user.educationInfo?.currentlyDoingHightEducation)}
+📚 শিক্ষাগত পটভূমি: ${getValue(user.educationInfo?.educationBackground)}
 
 <i>এসএসসি তথ্য:</i>
 📅 পাশের বছর: ${getValue(user.educationInfo?.sSCPassingYear)}
@@ -1048,6 +1099,7 @@ ${isMale ? `👖 টাখনুর উপরে কাপড়: ${getValue(use
 📏 উচ্চতা: ${getValue(user.personalInformation?.height)} ফুট
 🎨 গায়ের রং: ${getValue(user.personalInformation?.skinTone)}
 📖 ইসলামিক পড়াশোনা: ${getValue(user.personalInformation?.islamicStudy)}
+🏋️ শারীরিক গঠন: ${getValue(user.personalInformation?.physicalStructure)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1064,6 +1116,9 @@ ${isFemale && user.marriageInformationWomen ? `
 💼 বিয়ের পর চাকরি: ${getValue(user.marriageInformationWomen.jobAfterMarriage)}
 📚 বিয়ের পর পড়াশোনা: ${getValue(user.marriageInformationWomen.studyAfterMarriage)}
 💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationWomen.thoughtsOnMarriage)}
+👥 বহুবিবাহে সম্মতি: ${getValue(user.marriageInformationWomen.polygamyConsentOptions)}
+👶 সন্তান লালন-পালন: ${getValue(user.marriageInformationWomen.caringforChildren)}
+🤱 সন্তানের হেফাজত: ${getValue(user.marriageInformationWomen.childCustody)}
 ` : ''}
 
 ${isMale && user.marriageInformationMan ? `
@@ -1104,9 +1159,23 @@ ${user.pledge ? `
 ⚠️ ভুল তথ্যের দায়িত্ব: ${getValue(user.pledge.anyMisInformationWeAreNotKnowing)}
 ` : ''}
 
+${user.howYouWannaGetMarried ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⏰ <b> সময়:</b> ${new Date().toLocaleString('bn-BD', { 
+💑 <b>বিবাহের ধরন</b>
+💒 কীভাবে বিবাহ করতে চান: ${getValue(user.howYouWannaGetMarried)}
+` : ''}
+
+${user.customFields && user.customFields.size > 0 ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 <b>অতিরিক্ত তথ্য</b>
+${Array.from(user.customFields.entries()).map(([key, value]) => `${key}: ${getValue(value)}`).join('\n')}
+` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ <b>সময়:</b> ${new Date().toLocaleString('bn-BD', { 
     timeZone: 'Asia/Dhaka',
     dateStyle: 'full',
     timeStyle: 'short'

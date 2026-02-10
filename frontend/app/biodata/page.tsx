@@ -89,7 +89,7 @@ export default function BiodatasPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="  md:w-full mx-auto container w-full px-4 py-6">
+      <div className="  md:w-full mx-auto  w-full px-4 py-6">
         <div className="flex gap-6">
           {/* Filter on Left - Hidden on mobile (< md) */}
           <div className="hidden lg:block">

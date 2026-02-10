@@ -2,48 +2,63 @@ export const marriedStatus = [
   {
     "id": 1,
     "bn": "সকল",
-    "en": "all"
+    "en": "all",
+        "gender":"all"
   },
   {
     "id": 2,
     "bn": "অবিবাহিত",
-    "en": "Unmarried"
+    "en": "Unmarried",
+         "gender":"all"
   },
   {
     "id": 3,
     "bn": "ডিভোর্স্ড (সন্তান আছে)",
-    "en": "Divorced (With Children)"
+    "en": "Divorced (With Children)",
+    "gender":"female"
   },
   {
     "id": 4,
     "bn": "ডিভোর্স্ড (সন্তান নাই)",
-    "en": "Divorced (No Children)"
+    "en": "Divorced (No Children)",
+    "gender":"female"
   },
   {
     "id": 5,
     "bn": "বিপত্নীক (সন্তান আছে)",
-    "en": "Widower (With Children)"
+    "en": "Widower (With Children)",
+    "gender":"female"
   },
   {
     "id": 6,
     "bn": "বিপত্নীক (সন্তান নাই)",
-    "en": "Widower (No Children)"
+    "en": "Widower (No Children)",
+    "gender":"female"
   },
   {
     "id": 7,
     "bn": "বিবাহিত (একজন স্ত্রী রয়েছেন)",
-    "en": "Married (One Wife)"
+    "en": "Married (One Wife)",
+      "gender":"male"
   },
   {
     "id": 8,
     "bn": "বিবাহিত (দুইজন স্ত্রী রয়েছেন)",
-    "en": "Married (Two Wives)"
+    "en": "Married (Two Wives)",
+        "gender":"male"
   },
   {
     "id": 9,
     "bn": "বিবাহিত (তিনজন স্ত্রী রয়েছেন)",
-    "en": "Married (Three Wives)"
-  }
+    "en": "Married (Three Wives)",
+        "gender":"male"
+  },
+  {
+    "id": 100,
+    "bn": "মাসনা",
+    "en": "yes",
+    "gender":"male"
+  },
 ];
 
 
@@ -293,5 +308,22 @@ export const countries = [
     "id": 31,
     "bn": "অন্যান্য",
     "en": "other"
+  }
+];
+export const polygamyConsentOptions = [
+  { 
+    id: 1, 
+    label: "জি, ইনশা-আল্লাহ রাজি আছি।", 
+    value: "yes" 
+  },
+  { 
+    id: 2, 
+    label: "আলোচনা সাপেক্ষে।", 
+    value: "subject_to_discussion" 
+  },
+  { 
+    id: 3, 
+    label: "না রাজি নয়।", 
+    value: "no_not_willing" 
   }
 ];

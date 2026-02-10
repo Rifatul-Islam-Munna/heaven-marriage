@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -56,6 +56,16 @@ export default function BiodataFilter() {
   const [upazilaOpen, setUpazilaOpen] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
 
+  // Filter marital status based on selected gender
+  const filteredMaritalStatus = useMemo(() => {
+    if (gender === "all") {
+      return marriedStatus;
+    }
+    return marriedStatus.filter(
+      (status) => status.gender === "all" || status.gender === gender,
+    );
+  }, [gender]);
+
   const handleSearch = () => {
     const params = new URLSearchParams();
 
@@ -77,6 +87,26 @@ export default function BiodataFilter() {
     setUpazilaName("");
     setCountryName("");
     setQuery("");
+  };
+
+  // Handle gender change - reset marital status if it's not available for new gender
+  const handleGenderChange = (newGender: string) => {
+    setGender(newGender);
+
+    // Check if current marital status is valid for new gender
+    const isValidForNewGender = marriedStatus.find(
+      (status) =>
+        status.en === maritalStatus &&
+        (status.gender === "all" ||
+          status.gender === newGender ||
+          newGender === "all"),
+    );
+
+    if (!isValidForNewGender) {
+      setMaritalStatus("all");
+    }
+
+    setGenderOpen(false);
   };
 
   const selectedDistrictData = districts.find((d) => d.name === districtName);
@@ -173,10 +203,7 @@ export default function BiodataFilter() {
                           <CommandItem
                             key={option.value}
                             value={option.value}
-                            onSelect={(value) => {
-                              setGender(value);
-                              setGenderOpen(false);
-                            }}
+                            onSelect={(value) => handleGenderChange(value)}
                             className="py-2.5 sm:py-3"
                           >
                             <Check
@@ -227,7 +254,7 @@ export default function BiodataFilter() {
                       <CommandInput placeholder="খুঁজুন..." className="h-10" />
                       <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup>
-                        {marriedStatus.map((option) => (
+                        {filteredMaritalStatus.map((option) => (
                           <CommandItem
                             key={option.en}
                             value={option.en}
@@ -485,7 +512,7 @@ export default function BiodataFilter() {
                     {genderOptions.find((o) => o.value === gender)?.label}
                     <X
                       className="h-3 w-3 cursor-pointer hover:text-pink-900"
-                      onClick={() => setGender("all")}
+                      onClick={() => handleGenderChange("all")}
                     />
                   </span>
                 )}

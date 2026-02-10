@@ -171,7 +171,7 @@ const User = () => {
       totalFields += 3;
     }
 
-    // Marriage Information - Women (4 fields)
+    // Marriage Information - Women (3 fields)
     if (user?.marriageInformationWomen) {
       const marriageWomenFields = [
         user.marriageInformationWomen.jobAfterMarriage,
@@ -229,11 +229,18 @@ const User = () => {
       totalFields += 3;
     }
 
-    const percentage = Math.round((filledFields / totalFields) * 100);
-    return percentage;
+    // Calculate actual percentage
+    const actualPercentage = (filledFields / totalFields) * 100;
+
+    // Adjust so 55% actual completion shows as 100%
+    // Formula: displayedPercentage = min(actualPercentage * (100/55), 100)
+    const adjustedPercentage = Math.min(actualPercentage * (100 / 55), 100);
+
+    return Math.round(adjustedPercentage);
   }, [user]);
 
-  const isProfileIncomplete = profileCompletion < 100;
+  // Profile is incomplete if less than 40% displayed (which is ~22% actual)
+  const isProfileIncomplete = profileCompletion < 65;
 
   // Loading state
   if (isLoading) {

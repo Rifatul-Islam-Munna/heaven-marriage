@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CreateUserDto } from './create-user.dto';
-import { IsArray, IsInt, IsMongoId, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsArray, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
@@ -204,7 +204,7 @@ export class UserFilterDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(12)
+  @Min(10)
   ageMin?: number = 16;
 
   @ApiPropertyOptional({
@@ -225,7 +225,7 @@ export class UserFilterDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @Min(3)
   heightMin?: number ;
 
@@ -236,7 +236,7 @@ export class UserFilterDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsNumber()
   @Max(1200)
   heightMax?: number = 900 ;
 

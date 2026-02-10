@@ -131,7 +131,7 @@ function FilterContent({
   selectedUpazila,
 }: FilterContentProps) {
   const [age, setAge] = useState({
-    min: 18,
+    min: 10,
     max: 40,
   });
   const [height, setHeight] = useState({
@@ -253,7 +253,7 @@ function FilterContent({
                 বয়স: {filters.ageMin} - {filters.ageMax} বছর
               </Label>
               <Slider
-                min={18}
+                min={10}
                 max={70}
                 step={1}
                 value={[age.min, age.max]}
@@ -894,7 +894,7 @@ export default function BiodataAdvancedFilter() {
   const [filters, setFilters] = useQueryStates({
     gender: parseAsString.withDefault("all"),
     maritalStatus: parseAsArrayOf(parseAsString).withDefault([]),
-    ageMin: parseAsInteger.withDefault(18),
+    ageMin: parseAsInteger.withDefault(10),
     ageMax: parseAsInteger.withDefault(40),
     districtId: parseAsString, // Will store district NAME (not actual id)
     upazilaId: parseAsString, // Will store upazila NAME (not actual id)
@@ -942,7 +942,7 @@ export default function BiodataAdvancedFilter() {
     setFilters({
       gender: "all",
       maritalStatus: [],
-      ageMin: 18,
+      ageMin: 10,
       ageMax: 40,
       districtId: null,
       upazilaId: null,
@@ -972,7 +972,7 @@ export default function BiodataAdvancedFilter() {
   const hasActiveFilters =
     filters.gender !== "all" ||
     filters.maritalStatus.length > 0 ||
-    filters.ageMin !== 18 ||
+    filters.ageMin !== 10 ||
     filters.ageMax !== 40 ||
     filters.districtId ||
     filters.upazilaId ||

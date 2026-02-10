@@ -2,13 +2,25 @@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CheckCircle } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
 
 export function PledgeStep() {
   const formData = useProfileStore((state) => state.formData);
-  const updateNestedField = useProfileStore((state) => state.updateNestedField);
+  const updateNestedField = useProfileStore((state) => state.updateField);
+
+  const registrationOptions = [
+    "Niqaha এর মাধ্যমে",
+    "নিজে নিজে",
+    "আলোচনা সাপেক্ষ",
+  ];
 
   return (
     <div className="space-y-6">
@@ -20,6 +32,29 @@ export function PledgeStep() {
       </Alert>
 
       <div className="space-y-4 bg-white p-6 rounded-lg border">
+        <div className="space-y-2">
+          <Label htmlFor="howYouWannaGetMarried">
+            আপনি কীভাবে বিবাহ সম্পন্ন করতে চান?
+          </Label>
+          <Select
+            value={formData.howYouWannaGetMarried || ""}
+            onValueChange={(value) =>
+              updateNestedField("howYouWannaGetMarried", value)
+            }
+          >
+            <SelectTrigger id="howYouWannaGetMarried">
+              <SelectValue placeholder="বিবাহের পদ্ধতি নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {registrationOptions.map((option, index) => (
+                <SelectItem key={index} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-start space-x-3">
           <Checkbox
             id="youGordianKnowsThis"
@@ -33,8 +68,14 @@ export function PledgeStep() {
             htmlFor="youGordianKnowsThis"
             className="cursor-pointer leading-relaxed"
           >
-            আমার অভিভাবক এই বায়োডাটা সম্পর্কে জানেন এবং বিয়ের ব্যাপারে তাঁরা
-            রাজি আছেন
+            আশা করি আপনি কোনো ভুল তথ্য দেন নি, তারপরও আপনি যদি ইচ্ছাকৃতভাবে কোনো
+            ভ্রান্ত বা মিথ্যা তথ্য প্রদান করেন, কিংবা ভবিষ্যতে আপনার দেওয়া
+            প্রতিশ্রুতি পালন না করেন, সে ক্ষেত্রে হ্যাভেন ম্যারেজ সলিউশন (HMS)
+            আপনার সদস্যপদ বাতিলের অধিকার সংরক্ষণ করে। পাশাপাশি, যদি এমন
+            পরিস্থিতিতে আপনার স্ত্রী সংসার চালিয়ে যেতে অনিচ্ছুক হন এবং HMS-এর
+            সংশ্লিষ্ট কর্মকর্তাদের সঙ্গে পরামর্শক্রমে বিষয়টি যৌক্তিক বিবেচিত
+            হয়, তাহলে আপনি স্ত্রীর অনুরোধ ও ন্যায্য প্রয়োজনে তালাক প্রদানের
+            বিষয়ে সম্মত থাকবেন কি না?
           </Label>
         </div>
 

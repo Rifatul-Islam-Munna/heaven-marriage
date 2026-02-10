@@ -99,7 +99,8 @@ const getInitialFormData = (): Partial<User> => ({
     extraInfoHobby: '',
     height: undefined,
     skinTone: '',
-    islamicStudy: ''
+    islamicStudy: '',
+    physicalStructure:""
   },
   occupational: {
     profession: '',
@@ -110,7 +111,10 @@ const getInitialFormData = (): Partial<User> => ({
     isGuardiansAgreed: false,
     jobAfterMarriage: '',
     studyAfterMarriage: '',
-    thoughtsOnMarriage: ''
+    thoughtsOnMarriage: '',
+    polygamyConsentOptions: '',
+    caringforChildren: '',
+  childCustody:"",
   },
   marriageInformationMan: {
     isGuardiansAgreed: false,
@@ -137,7 +141,8 @@ const getInitialFormData = (): Partial<User> => ({
     youGordianKnowsThis: false,
     allTheInformationTrue: false,
     anyMisInformationWeAreNotKnowing: false
-  }
+  },
+  howYouWannaGetMarried: '',
 });
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({

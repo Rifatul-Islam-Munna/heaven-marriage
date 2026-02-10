@@ -11,11 +11,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { polygamyConsentOptions } from "@/staticData/all-data";
 
 export function MarriageInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateNestedField = useProfileStore((state) => state.updateNestedField);
-
+  const childCareConsent = [
+    { id: 1, label: "জি, প্রস্তুত আছি।", value: "yes_prepared" },
+    { id: 2, label: "না, প্রস্তুত নাই", value: "not_prepared" },
+    {
+      id: 3,
+      label: "শর্তসাপেক্ষ প্রস্তুত আছি।",
+      value: "conditional_prepared",
+    },
+  ];
+  const childCustodyDecision = [
+    { id: 1, label: "আমার সাথে", value: "with_me" },
+    { id: 2, label: "তার বাবার কাছে", value: "with_father" },
+    { id: 3, label: "আমার পরিবারের কারোর কাছে", value: "with_my_family" },
+    { id: 4, label: "প্রযোজ্য না", value: "not_applicable" },
+  ];
   if (formData.gender === "female") {
     return (
       <div className="space-y-6">
@@ -70,6 +85,90 @@ export function MarriageInfoStep() {
             }
             placeholder="হ্যাঁ/না"
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wifeVailAfterMarriage">
+            আপনি কারো ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রূবা'আ) হতে রাজি আছেন
+            কি না?
+          </Label>
+          <Select
+            value={
+              formData.marriageInformationWomen?.polygamyConsentOptions || ""
+            }
+            onValueChange={(value) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "polygamyConsentOptions",
+                value,
+              )
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {polygamyConsentOptions.map((option) => (
+                <SelectItem key={option.id} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wifeVailAfterMarriage">
+            আপনার স্বামীর অন্য স্ত্রীর মা-হারা সন্তান থাকলে তাদেরকে লালন-পালন
+            করতে প্রস্তুত আছেন কি না?
+          </Label>
+          <Select
+            value={formData.marriageInformationWomen?.caringforChildren || ""}
+            onValueChange={(value) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "caringforChildren",
+                value,
+              )
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {childCareConsent.map((option) => (
+                <SelectItem key={option.id} value={option.label}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wifeVailAfterMarriage">
+            আপনার অন্য ঘরের সন্তান থাকলে কোথায় রাখতে চান, তার ব্যাপারে কী
+            সিদ্ধান্ত আপনার? (বিবাহিতা ও সন্তানবিশিষ্টা হলে)। অবিবাহিতা হলে
+            “প্রযোজ্য না” লিখুন।
+          </Label>
+          <Select
+            value={formData.marriageInformationWomen?.childCustody || ""}
+            onValueChange={(value) =>
+              updateNestedField(
+                "marriageInformationWomen",
+                "childCustody",
+                value,
+              )
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="নির্বাচন করুন" />
+            </SelectTrigger>
+            <SelectContent>
+              {childCustodyDecision.map((option) => (
+                <SelectItem key={option.id} value={option.label}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">

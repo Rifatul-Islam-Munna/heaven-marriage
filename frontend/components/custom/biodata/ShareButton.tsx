@@ -52,7 +52,11 @@ export function ShareButton() {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-pink-600 w-full"
+        >
           <Share2 className="h-4 w-4" />
           শেয়ার করুন
         </Button>

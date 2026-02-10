@@ -264,7 +264,7 @@ class PersonalInformationDto {
   @IsOptional()
   @Min(100)
   @Max(250)
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number(value))
   height?: number;
 
   @ApiPropertyOptional({ example: 'Fair', description: 'Skin tone' })
@@ -276,6 +276,10 @@ class PersonalInformationDto {
   @IsString()
   @IsOptional()
   islamicStudy?: string;
+  @ApiPropertyOptional({ example: 'Madrasa' })
+  @IsString()
+  @IsOptional()
+  physicalStructure?: string;
 }
 
 class OccupationalDto {
@@ -316,6 +320,19 @@ class MarriageInformationWomenDto {
   @IsString()
   @IsOptional()
   thoughtsOnMarriage?: string;
+  @ApiPropertyOptional({ example: 'Want a pious and caring husband' })
+  @IsString()
+  @IsOptional()
+  polygamyConsentOptions: string;
+
+   @ApiPropertyOptional({ example: 'Want a pious and caring husband' })
+  @IsString()
+  @IsOptional()
+  caringforChildren: string;
+  @ApiPropertyOptional({ example: 'Want a pious and caring husband' })
+  @IsString()
+  @IsOptional()
+  childCustody: string;
 }
 
 class MarriageInformationManDto {
@@ -369,6 +386,7 @@ class ExpectedLifePartnerDto {
 
   @ApiPropertyOptional({ example: '5\'2" to 5\'6"' })
   @IsString()
+  
   @IsOptional()
   height?: string;
 
@@ -481,7 +499,7 @@ export class CreateUserDto {
   @ApiPropertyOptional({ example: 25, minimum: 18, maximum: 100 })
   @IsNumber()
   @IsOptional()
-  @Min(18)
+  @Min(10)
   @Max(100)
   @Transform(({ value }) => parseInt(value, 10))
   age?: number;
@@ -515,6 +533,12 @@ export class CreateUserDto {
   @IsOptional()
   @Length(6, 6)
   otpNumber?: string;
+
+  @ApiPropertyOptional({ example: '123456' })
+  @IsString()
+  @IsOptional()
+
+  howYouWannaGetMarried?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

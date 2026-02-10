@@ -8,6 +8,15 @@ import {
 import BiodataCard from "./biodata-card";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { PaginatedUserResponse } from "@/@types/user";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 
 interface Biodata {
   id: string;
@@ -32,10 +41,10 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
   const [filters, setFilters] = useQueryStates({
     gender: parseAsString.withDefault("all"),
     maritalStatus: parseAsArrayOf(parseAsString).withDefault([]),
-    ageMin: parseAsInteger.withDefault(18),
+    ageMin: parseAsInteger.withDefault(10),
     ageMax: parseAsInteger.withDefault(40),
-    districtId: parseAsString, // Changed from permanentDistrict/currentDistrict
-    upazilaId: parseAsString, // Added upazila
+    districtId: parseAsString,
+    upazilaId: parseAsString,
     educationMedium: parseAsArrayOf(parseAsString).withDefault([]),
     religiousEducation: parseAsArrayOf(parseAsString).withDefault([]),
     heightMin: parseAsInteger.withDefault(4),
@@ -63,19 +72,64 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
   const { data, isLoading } = useQueryWrapper<PaginatedUserResponse>(
     ["get-biodatas", query],
     `/user/get-all-user?${query}`,
-    { staleTime: 2 * 60 * 60 * 1000 },
-    1500,
-    "get-a-data-of-user",
   );
 
   console.log("Query:", query);
 
+  // Pagination handler
+  const handlePageChange = (newPage: number) => {
+    setFilters({ page: newPage });
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    if (!data) return [];
+
+    const { page, totalPages } = data;
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= 7) {
+      // Show all pages if total is 7 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+
+      if (page > 3) {
+        pages.push("...");
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (page < totalPages - 2) {
+        pages.push("...");
+      }
+
+      // Always show last page
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
   if (isLoading) {
     return (
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
-          <BiodataCardSkeleton key={i} />
-        ))}
+      <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <BiodataCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -110,21 +164,93 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {data?.docs?.map((biodata) => (
-        <BiodataCard
-          key={biodata._id}
-          age={biodata?.age ?? 0}
-          biodataNumber={biodata?.userId ?? ""}
-          district={biodata?.address?.district ?? ""}
-          upazila={biodata?.address?.upazila ?? ""}
-          education={biodata?.educationInfo?.highestEducation ?? ""}
-          profession={biodata?.occupational?.profession ?? ""}
-          gender={biodata?.gender ?? ""}
-          height={biodata?.personalInformation?.height ?? ""}
-          id={biodata._id ?? ""}
-        />
-      ))}
+    <div className="space-y-8">
+      {/* Results Summary */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          মোট{" "}
+          <span className="font-semibold text-gray-900">{data?.totalDocs}</span>{" "}
+          টি বায়োডাটা পাওয়া গেছে
+          {data && data.totalPages > 1 && (
+            <span className="ml-2">
+              (পৃষ্ঠা {data.page} / {data.totalPages})
+            </span>
+          )}
+        </p>
+      </div>
+
+      {/* Biodata Grid */}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {data?.docs?.map((biodata) => (
+          <BiodataCard
+            key={biodata._id}
+            age={biodata?.age ?? 0}
+            biodataNumber={biodata?.userId ?? ""}
+            district={biodata?.address?.district ?? ""}
+            upazila={biodata?.address?.upazila ?? ""}
+            education={biodata?.educationInfo?.highestEducation ?? ""}
+            profession={biodata?.occupational?.profession ?? ""}
+            gender={biodata?.gender ?? ""}
+            height={biodata?.personalInformation?.height ?? ""}
+            id={biodata._id ?? ""}
+            skinTone={biodata?.personalInformation?.skinTone ?? ""}
+          />
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {data && data.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              {/* Previous Button */}
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() =>
+                    data.hasPrevPage && handlePageChange(data.page - 1)
+                  }
+                  className={
+                    !data.hasPrevPage
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {/* Page Numbers */}
+              {getPageNumbers().map((pageNum, idx) => (
+                <PaginationItem key={idx}>
+                  {pageNum === "..." ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      onClick={() => handlePageChange(pageNum as number)}
+                      isActive={pageNum === data.page}
+                      className="cursor-pointer"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+
+              {/* Next Button */}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    data.hasNextPage && handlePageChange(data.page + 1)
+                  }
+                  className={
+                    !data.hasNextPage
+                      ? "pointer-events-none opacity-50"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

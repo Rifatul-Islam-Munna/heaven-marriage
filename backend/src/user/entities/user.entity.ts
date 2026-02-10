@@ -125,6 +125,7 @@ export class User {
         height:number; // will be slider withNumber
         skinTone:string; // will be enum
         islamicStudy:string; // will be enum
+        physicalStructure:string;
 
     }
 
@@ -141,6 +142,10 @@ export class User {
      jobAfterMarriage:string;
      studyAfterMarriage:string;
      thoughtsOnMarriage:string;
+     //new option
+       polygamyConsentOptions: string;
+  caringforChildren: string;
+  childCustody: string;
 
    }  
     @Prop({type:Object})
@@ -183,6 +188,8 @@ export class User {
 customFields?: Map<string, string>;
 
 
+@Prop()
+howYouWannaGetMarried :string
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
