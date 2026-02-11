@@ -153,7 +153,7 @@ export default function AdminGuidelinesDashboard() {
 
   // Count items in description
   const countItems = (description: string) => {
-    return description.split(",").filter((item) => item.trim().length > 0)
+    return description.split(",,").filter((item) => item.trim().length > 0)
       .length;
   };
 
@@ -218,7 +218,7 @@ export default function AdminGuidelinesDashboard() {
 
               <div className="space-y-2">
                 <Label htmlFor="create-description" className="">
-                  নির্দেশনা তালিকা (কমা দিয়ে আলাদা করুন){" "}
+                  নির্দেশনা তালিকা (কমা ,, দিয়ে আলাদা করুন){" "}
                   <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
