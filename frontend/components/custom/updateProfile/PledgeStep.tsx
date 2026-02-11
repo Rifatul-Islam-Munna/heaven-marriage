@@ -14,7 +14,8 @@ import { useProfileStore } from "@/zustan/useProfileStore";
 
 export function PledgeStep() {
   const formData = useProfileStore((state) => state.formData);
-  const updateNestedField = useProfileStore((state) => state.updateField);
+  const updateNestedField = useProfileStore((state) => state.updateNestedField);
+  const updatedFieldn = useProfileStore((state) => state.updateField);
 
   const registrationOptions = [
     "Niqaha এর মাধ্যমে",
@@ -39,7 +40,7 @@ export function PledgeStep() {
           <Select
             value={formData.howYouWannaGetMarried || ""}
             onValueChange={(value) =>
-              updateNestedField("howYouWannaGetMarried", value)
+              updatedFieldn("howYouWannaGetMarried", value)
             }
           >
             <SelectTrigger id="howYouWannaGetMarried">
@@ -70,12 +71,12 @@ export function PledgeStep() {
           >
             আশা করি আপনি কোনো ভুল তথ্য দেন নি, তারপরও আপনি যদি ইচ্ছাকৃতভাবে কোনো
             ভ্রান্ত বা মিথ্যা তথ্য প্রদান করেন, কিংবা ভবিষ্যতে আপনার দেওয়া
-            প্রতিশ্রুতি পালন না করেন, সে ক্ষেত্রে হ্যাভেন ম্যারেজ সলিউশন (HMS)
-            আপনার সদস্যপদ বাতিলের অধিকার সংরক্ষণ করে। পাশাপাশি, যদি এমন
-            পরিস্থিতিতে আপনার স্ত্রী সংসার চালিয়ে যেতে অনিচ্ছুক হন এবং HMS-এর
-            সংশ্লিষ্ট কর্মকর্তাদের সঙ্গে পরামর্শক্রমে বিষয়টি যৌক্তিক বিবেচিত
-            হয়, তাহলে আপনি স্ত্রীর অনুরোধ ও ন্যায্য প্রয়োজনে তালাক প্রদানের
-            বিষয়ে সম্মত থাকবেন কি না?
+            প্রতিশ্রুতি পালন না করেন, সে ক্ষেত্রে হ্যাভেন ম্যারেজ সলিউশন
+            (Niqaha) আপনার সদস্যপদ বাতিলের অধিকার সংরক্ষণ করে। পাশাপাশি, যদি এমন
+            পরিস্থিতিতে আপনার স্ত্রী সংসার চালিয়ে যেতে অনিচ্ছুক হন এবং
+            Niqaha-এর সংশ্লিষ্ট কর্মকর্তাদের সঙ্গে পরামর্শক্রমে বিষয়টি যৌক্তিক
+            বিবেচিত হয়, তাহলে আপনি স্ত্রীর অনুরোধ ও ন্যায্য প্রয়োজনে তালাক
+            প্রদানের বিষয়ে সম্মত থাকবেন কি না?
           </Label>
         </div>
 

@@ -81,7 +81,7 @@ export default function BiodataCard({
   };
 
   const displayUserId =
-    gender === "male" ? `NB-${biodataNumber}` : `NG-${biodataNumber}`;
+    gender === "male" ? `NG-${biodataNumber}` : `NB-${biodataNumber}`;
 
   return (
     <div

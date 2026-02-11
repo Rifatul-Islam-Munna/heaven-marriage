@@ -179,7 +179,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 {/* Biodata Number */}
                 <div className="text-center mb-8">
                   <h2 className="text-2xl font-bold mb-2">
-                    বায়োডাটা নং : {userData?.gender === "male" ? "NB" : "NF"}-
+                    বায়োডাটা নং : {userData?.gender === "male" ? "NG" : "NB"}-
                     {userData?.userId}
                   </h2>
                   <Badge className="bg-white/20 text-white hover:bg-white/30 border-0">
