@@ -24,7 +24,7 @@ export default function GuidelinesPage() {
   // Parse comma-separated items
   const parseItems = (description: string): string[] => {
     return description
-      .split(",")
+      .split(",,")
       .map((item) => item.trim())
       .filter((item) => item.length > 0);
   };
