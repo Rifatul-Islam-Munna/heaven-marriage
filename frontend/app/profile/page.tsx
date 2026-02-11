@@ -51,6 +51,7 @@ const User = () => {
   };
 
   // Calculate profile completion percentage
+  // Calculate profile completion percentage
   const profileCompletion = useMemo(() => {
     if (!user) return 0;
 
@@ -233,14 +234,31 @@ const User = () => {
     const actualPercentage = (filledFields / totalFields) * 100;
 
     // Adjust so 55% actual completion shows as 100%
-    // Formula: displayedPercentage = min(actualPercentage * (100/55), 100)
     const adjustedPercentage = Math.min(actualPercentage * (100 / 55), 100);
 
     return Math.round(adjustedPercentage);
   }, [user]);
 
-  // Profile is incomplete if less than 40% displayed (which is ~22% actual)
-  const isProfileIncomplete = profileCompletion < 65;
+  // Helper function to check if a field has value (reusable)
+  const hasValue = (field: any): boolean => {
+    if (field === undefined || field === null || field === "") return false;
+    if (typeof field === "number" && field === 0) return false;
+    return true;
+  };
+
+  // Check for required critical fields (height, age, gender)
+  const hasCriticalFields = useMemo(() => {
+    if (!user) return false;
+
+    const hasAge = hasValue(user?.age);
+    const hasGender = hasValue(user?.gender);
+    const hasHeight = hasValue(user?.personalInformation?.height);
+
+    return hasAge && hasGender && hasHeight;
+  }, [user]);
+
+  // Profile is incomplete if missing critical fields OR less than 65% completion
+  const isProfileIncomplete = !hasCriticalFields || profileCompletion < 65;
 
   // Loading state
   if (isLoading) {

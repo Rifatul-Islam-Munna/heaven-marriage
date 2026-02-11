@@ -224,9 +224,23 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
     return Math.round(adjustedPercentage);
   }, [user]);
+  const hasValue = (field: any): boolean => {
+    if (field === undefined || field === null || field === "") return false;
+    if (typeof field === "number" && field === 0) return false;
+    return true;
+  };
+  const hasCriticalFields = useMemo(() => {
+    if (!user) return false;
 
-  // Profile is incomplete if less than 65% displayed
-  const isProfileIncomplete = profileCompletion < 65;
+    const hasAge = hasValue(user?.age);
+    const hasGender = hasValue(user?.gender);
+    const hasHeight = hasValue(user?.personalInformation?.height);
+
+    return hasAge && hasGender && hasHeight;
+  }, [user]);
+
+  // Profile is incomplete if missing critical fields OR less than 65% completion
+  const isProfileIncomplete = !hasCriticalFields || profileCompletion < 65;
 
   // Create userObject with useMemo to avoid unnecessary recalculations
   const userObject = useMemo(
