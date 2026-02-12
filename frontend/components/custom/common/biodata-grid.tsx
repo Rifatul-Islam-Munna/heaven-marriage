@@ -57,6 +57,7 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
     page: parseAsInteger.withDefault(1),
     query: parseAsString.withDefault(""),
     country: parseAsString.withDefault(""),
+    polygamy: parseAsArrayOf(parseAsString).withDefault([]),
   });
 
   const query = Object.entries(filters)
@@ -72,9 +73,9 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
   const { data, isLoading } = useQueryWrapper<PaginatedUserResponse>(
     ["get-biodatas", query],
     `/user/get-all-user?${query}`,
-    { staleTime: 60 * 1000 },
+    /*   { staleTime: 60 * 1000 },
     1200,
-    "get-all-user-data",
+    "get-all-user-data", */
   );
 
   console.log("Query:", query);

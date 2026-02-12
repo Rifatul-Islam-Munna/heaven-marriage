@@ -264,6 +264,13 @@ export class UserFilterDto {
   @IsOptional()
   @IsString()
   upazilaId?: string;
+  @ApiPropertyOptional({
+    description: 'Upazila ID',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @IsOptional()
+  @IsString()
+  polygamy?: string;
 
 
 }

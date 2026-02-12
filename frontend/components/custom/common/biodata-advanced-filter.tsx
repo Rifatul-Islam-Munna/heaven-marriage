@@ -91,6 +91,7 @@ const categoryOptions = [
 
   { value: "verified", label: "ভেরিফাইড" },
 ];
+const OtherThing = [{ value: "masna", label: "মাসনা" }];
 
 // Separate FilterContent Component
 interface FilterContentProps {
@@ -878,6 +879,38 @@ function FilterContent({
                 ))}
               </div>
             </div>
+            <div>
+              <Label className="mb-2 block text-xs font-medium">
+                বহুবিবাহে সম্মত
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {OtherThing.map((option) => (
+                  <div
+                    key={option.value}
+                    className="flex items-center space-x-1.5"
+                  >
+                    <Checkbox
+                      id={`category-${option.value}`}
+                      checked={filters.polygamy.includes(option.value)}
+                      onCheckedChange={(checked) =>
+                        handleCheckboxChange(
+                          "polygamy",
+                          option.value,
+                          checked as boolean,
+                        )
+                      }
+                      className="h-4 w-4"
+                    />
+                    <Label
+                      htmlFor={`category-${option.value}`}
+                      className="cursor-pointer text-xs font-normal leading-tight"
+                    >
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CollapsibleContent>
         </Collapsible>
       </div>
@@ -909,6 +942,7 @@ export default function BiodataAdvancedFilter() {
     category: parseAsArrayOf(parseAsString).withDefault([]),
     query: parseAsString.withDefault(""),
     country: parseAsString.withDefault(""),
+    polygamy: parseAsArrayOf(parseAsString).withDefault([]),
   });
 
   // Collapsible sections state

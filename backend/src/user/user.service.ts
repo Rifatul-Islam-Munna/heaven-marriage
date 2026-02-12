@@ -235,6 +235,7 @@ async findUserAndUpdated() {
   }
 
  async findAll(userQuery: UserFilterDto) {
+
   const {
     ageMax,
     ageMin,
@@ -254,6 +255,7 @@ async findUserAndUpdated() {
     skinColor,
     upazilaId,
     country,
+    polygamy
     
   } = userQuery;
 
@@ -305,7 +307,10 @@ pipeline.push({
   if (gender && gender !== 'all') {
     matchConditions.gender = gender;
   }
-
+  this.logger.debug('polygamy',polygamy)
+ if(polygamy){
+  matchConditions['marriageInformationWomen.polygamyConsentOptions'] = 'yes'
+ }
   if (maritalStatus && maritalStatus.length > 0 && maritalStatus[0] !== 'all') {
   const hasPolygamy = maritalStatus.includes('yes');
   const otherStatuses = maritalStatus.filter(status => status !== 'yes');

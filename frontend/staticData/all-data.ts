@@ -53,12 +53,12 @@ export const marriedStatus = [
     "en": "Married (Three Wives)",
         "gender":"male"
   },
-  {
+  /* {
     "id": 100,
     "bn": "মাসনা",
     "en": "yes",
     "gender":"female"
-  },
+  }, */
   {
   "id": 101,
   "bn": "ডিভোর্সী (সন্তান আছে)",

@@ -299,7 +299,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
             <Avatar className="h-10 w-10">
@@ -317,7 +317,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-72" align="center" forceMount>
+        <DropdownMenuContent className="w-72" align="center">
           {/* Profile Completion Status - Only for non-admin users */}
           {!isAdmin && (
             <>
