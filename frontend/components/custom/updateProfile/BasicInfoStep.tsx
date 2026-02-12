@@ -24,7 +24,7 @@ import {
   CommandInput,
   CommandItem,
 } from "@/components/ui/command";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function BasicInfoStep() {
@@ -35,7 +35,14 @@ export function BasicInfoStep() {
   const shouldShowPhoneNumber = useProfileStore(
     (state) => state.shouldShowPhoneNumber,
   );
-
+  const filteredMaritalStatus = useMemo(() => {
+    if (formData.gender === "all") {
+      return marriedStatus;
+    }
+    return marriedStatus.filter(
+      (status) => status.gender === "all" || status.gender === formData.gender,
+    );
+  }, [formData.gender]);
   console.log("shouldShowEmail", shouldShowEmail);
   const [countryOpen, setCountryOpen] = useState(false);
   return (
@@ -99,7 +106,7 @@ export function BasicInfoStep() {
               <SelectValue placeholder="নির্বাচন করুন" />
             </SelectTrigger>
             <SelectContent>
-              {filterOutstatus.map((status) => (
+              {filteredMaritalStatus.map((status) => (
                 <SelectItem key={status.id} value={status.en}>
                   {status.bn}
                 </SelectItem>

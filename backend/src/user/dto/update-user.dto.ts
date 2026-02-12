@@ -272,7 +272,6 @@ export class UserFilterDto {
 export class FindOneDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
-  @IsMongoId()
   id: string;
 }
 export class FindOneTokenDto {
@@ -332,4 +331,23 @@ export class OtpstringDto{
     @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
   otp: string;
+}
+
+
+export class ReqForDto{
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsPhoneNumber("BD")
+  phoneNumber: string;
+}
+export class NewPasswordResetWithOtp{
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsPhoneNumber("BD")
+  phoneNumber: string;
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  otp: string;
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  newPassword: string;
+
 }

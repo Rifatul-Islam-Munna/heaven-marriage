@@ -16,6 +16,9 @@ export class User {
     @Prop()
     userId:string
 
+    @Prop({default:false})
+    isPublished:boolean;
+
     @Prop({type: String, enum: UserType, default: UserType.USER})
     role:UserType
 

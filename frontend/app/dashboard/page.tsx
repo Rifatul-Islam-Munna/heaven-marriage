@@ -52,6 +52,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "use-debounce";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import { useRouter } from "next/navigation";
 
 interface User {
   _id: string;
@@ -62,6 +63,7 @@ interface User {
   isSubscriber: boolean;
   isOtpVerified: boolean;
   numberOfConnections: number;
+  isPublished?: boolean;
 }
 
 interface PaginatedUsersResponse {
@@ -85,6 +87,7 @@ export default function AdminUsersTable() {
     null,
   );
   const [connectionValue, setConnectionValue] = useState<string>("");
+  const router = useRouter();
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
@@ -237,6 +240,9 @@ export default function AdminUsersTable() {
                 OTP যাচাই
               </TableHead>
               <TableHead className="font-heading font-semibold text-center">
+                প্রকাশিত
+              </TableHead>
+              <TableHead className="font-heading font-semibold text-center">
                 সাবস্ক্রাইবার
               </TableHead>
               <TableHead className="font-heading font-semibold text-right">
@@ -320,6 +326,13 @@ export default function AdminUsersTable() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
+                    {user.isPublished ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
                     <Button
                       variant={user.isSubscriber ? "default" : "outline"}
                       size="sm"
@@ -339,6 +352,16 @@ export default function AdminUsersTable() {
                     </Button>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        router.push(`/dashboard/edit-profile/${user._id}`)
+                      }
+                      className="text-green-600 hover:text-green-700 hover:bg-red-50"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -478,6 +501,16 @@ export default function AdminUsersTable() {
                     {user.isSubscriber ? "সক্রিয়" : "নিষ্ক্রিয়"}
                   </Button>
                   <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      router.push(`/dashboard/edit-profile/${user._id}`)
+                    }
+                    className="text-green-600 hover:text-green-700 hover:bg-red-50"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteUserId(user._id)}
@@ -586,7 +619,7 @@ export default function AdminUsersTable() {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                deleteUserId && deleteMutation.mutate(deleteUserId)
+                deleteUserId && deleteMutation.mutate({ id: deleteUserId })
               }
               disabled={deleteMutation.isPending}
               className="bg-red-600 hover:bg-red-700 font-heading w-full sm:w-auto"

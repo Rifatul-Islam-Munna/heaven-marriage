@@ -24,6 +24,7 @@ interface BiodataCardProps {
   isVerified?: boolean;
   className?: string;
   isForShortList?: boolean;
+  userId?: string;
 }
 
 // Helper function to convert height to Bangla format
@@ -61,6 +62,7 @@ export default function BiodataCard({
   isVerified = false,
   className,
   isForShortList,
+  userId,
 }: BiodataCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const client = useQueryClient();
@@ -82,7 +84,7 @@ export default function BiodataCard({
 
   const displayUserId =
     gender === "male" ? `NG-${biodataNumber}` : `NB-${biodataNumber}`;
-
+  const pushId = userId ? userId : id;
   return (
     <div
       className={cn(
@@ -144,7 +146,7 @@ export default function BiodataCard({
         </div>
         {/* RIGHT: Button (Bottom-aligned) */}
         <div className="flex-shrink-0 flex items-end">
-          <Link href={`/biodata/${id}`}>
+          <Link href={`/biodata/${pushId}`}>
             <Button
               className="rounded-full bg-gradient-to-r from-pink-500 to-pink-600 px-4 py-2 text-sm font-medium hover:from-pink-600 hover:to-pink-700"
               size="sm"

@@ -105,14 +105,16 @@ export default function FaqPage() {
                 >
                   <AccordionTrigger className="hover:no-underline py-4 sm:py-5">
                     <div className="flex items-start gap-3 sm:gap-4 text-left pr-4">
-                      <div className=" w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-pink-500 flex items-center justify-center text-white font-semibold text-base">
-                        {index + 1}
+                      {/* FIXED: Added flex-shrink-0, consistent sizing, and fixed text size */}
+                      <div className="flex-shrink-0 min-w-[32px] max-w-[32px] min-h-[32px] max-h-[32px] sm:min-w-[36px] sm:max-w-[36px] sm:min-h-[36px] sm:max-h-[36px] rounded-full bg-pink-500 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
+                        {(index + 1).toLocaleString("bn-BD")}
                       </div>
-                      <span className=" font-semibold text-sm sm:text-base lg:text-lg text-gray-900 leading-relaxed">
+                      <span className="font-semibold text-sm sm:text-base lg:text-lg text-gray-900 leading-relaxed">
                         {faq.title}
                       </span>
                     </div>
                   </AccordionTrigger>
+
                   <AccordionContent className="pb-5 sm:pb-6 pl-10 sm:pl-12 pr-4">
                     <div className="border-t border-gray-100 pt-4">
                       <p className="text-sm sm:text-base text-gray-700 leading-relaxed  whitespace-pre-wrap">

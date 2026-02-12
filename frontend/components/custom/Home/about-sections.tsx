@@ -85,25 +85,33 @@ export default function AboutSection() {
 
       <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="mx-auto mb-16 max-w-4xl text-center">
-          <div className="mb-6 flex items-center justify-center gap-3">
-            <div className="h-px w-12 bg-gradient-to-r from-transparent to-pink-500" />
-            <Heart className="h-8 w-8 fill-pink-500 text-pink-500" />
-            <div className="h-px w-12 bg-gradient-to-l from-transparent to-pink-500" />
+        <div className="mx-auto mb-12 max-w-4xl px-4 text-center sm:mb-16 sm:px-6">
+          {/* Decorative Header */}
+          <div className="mb-4 flex items-center justify-center gap-2 sm:mb-6 sm:gap-3">
+            <div className="h-px w-8 bg-gradient-to-r from-transparent to-pink-500 sm:w-12" />
+            <Heart className="h-6 w-6 fill-pink-500 text-pink-500 sm:h-8 sm:w-8" />
+            <div className="h-px w-8 bg-gradient-to-l from-transparent to-pink-500 sm:w-12" />
           </div>
 
-          <h2 className="font-heading text-4xl font-bold text-foreground sm:text-5xl md:text-6xl">
+          {/* Main Heading */}
+          <h2 className="font-heading text-3xl font-bold leading-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
             মুহতারাম ও মুহতারামা!
           </h2>
 
-          <div className="mt-8 space-y-4 text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl">
-            <p>
+          {/* Description - Split for better mobile readability */}
+          <div className="mt-6 space-y-3 sm:mt-8 sm:space-y-4">
+            <p className="mx-auto max-w-3xl text-[15px] leading-[1.9] text-muted-foreground sm:text-base sm:leading-[1.8] md:text-lg md:leading-relaxed lg:text-xl">
               Niqaha কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়। এটি ইসলামী শরিয়াহ-সম্মত
               দাওয়াতী প্ল্যাটফর্ম, যেখানে বিবাহ, তালাক ও দাম্পত্য জীবনের শরয়ী
-              সমাধান প্রদান করা হয়। আমরা কেবল বিবাহ সম্পন্ন করাই না, বরং একটি
-              সুখী, বরকতময় ও টেকসই দাম্পত্য জীবন গঠনে সহায়তা করি। আমাদের
-              লক্ষ্য ইসলামী অনুশাসন মেনে বিবাহকে সহজ করা, হারাম থেকে বাঁচানো এবং
-              সুন্নাহ অনুযায়ী পরিবার গঠন করা।
+              সমাধান প্রদান করা হয়।
+            </p>
+            <p className="mx-auto max-w-3xl text-[15px] leading-[1.9] text-muted-foreground sm:text-base sm:leading-[1.8] md:text-lg md:leading-relaxed lg:text-xl">
+              আমরা কেবল বিবাহ সম্পন্ন করাই না, বরং একটি সুখী, বরকতময় ও টেকসই
+              দাম্পত্য জীবন গঠনে সহায়তা করি।
+            </p>
+            <p className="mx-auto max-w-3xl text-[15px] leading-[1.9] text-muted-foreground sm:text-base sm:leading-[1.8] md:text-lg md:leading-relaxed lg:text-xl">
+              আমাদের লক্ষ্য ইসলামী অনুশাসন মেনে বিবাহকে সহজ করা, হারাম থেকে
+              বাঁচানো এবং সুন্নাহ অনুযায়ী পরিবার গঠন করা।
             </p>
           </div>
         </div>

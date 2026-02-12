@@ -1,6 +1,6 @@
 "use client";
 import { useUser } from "@/lib/useUser";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,25 @@ import {
   Shield,
   AlertCircle,
   Loader2,
+  EyeOff,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { UserType, User as USer } from "@/@types/user";
 import { useRouter } from "next/navigation";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import Image from "next/image";
+import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import { logOutUser } from "@/actions/auth";
 
 export interface UserInfo {
   _id: string;
@@ -37,7 +51,15 @@ export interface UserInfo {
 const User = () => {
   const router = useRouter();
 
-  const { data: user, isLoading } = useQueryWrapper<USer>(
+  // Alert dialog states
+  const [showHideAlert, setShowHideAlert] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+
+  const {
+    data: user,
+    isLoading,
+    refetch,
+  } = useQueryWrapper<USer>(
     ["get-my-profile-for-success"],
     "/user/get-my-profile",
   );
@@ -50,7 +72,52 @@ const User = () => {
     router.push(`/biodata/${user?._id}`);
   };
 
-  // Calculate profile completion percentage
+  // Hide/Unhide mutation
+  const { mutate: toggleVisibility, isPending: isTogglingVisibility } =
+    useCommonMutationApi({
+      method: "PATCH",
+      url: "/user/update-user", // Adjust to your actual endpoint
+      mutationKey: ["toggle-my-visibility"],
+      successMessage: user?.isPublished
+        ? "প্রোফাইল লুকানো হয়েছে"
+        : "প্রোফাইল প্রকাশিত হয়েছে",
+      onSuccess: () => {
+        refetch();
+      },
+    });
+
+  // Delete mutation with logout
+  const { mutate: deleteUser, isPending: isDeleting } = useCommonMutationApi({
+    method: "DELETE",
+    url: "/user/delete-my-account",
+    mutationKey: ["delete-user"],
+    successMessage: "ব্যবহারকারী মুছে ফেলা হয়েছে",
+    onSuccess: () => {
+      handellogout();
+    },
+  });
+
+  const handellogout = async () => {
+    const res = await logOutUser();
+    if (res) {
+      /*   await refetch();
+      router.refresh(); */
+      window.location.href = "/";
+    }
+  };
+
+  // Handle hide/unhide confirmation
+  const handleToggleVisibility = () => {
+    toggleVisibility({ isPublished: !user?.isPublished });
+    setShowHideAlert(false);
+  };
+
+  // Handle delete confirmation
+  const handleDelete = () => {
+    deleteUser({});
+    setShowDeleteAlert(false);
+  };
+
   // Calculate profile completion percentage
   const profileCompletion = useMemo(() => {
     if (!user) return 0;
@@ -310,7 +377,7 @@ const User = () => {
                 className="bg-pink-500 hover:bg-pink-600 text-white"
               >
                 <Edit className="w-4 h-4 mr-2" />
-                সম্পাদনা করুন
+                বায়োডাটা এডিট করুন
               </Button>
               <Button
                 onClick={handleVisitProfile}
@@ -322,6 +389,42 @@ const User = () => {
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Action Buttons - Hide/Unhide and Delete */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          <Button
+            onClick={() => setShowHideAlert(true)}
+            disabled={isTogglingVisibility}
+            variant="outline"
+            className={`flex items-center gap-2 ${
+              user?.isPublished
+                ? "border-orange-500 text-orange-600 hover:bg-orange-50"
+                : "border-green-500 text-green-600 hover:bg-green-50"
+            }`}
+          >
+            {user?.isPublished ? (
+              <>
+                <EyeOff className="w-4 h-4" />
+                প্রোফাইল লুকান
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4" />
+                প্রোফাইল প্রকাশ করুন
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={() => setShowDeleteAlert(true)}
+            disabled={isDeleting}
+            variant="outline"
+            className="flex items-center gap-2 border-red-500 text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            অ্যাকাউন্ট মুছে ফেলুন
+          </Button>
         </div>
 
         {/* Profile Completion Alert */}
@@ -362,7 +465,7 @@ const User = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <CardTitle className="text-xl font-semibold text-gray-900 flex items-center gap-3">
                 {/* Gender-based Profile Image */}
-                <div className="w-12 h-12 rounded-lg overflow-hidden  flex-shrink-0">
+                <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                   {user?.gender ? (
                     <Image
                       src={
@@ -383,28 +486,52 @@ const User = () => {
                 </div>
                 প্রোফাইল তথ্য
               </CardTitle>
-              {user?.isOtpVerified !== undefined && (
-                <Badge
-                  variant={user?.isOtpVerified ? "default" : "destructive"}
-                  className={
-                    user?.isOtpVerified
-                      ? "bg-green-500 hover:bg-green-600"
-                      : "bg-red-500"
-                  }
-                >
-                  {user?.isOtpVerified ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      যাচাইকৃত
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-3 h-3 mr-1" />
-                      যাচাই করা হয়নি
-                    </>
-                  )}
-                </Badge>
-              )}
+              <div className="flex gap-2">
+                {user?.isOtpVerified !== undefined && (
+                  <Badge
+                    variant={user?.isOtpVerified ? "default" : "destructive"}
+                    className={
+                      user?.isOtpVerified
+                        ? "bg-green-500 hover:bg-green-600"
+                        : "bg-red-500"
+                    }
+                  >
+                    {user?.isOtpVerified ? (
+                      <>
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        যাচাইকৃত
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3 h-3 mr-1" />
+                        যাচাই করা হয়নি
+                      </>
+                    )}
+                  </Badge>
+                )}
+                {user?.isPublished !== undefined && (
+                  <Badge
+                    variant={user?.isPublished ? "default" : "secondary"}
+                    className={
+                      user?.isPublished
+                        ? "bg-blue-500 hover:bg-blue-600"
+                        : "bg-gray-500"
+                    }
+                  >
+                    {user?.isPublished ? (
+                      <>
+                        <Eye className="w-3 h-3 mr-1" />
+                        প্রকাশিত
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3 h-3 mr-1" />
+                        লুকানো
+                      </>
+                    )}
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
 
@@ -541,6 +668,62 @@ const User = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Hide/Unhide Confirmation Dialog */}
+      <AlertDialog open={showHideAlert} onOpenChange={setShowHideAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {user?.isPublished
+                ? "প্রোফাইল লুকাতে চান?"
+                : "প্রোফাইল প্রকাশ করতে চান?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {user?.isPublished
+                ? "আপনার প্রোফাইলটি লুকানো হলে অন্য ব্যবহারকারীরা এটি দেখতে পারবেন না। আপনি যেকোনো সময় আবার প্রকাশ করতে পারবেন।"
+                : "আপনার প্রোফাইলটি প্রকাশিত হলে অন্য ব্যবহারকারীরা এটি দেখতে পারবেন এবং আপনার সাথে যোগাযোগ করতে পারবেন।"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>বাতিল</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleToggleVisibility}
+              className={
+                user?.isPublished
+                  ? "bg-orange-600 hover:bg-orange-700"
+                  : "bg-green-600 hover:bg-green-700"
+              }
+            >
+              নিশ্চিত করুন
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">
+              অ্যাকাউন্ট মুছে ফেলতে চান?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              সতর্কতা! এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। এটি স্থায়ীভাবে
+              আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা মুছে ফেলবে। আপনি কি নিশ্চিত যে
+              আপনি আপনার অ্যাকাউন্ট মুছে ফেলতে চান?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>বাতিল</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              হ্যাঁ, মুছে ফেলুন
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -115,6 +115,7 @@ export interface Pledge {
 export interface User {
   _id?: string;
   name: string;
+  isPublished?: boolean;
   userId?: string;
   role: UserType;
   email?: string;
@@ -144,6 +145,7 @@ export interface User {
   numberOfConnections?:number;
   customFields?: Record<string, string>;
   howYouWannaGetMarried?: string;
+
 }
 export interface UserInfo {
   _id:string

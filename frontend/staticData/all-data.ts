@@ -9,31 +9,31 @@ export const marriedStatus = [
     "id": 2,
     "bn": "অবিবাহিত",
     "en": "Unmarried",
-         "gender":"all"
+     "gender":"all"
   },
   {
     "id": 3,
     "bn": "ডিভোর্স্ড (সন্তান আছে)",
     "en": "Divorced (With Children)",
-    "gender":"female"
+    "gender":"male"
   },
   {
     "id": 4,
     "bn": "ডিভোর্স্ড (সন্তান নাই)",
     "en": "Divorced (No Children)",
-    "gender":"female"
+    "gender":"male"
   },
   {
     "id": 5,
     "bn": "বিপত্নীক (সন্তান আছে)",
     "en": "Widower (With Children)",
-    "gender":"female"
+    "gender":"male"
   },
   {
     "id": 6,
     "bn": "বিপত্নীক (সন্তান নাই)",
     "en": "Widower (No Children)",
-    "gender":"female"
+    "gender":"male"
   },
   {
     "id": 7,
@@ -57,8 +57,43 @@ export const marriedStatus = [
     "id": 100,
     "bn": "মাসনা",
     "en": "yes",
-    "gender":"male"
+    "gender":"female"
   },
+  {
+  "id": 101,
+  "bn": "ডিভোর্সী (সন্তান আছে)",
+  "en": "Divorced (with children)",
+  "gender": "female"
+},
+{
+  "id": 102,
+  "bn": "ডিভোর্সী (সন্তান নেই)",
+  "en": "Divorced (without children)",
+  "gender": "female"
+},
+{
+  "id": 103,
+  "bn": "বিধবা (সন্তান আছে)",
+  "en": "Widow (with children)",
+  "gender": "female"
+},
+{
+  "id": 104,
+  "bn": "বিধবা (সন্তান নেই)",
+  "en": "Widow (without children)",
+  "gender": "female"
+},
+{
+  "id": 105,
+  "bn": "বন্ধ্যা",
+  "en": "Childless/Infertile",
+  "gender": "female"
+}
+
+
+
+
+
 ];
 
 

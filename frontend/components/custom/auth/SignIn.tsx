@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 import LoginWithGoogle from "./GoogleLogin";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function SignIn() {
   const { refetch } = useUser();
@@ -98,12 +99,12 @@ export default function SignIn() {
                 <Label htmlFor="password" className="text-gray-700 font-medium">
                   পাসওয়ার্ড
                 </Label>
-                <a
-                  href="/forgot-password"
+                <Link
+                  href="/forgot/req-for-otp"
                   className="text-sm text-pink-600 hover:text-pink-700 hover:underline"
                 >
                   ভুলে গেছেন?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <Input

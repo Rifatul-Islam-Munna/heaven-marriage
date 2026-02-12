@@ -516,6 +516,12 @@ export class CreateUserDto {
   @Max(200)
   @Transform(({ value }) => parseInt(value, 10))
   weight?: number;
+  @ApiPropertyOptional({ example: 65, minimum: 30, maximum: 200, description: 'Weight in kg' })
+  @IsOptional()
+
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  isPublished?: boolean;
 
   @ApiPropertyOptional({ example: 'Bangladeshi' })
   @IsString()

@@ -24,6 +24,8 @@ import { useUser } from "@/lib/useUser";
 import { UserNav } from "./UserNav";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
+import { logOutUser } from "@/actions/auth";
 
 // Navigation items array
 const navItems = [

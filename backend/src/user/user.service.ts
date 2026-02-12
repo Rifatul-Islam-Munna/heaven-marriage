@@ -1,6 +1,6 @@
 import { HttpException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AdminUserDto, FindOneDto, LoginDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './entities/user.entity';
 import { Model, Types } from 'mongoose';
@@ -262,7 +262,14 @@ async findUserAndUpdated() {
   const limit = 10;
   const skip = (page - 1) * limit;
   const pipeline: any[] = [];
-
+pipeline.push({
+  $match: {
+    $and: [
+      { isPublished: { $eq: true } },
+      { isPublished: { $ne: null } }
+    ]
+  }
+});
   // 1. Fuzzy Search Stage (only if query provided)
  if (query) { 
     console.log('Adding text search stage for:', query);
@@ -438,6 +445,7 @@ pipeline.push({
       userId:1,
       role: 1,
       createdAt: 1,
+    
       'address.district': 1,
       'address.upazila': 1,
       'address.presentAddress': 1,
@@ -561,13 +569,35 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
 
 
 
-  async findOne(id: FindOneDto) {
-    const findOne = await this.userModel.findById(id.id).select("  -password -email -otpNumber -otpValidatedAt -phoneNumber -name").lean();
-    if(!findOne) {
-      throw new HttpException('User not found', 400);
-    }
-    return findOne;
+async findOne(id: FindOneDto) {
+  const searchId = id.id;
+  const isValidObjectId = Types.ObjectId.isValid(searchId) && 
+                          String(new Types.ObjectId(searchId)) === searchId;
+  
+  let findOne;
+  
+  // Try to find by _id first if it's a valid ObjectId
+  if (isValidObjectId) {
+    findOne = await this.userModel
+      .findById(searchId)
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -name')
+      .lean();
   }
+  
+  // If not found and not a valid ObjectId, try userId
+  if (!findOne) {
+    findOne = await this.userModel
+      .findOne({ userId: searchId })
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -name')
+      .lean();
+  }
+  
+  if (!findOne) {
+    throw new HttpException('User not found', 400);
+  }
+  
+  return findOne;
+}
   async finMyProfile(id: string) {
     const findOne = await this.userModel.findById(id).select("  -password -otpNumber -otpValidatedAt ").lean();
     if(!findOne) {
@@ -585,6 +615,13 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
     return findOne;
   }
 
+   async removeUser(id: string) {
+     const findOne = await this.userModel.findByIdAndDelete(id).lean();
+    if(!findOne) {
+      throw new HttpException('User not found', 400);
+    }
+    return findOne;
+  }
    async remove(id: FindOneDto) {
      const findOne = await this.userModel.findByIdAndDelete(id.id).lean();
     if(!findOne) {
@@ -636,7 +673,7 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections')
+      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }) // Latest users first
@@ -796,6 +833,63 @@ async getMyRequests (userId:string, query:PaginationDto){
   }
 
 }
+
+async RequestForOtpRestPassword(payload:ReqForDto){
+  const findOneUser = await this.userModel.findOne({phoneNumber:payload.phoneNumber}).lean();
+  if(!findOneUser){
+    throw new HttpException('User not found', 400);
+  }
+        const newOtp = await this.otpService.generateUniqueOTP();
+    const newOtpExpiry = new Date(Date.now() + 26 * 60 * 1000);
+
+    await this.userModel.updateOne(
+      { phoneNumber: findOneUser.phoneNumber },
+      {
+        $set: {
+          otpNumber: newOtp,
+          otpValidatedAt: newOtpExpiry,
+        },
+      }
+    );
+    this.smsService.sendOtpSms(findOneUser.phoneNumber,newOtp)
+
+    return {
+      message:"OTP sent successfully",
+     
+    }
+
+  
+}
+async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
+  const findUser = await this.userModel.findOne({phoneNumber:payload.phoneNumber,otpNumber:payload.otp}).lean();
+  if(!findUser){
+    throw new HttpException('User not found', 400);
+  }
+
+  const hashedPassword = await bcrypt.hash(payload.newPassword, 10);
+  await this.userModel.updateOne(
+    { phoneNumber: findUser.phoneNumber },
+    {
+      $set: {
+        password: hashedPassword,
+        otpNumber: null,
+        otpValidatedAt: null,
+      },
+    }
+  );
+  return {
+    message:"Password reset successfully",
+  }
+  
+}
+
+
+
+
+
+
+
+
 
 //bot 
 

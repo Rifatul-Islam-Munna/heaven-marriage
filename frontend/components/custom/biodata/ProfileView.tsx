@@ -72,9 +72,9 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const { data: userData, isLoading } = useQueryWrapper<User>(
     ["get-user", id],
     `/user/get-one-user?id=${id}`,
-    { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
+    /*  { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
     1000,
-    "bio-data-info",
+    "bio-data-info", */
   );
   const router = useRouter();
 
@@ -201,7 +201,9 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   <div className="flex justify-between py-2 border-b border-white/20">
                     <span className="text-white/80">জন্মসন</span>
                     <span className="font-semibold">
-                      {userData?.dateOfBirth || "তথ্য নেই"}
+                      {userData?.age
+                        ? new Date().getFullYear() - userData.age
+                        : "তথ্য নেই"}
                     </span>
                   </div>
 
