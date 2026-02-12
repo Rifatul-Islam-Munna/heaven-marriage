@@ -99,7 +99,7 @@ export default function GuidelinesPage() {
                   <AccordionTrigger className="px-4 py-5 sm:px-6 sm:py-6 hover:no-underline hover:bg-pink-50/50 transition-colors [&[data-state=open]]:bg-pink-50">
                     <div className="flex items-center gap-3 sm:gap-4 w-full text-left">
                       <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-md">
-                        {index + 1}
+                        {(index + 1).toLocaleString("bn-BD")}
                       </div>
                       <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 leading-tight flex-1 pr-2">
                         {guideline.title}

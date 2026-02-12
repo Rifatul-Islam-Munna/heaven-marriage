@@ -53,7 +53,7 @@ import { useDebounce } from "use-debounce";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
-
+import { parseAsInteger, useQueryState } from "nuqs";
 interface User {
   _id: string;
   name: string;
@@ -78,7 +78,8 @@ interface PaginatedUsersResponse {
 
 export default function AdminUsersTable() {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
+
+  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
   const [searchQuery, setSearchQuery] = useState("");
   const [gender, setGender] = useState("all");
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -530,9 +531,14 @@ export default function AdminUsersTable() {
         <div className="flex flex-col gap-4">
           {/* Page Info */}
           <div className="text-sm text-center text-muted-foreground font-heading">
-            পেজ {data?.page} / {totalPages} · {((data?.page ?? 1) - 1) * 10 + 1}{" "}
-            - {Math.min((data?.page ?? 1) * 10, data?.totalItems ?? 0)} টি
-            দেখানো হচ্ছে
+            মোট {data?.totalItems?.toLocaleString("bn-BD")} টির মধ্যে{" "}
+            {(((data?.page ?? 1) - 1) * 10 + 1).toLocaleString("bn-BD")} -{" "}
+            {Math.min(
+              (data?.page ?? 1) * 10,
+              data?.totalItems ?? 0,
+            ).toLocaleString("bn-BD")}{" "}
+            দেখানো হচ্ছে (পেজ {data?.page?.toLocaleString("bn-BD")}/
+            {totalPages?.toLocaleString("bn-BD")})
           </div>
 
           {/* Pagination Controls */}
