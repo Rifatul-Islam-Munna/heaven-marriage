@@ -264,10 +264,12 @@ export default function AdminUsersTable() {
               users.map((user) => (
                 <TableRow key={user._id} className="hover:bg-pink-50/50">
                   <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.phoneNumber}</TableCell>
+                  <TableCell>{user?.email}</TableCell>
+                  <TableCell>{user?.phoneNumber}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{user.maritalStatus}</Badge>
+                    <Badge variant="outline">
+                      {user?.maritalStatus ?? "N/A"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     {editingConnectionId === user._id ? (
@@ -301,7 +303,7 @@ export default function AdminUsersTable() {
                     ) : (
                       <div className="flex items-center justify-center gap-2">
                         <Badge variant="secondary" className="font-semibold">
-                          {user.numberOfConnections}
+                          {user?.numberOfConnections}
                         </Badge>
                         <Button
                           size="icon"
