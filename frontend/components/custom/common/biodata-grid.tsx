@@ -73,9 +73,9 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
   const { data, isLoading } = useQueryWrapper<PaginatedUserResponse>(
     ["get-biodatas", query],
     `/user/get-all-user?${query}`,
-    /*   { staleTime: 60 * 1000 },
+    { staleTime: 60 * 1000 },
     1200,
-    "get-all-user-data", */
+    "get-all-user-data",
   );
 
   console.log("Query:", query);
