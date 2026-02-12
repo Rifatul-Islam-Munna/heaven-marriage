@@ -95,7 +95,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
       method: "PATCH",
       url: "/user/update-user-admin", // Adjust to your actual endpoint
       mutationKey: ["toggle-visibility"],
-      successMessage: data?.isPublished
+      successMessage: data?.isPublishFromAdmin
         ? "প্রোফাইল লুকানো হয়েছে"
         : "প্রোফাইল প্রকাশিত হয়েছে",
       onSuccess: () => {
@@ -156,7 +156,10 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
 
   // Handle hide/unhide confirmation
   const handleToggleVisibility = () => {
-    toggleVisibility({ id, isPublished: !data?.isPublished ?? true });
+    toggleVisibility({
+      id,
+      isPublishFromAdmin: !data?.isPublishFromAdmin ?? true,
+    });
     setShowHideAlert(false);
   };
 
@@ -203,12 +206,12 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             disabled={isTogglingVisibility || isLoading}
             variant="outline"
             className={`flex items-center gap-2 ${
-              data?.isPublished
+              data?.isPublishFromAdmin
                 ? "border-orange-500 text-orange-600 hover:bg-orange-50"
                 : "border-green-500 text-green-600 hover:bg-green-50"
             }`}
           >
-            {data?.isPublished ? (
+            {data?.isPublishFromAdmin ? (
               <>
                 <EyeOff className="w-4 h-4" />
                 লুকান

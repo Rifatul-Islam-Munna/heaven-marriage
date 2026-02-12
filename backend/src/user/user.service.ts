@@ -268,10 +268,13 @@ pipeline.push({
   $match: {
     $and: [
       { isPublished: { $eq: true } },
-      { isPublished: { $ne: null } }
+      { isPublished: { $ne: null } },
+      { isPublishFromAdmin: { $eq: true } },
+      { isPublishFromAdmin: { $ne: null } }
     ]
   }
 });
+
   // 1. Fuzzy Search Stage (only if query provided)
  if (query) { 
     console.log('Adding text search stage for:', query);
@@ -678,7 +681,7 @@ async findOne(id: FindOneDto) {
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished')
+      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }) // Latest users first

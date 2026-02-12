@@ -116,6 +116,7 @@ export interface User {
   _id?: string;
   name: string;
   isPublished?: boolean;
+  isPublishFromAdmin?: boolean;
   userId?: string;
   role: UserType;
   email?: string;

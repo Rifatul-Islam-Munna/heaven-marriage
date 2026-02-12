@@ -16,8 +16,11 @@ export class User {
     @Prop()
     userId:string
 
-    @Prop({default:false})
+    @Prop({default:true})
     isPublished:boolean;
+
+    @Prop({default:false})
+    isPublishFromAdmin:boolean;
 
     @Prop({type: String, enum: UserType, default: UserType.USER})
     role:UserType

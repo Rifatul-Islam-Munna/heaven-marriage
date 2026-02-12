@@ -64,6 +64,7 @@ interface User {
   isOtpVerified: boolean;
   numberOfConnections: number;
   isPublished?: boolean;
+  isPublishFromAdmin?: boolean;
 }
 
 interface PaginatedUsersResponse {
@@ -329,7 +330,7 @@ export default function AdminUsersTable() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    {user.isPublished ? (
+                    {user.isPublishFromAdmin ? (
                       <CheckCircle className="h-5 w-5 text-green-600 mx-auto" />
                     ) : (
                       <XCircle className="h-5 w-5 text-red-500 mx-auto" />
