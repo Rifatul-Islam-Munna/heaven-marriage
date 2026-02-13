@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function CreateBiodataSection() {
-  const router = useRouter();
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-pink-50 via-purple-50 to-pink-50 py-16 md:py-24">
       {/* Decorative Elements */}
