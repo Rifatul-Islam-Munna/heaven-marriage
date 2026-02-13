@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function CreateBiodataSection() {
+  const router = useRouter();
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-pink-50 via-purple-50 to-pink-50 py-16 md:py-24">
       {/* Decorative Elements */}
@@ -41,7 +42,10 @@ export default function CreateBiodataSection() {
             size="lg"
             className="group h-12 w-full border-2 border-pink-600 bg-white px-8 text-base font-semibold text-pink-600 shadow-md transition-all hover:bg-pink-50 hover:scale-105 hover:shadow-lg sm:h-14 sm:w-auto sm:text-lg"
           >
-            <Link href="/contact" target="_blank">
+            <Link
+              href="https://www.facebook.com/share/v/1FfQ7w7gZM/?mibextid=wwXIfr"
+              target="_blank"
+            >
               <Youtube className="mr-2 h-5 w-5 text-red-600 transition-transform group-hover:scale-110" />
               যেভাবে বায়োডাটা তৈরি করবেন
             </Link>

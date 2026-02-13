@@ -69,7 +69,7 @@ const User = () => {
   };
 
   const handleVisitProfile = () => {
-    router.push(`/biodata/${user?._id}`);
+    router.push(`/biodata/${user?.userId}`);
   };
 
   // Hide/Unhide mutation
