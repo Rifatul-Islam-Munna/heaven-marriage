@@ -40,7 +40,9 @@ const lato = Lato({
 });
 // app/layout.tsx
 import type { Metadata } from "next";
-
+import { GoogleTagManager } from "@next/third-parties/google";
+import { PageViewTracker } from "@/lib/PageViewTracker";
+import { Suspense } from "react";
 export const metadata: Metadata = {
   title:
     "নিকাহা - বাংলাদেশের সেরা হালাল ম্যাট্রিমনি ওয়েবসাইট | Halal Marriage Platform",
@@ -145,8 +147,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
+      <GoogleTagManager gtmId="GTM-K8LP7V8D" />
       <body className={` ${cormorant.variable} ${lato.variable} antialiased`}>
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-K8LP7V8D"
+            height="0"
+            width="0"
+            className="display:none;visibility:hidden"
+          ></iframe>
+        </noscript>
+
         <WhatsAppFloat />
+        <Suspense>
+          <PageViewTracker />
+        </Suspense>
+
         <QueryClint>
           <NuqsAdapter>
             <Navbar />
