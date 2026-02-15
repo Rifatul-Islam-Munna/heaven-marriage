@@ -98,8 +98,8 @@ const VerifyAndResetPassword = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error("পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে", {
+    if (newPassword.length < 8) {
+      toast.error("পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে", {
         duration: 5000,
         style: { background: "red", color: "white" },
       });
@@ -221,7 +221,7 @@ const VerifyAndResetPassword = () => {
                   <Input
                     id="newPassword"
                     type={showPassword ? "text" : "password"}
-                    placeholder="কমপক্ষে ৬ অক্ষর"
+                    placeholder="কমপক্ষে ৮ অক্ষর"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="h-10 pl-9 pr-9 text-sm border-gray-300 focus:border-pink-500 focus:ring-pink-500"
