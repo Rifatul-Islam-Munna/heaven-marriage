@@ -37,6 +37,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
+import { viewContentEvent } from "@/lib/google-tag-manager";
+import { useEffect } from "react";
 
 interface ProfileViewProps {
   id: string;
@@ -72,10 +74,24 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const { data: userData, isLoading } = useQueryWrapper<User>(
     ["get-user", id],
     `/user/get-one-user?id=${id}`,
-    /*  { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
+    { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
     1000,
-    "bio-data-info", */
+    "bio-data-info",
   );
+
+  useEffect(() => {
+    if (userData) {
+      viewContentEvent({
+        biodata_id: userData._id,
+        biodata_number: userData.userId,
+        gender: userData.gender,
+        age: userData.age,
+        district: userData.address?.district,
+        education: userData.educationInfo?.highestEducation,
+        profession: userData.occupational?.profession,
+      });
+    }
+  }, [userData]);
   const router = useRouter();
 
   const { mutate, isPending } = useCommonMutationApi({
