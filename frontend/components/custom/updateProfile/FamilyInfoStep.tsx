@@ -90,14 +90,10 @@ export function FamilyInfoStep() {
             <Label htmlFor="brotherCount">ভাই কতজন</Label>
             <Input
               id="brotherCount"
-              type="number"
+              type="text"
               value={formData.familyInfo?.brotherCount || ""}
               onChange={(e) =>
-                updateNestedField(
-                  "familyInfo",
-                  "brotherCount",
-                  parseInt(e.target.value),
-                )
+                updateNestedField("familyInfo", "brotherCount", e.target.value)
               }
             />
           </div>
@@ -106,14 +102,10 @@ export function FamilyInfoStep() {
             <Label htmlFor="sisterCount">বোন কতজন</Label>
             <Input
               id="sisterCount"
-              type="number"
+              type="text"
               value={formData.familyInfo?.sisterCount || ""}
               onChange={(e) =>
-                updateNestedField(
-                  "familyInfo",
-                  "sisterCount",
-                  parseInt(e.target.value),
-                )
+                updateNestedField("familyInfo", "sisterCount", e.target.value)
               }
             />
           </div>

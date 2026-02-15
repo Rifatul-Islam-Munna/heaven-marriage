@@ -281,56 +281,18 @@ export function ExpectedPartnerStep({
 
         <div className="space-y-2">
           <Label htmlFor="partnerHeight">উচ্চতা</Label>
-          <Popover open={heightOpen} onOpenChange={setHeightOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={heightOpen}
-                className="w-full justify-between"
-              >
-                {formData.expectedLifePartner?.height
-                  ? heightOptions.find(
-                      (option) =>
-                        option.value === formData.expectedLifePartner?.height,
-                    )?.label
-                  : "উচ্চতা নির্বাচন করুন"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0">
-              <Command>
-                <CommandInput placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
-                <CommandEmpty>কোনো উচ্চতা পাওয়া যায়নি।</CommandEmpty>
-                <CommandGroup className="max-h-64 overflow-auto">
-                  {heightOptions.map((option) => (
-                    <CommandItem
-                      key={option.value}
-                      value={option.searchText}
-                      onSelect={() => {
-                        updateNestedField(
-                          "expectedLifePartner",
-                          "height",
-                          option.value,
-                        );
-                        setHeightOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          formData.expectedLifePartner?.height === option.value
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {option.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <Input
+            id="partnerHeight"
+            placeholder="উচ্চতা লিখুন (যেমন: 5'6'')"
+            value={formData.expectedLifePartner?.height || ""}
+            onChange={(e) => {
+              updateNestedField(
+                "expectedLifePartner",
+                "height",
+                e.target.value,
+              );
+            }}
+          />
         </div>
 
         <div className="space-y-2">

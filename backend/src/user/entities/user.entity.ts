@@ -99,9 +99,9 @@ export class User {
         fathersProfession:string,
         isMotherAlive:boolean,
         mothersProfession:string,
-        brotherCount:number,
+        brotherCount:string,
         brotherInformation:string;
-        sisterCount:number,
+        sisterCount:string,
         sisterInformation:string;
         familyFinancial:string; //  will be enum
         familyAssetDetails:string;

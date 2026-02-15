@@ -18,6 +18,7 @@ import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import { CustomQuestionsStep } from "./CustomQuestionsStep";
 import { toast } from "sonner";
+import { useUser } from "@/lib/useUser";
 
 const steps = [
   "মৌলিক তথ্য",
@@ -38,12 +39,14 @@ export default function ProfileUpdateForm() {
   const getFormData = useProfileStore((state) => state.getFormData);
   const initializeForm = useProfileStore((state) => state.initializeForm);
   console.log("current-data", getFormData());
+  const formData = getFormData();
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
   const { data, isLoading } = useQueryWrapper(
     ["get-my-profile"],
     "/user/get-my-profile",
@@ -111,7 +114,11 @@ export default function ProfileUpdateForm() {
       case 6:
         return <MarriageInfoStep />;
       case 7:
-        return <ExpectedPartnerStep />;
+        return (
+          <ExpectedPartnerStep
+            partnerGender={formData.gender === "male" ? "female" : "male"}
+          />
+        );
       case 8:
         return <CustomQuestionsStep />;
       case 9:
@@ -124,6 +131,16 @@ export default function ProfileUpdateForm() {
   return (
     <div className="min-h-screen w-full bg-gray-50 py-4 sm:py-6 lg:py-8">
       <div className="w-full container mx-auto px-3 sm:px-4 lg:px-6">
+        <div className=" w-full flex justify-end items-end mb-3">
+          <Button
+            onClick={handleSubmit}
+            className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-11 sm:h-10"
+            disabled={isPending}
+          >
+            সম্পন্ন করুন
+          </Button>
+        </div>
+
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">
           {/* Mobile: Simple Progress Bar */}

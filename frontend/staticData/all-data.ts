@@ -115,6 +115,7 @@ export const fiqhOptions = [
   { value: "shafi", label: "শাফেঈ" },
   { value: "maliki", label: "মালিকি" },
   { value: "hanbali", label: "হাম্বলি" },
+  { value: "salafi", label: "সালাফি" },
 ];
 
 export const religiousEducationOptions = [

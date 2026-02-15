@@ -228,10 +228,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   <div className="flex justify-between py-2 border-b border-white/20">
                     <span className="text-white/80">গাত্রবর্ণ</span>
                     <span className="font-semibold">
-                      {skinColorOptions?.find(
-                        (t) =>
-                          t.value === userData?.personalInformation?.skinTone,
-                      )?.label || "তথ্য নেই"}
+                      {userData?.personalInformation?.skinTone}
                     </span>
                   </div>
 
@@ -514,9 +511,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     />
                     <InfoRow
                       label="ভাই কতগুলি ?"
-                      value={userData?.familyInfo?.brotherCount?.toLocaleString(
-                        "bn-BD",
-                      )}
+                      value={userData?.familyInfo?.brotherCount}
                       bgWhite
                     />
                     <InfoRow
@@ -525,9 +520,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     />
                     <InfoRow
                       label="বোন কতগুলি"
-                      value={userData?.familyInfo?.sisterCount?.toLocaleString(
-                        "bn-BD",
-                      )}
+                      value={userData?.familyInfo?.sisterCount}
                       bgWhite
                     />
                     <InfoRow
@@ -863,9 +856,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     />
                     <InfoRow
                       label="উচ্চতা"
-                      value={formatHeightToBangla(
-                        userData?.expectedLifePartner?.height ?? 0,
-                      )}
+                      value={userData?.expectedLifePartner?.height ?? "N/A"}
                       bgWhite
                     />
                     <InfoRow

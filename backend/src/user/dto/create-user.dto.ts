@@ -138,10 +138,9 @@ class FamilyInfoDto {
   mothersProfession?: string;
 
   @ApiPropertyOptional({ example: 2, minimum: 0 })
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  @Min(0)
-  @Transform(({ value }) => parseInt(value, 10))
+ 
   brotherCount?: number;
 
   @ApiPropertyOptional({ example: '1 married, 1 studying' })
@@ -150,10 +149,8 @@ class FamilyInfoDto {
   brotherInformation?: string;
 
   @ApiPropertyOptional({ example: 1, minimum: 0 })
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  @Min(0)
-  @Transform(({ value }) => parseInt(value, 10))
   sisterCount?: number;
 
   @ApiPropertyOptional({ example: '1 married' })
