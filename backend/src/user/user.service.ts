@@ -940,7 +940,7 @@ async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
       const sent = await this.telegramService.sendDocument({
         channel: isMale ? TelegramChannel.MALE : TelegramChannel.FEMALE,
         document: pdfBuffer,
-        filename: `biodata-${isMale ? 'NG' : 'NB'}-${user.userId}.pdf`,
+        filename: `${user?.name}-biodata-${isMale ? 'NG' : 'NB'}-${user.userId}.pdf`,
         caption: `🎉 New ${isMale ? 'Male' : 'Female'} Biodata\n\nBiodata #${isMale ? 'NG' : 'NB'}-${user.userId}\nName: ${user.name || 'N/A'}\nPhone: ${user.phoneNumber || 'N/A'}`,
       });
 
