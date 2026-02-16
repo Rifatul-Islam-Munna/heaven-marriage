@@ -15,7 +15,7 @@ export class PdfService {
   async generateBiodataPdf(user: UserDocument): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
-     /*  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -25,7 +25,7 @@ export class PdfService {
         '--no-zygote',
         '--font-render-hinting=none', // Better font rendering
         '--disable-accelerated-2d-canvas',
-      ], */
+      ],
     });
 
     try {
