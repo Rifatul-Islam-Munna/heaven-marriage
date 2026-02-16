@@ -39,6 +39,7 @@ FROM node:22-alpine AS production
 WORKDIR /app
 
 # Install Chromium and dependencies for Puppeteer
+# Install Chromium + Bengali/International Fonts
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -46,12 +47,17 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    font-noto \
+    font-noto-bengali \
+    font-noto-devanagari \
+    terminus-font \
     nodejs \
     yarn
 
-# Tell Puppeteer to use the installed Chromium
+# Tell Puppeteer to use installed Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 
 # Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001

@@ -926,7 +926,10 @@ async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
     this.logger.warn(`User ${user.userId} data is only ${completionPercentage}% complete. Skipping PDF send.`);
     return false;
   }
-    if(user?.isPdfSend) return;
+    if(user?.isPdfSend) {
+      this.logger.warn(`User ${user.userId} has already sent a PDF. Skipping PDF send.`);
+      return false;
+    };
     
     try {
       // Generate PDF
