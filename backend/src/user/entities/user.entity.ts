@@ -196,6 +196,8 @@ customFields?: Map<string, string>;
 
 @Prop()
 howYouWannaGetMarried :string
+@Prop()
+isPdfSend :boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { AxiosResponse } from 'axios';
+import FormData from 'form-data'; // Add this import
 
 export enum TelegramChannel {
   MALE = 'NEW_USER',
@@ -15,6 +16,13 @@ interface SendMessageOptions {
   channel: TelegramChannel;
   message: string;
   isHTML?: boolean;
+}
+
+interface SendDocumentOptions {
+  channel: TelegramChannel;
+  document: Buffer;
+  filename: string;
+  caption?: string;
 }
 
 @Injectable()
@@ -39,20 +47,20 @@ export class TelegramService {
       ],
       [
         TelegramChannel.FEMALE,
-        this.configService.get<string>('TELEGRAM_CHANNEL_FEMALE')  as string,
+        this.configService.get<string>('TELEGRAM_CHANNEL_FEMALE') as string,
       ],
       [
         TelegramChannel.SUBSCRIBER,
-        this.configService.get<string>('TELEGRAM_CHANNEL_SUBSCRIBER')  as string,
+        this.configService.get<string>('TELEGRAM_CHANNEL_SUBSCRIBER') as string,
       ],
       [
         TelegramChannel.NUMBERREQUEST,
-        this.configService.get<string>('TELEGRAM_CHANNEL_NUMBERREQUEST')  as string,
+        this.configService.get<string>('TELEGRAM_CHANNEL_NUMBERREQUEST') as string,
       ],
     ]);
 
     if (!this.botToken) {
-      this.logger.error('TELEGRAM_BOT_TOKEN is not configured') ;
+      this.logger.error('TELEGRAM_BOT_TOKEN is not configured');
     }
   }
 
@@ -87,6 +95,52 @@ export class TelegramService {
     } catch (error) {
       this.logger.error(
         `Failed to send message to ${options.channel}: ${error.response?.data?.description || error.message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Send document (PDF, images, etc.) to a specific channel
+   * @param options - Channel, document buffer, filename, and optional caption
+   */
+  async sendDocument(options: SendDocumentOptions): Promise<boolean> {
+    try {
+      const channelId = this.channelIds.get(options.channel);
+
+      if (!channelId) {
+        this.logger.warn(`Channel ${options.channel} is not configured`);
+        return false;
+      }
+
+      const formData = new FormData();
+      formData.append('chat_id', channelId);
+      formData.append('document', options.document, {
+        filename: options.filename,
+        contentType: 'application/pdf',
+      });
+
+      if (options.caption) {
+        formData.append('caption', options.caption);
+      }
+
+      const response: AxiosResponse = await lastValueFrom(
+        this.httpService.post(`${this.baseUrl}/sendDocument`, formData, {
+          headers: {
+            ...formData.getHeaders(),
+          },
+        }),
+      );
+
+      if (response.data.ok) {
+        this.logger.log(`Document sent to ${options.channel} channel`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send document to ${options.channel}: ${error.response?.data?.description || error.message}`,
       );
       return false;
     }

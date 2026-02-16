@@ -12,10 +12,11 @@ import { TelegramService } from './telegram.service';
 import { SmsService } from './sms.service';
 import { OtpService } from './otp.service';
 import { Counter, CounterSchema } from './entities/counter.schema';
+import { PdfService } from './pdf.service';
 
 @Module({
   imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
   controllers: [UserController],
-  providers: [UserService,BkashService,TelegramService,SmsService,OtpService],
+  providers: [UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
 })
 export class UserModule {}
