@@ -25,19 +25,19 @@ export class PdfService {
         '--no-zygote',
         '--single-process',
         '--disable-accelerated-2d-canvas',
-         '--disable-extensions',
-         '--disable-software-rasterizer'
+        '--disable-extensions',
+        '--disable-software-rasterizer',
       ],
     });
 
     try {
       const page = await browser.newPage();
       
-      // High resolution for sharp text
+      // 3x resolution for ultra-sharp text
       await page.setViewport({ 
         width: 800, 
         height: 1200, 
-        deviceScaleFactor: 2 // 2x resolution for crisp text
+        deviceScaleFactor: 3 // 3x = super sharp
       });
 
       const htmlContent = this.generateHtml(user);
@@ -50,10 +50,10 @@ export class PdfService {
         format: 'A4',
         printBackground: true,
         margin: { 
-          top: '15px', 
-          right: '15px', 
-          bottom: '15px', 
-          left: '15px' 
+          top: '12mm', 
+          right: '12mm', 
+          bottom: '12mm', 
+          left: '12mm' 
         },
         preferCSSPageSize: true,
       });
@@ -141,9 +141,9 @@ export class PdfService {
     }
     
     body {
-      font-family: 'Noto Sans Bengali', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-family: 'Noto Sans Bengali', 'Kalpurush', 'SolaimanLipi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       background-color: #f9fafb;
-      padding: 15px;
+      padding: 16px;
       color: #111827;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -157,89 +157,92 @@ export class PdfService {
 
     .header-card {
       background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
-      border-radius: 12px;
-      padding: 28px;
+      border-radius: 14px;
+      padding: 32px;
       color: white;
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
 
     .avatar {
-      width: 90px;
-      height: 90px;
-      margin: 0 auto 18px;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 20px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.25);
+      border: 3px solid rgba(255, 255, 255, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 45px;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 2px;
     }
 
     .biodata-number {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: 0.3px;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
     }
 
     .gender-badge {
       display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 5px 18px;
-      border-radius: 18px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.25);
+      padding: 7px 22px;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 22px;
+      letter-spacing: 1px;
     }
 
     .quick-info {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 12px;
       text-align: left;
     }
 
     .info-item {
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 8px;
-      font-size: 12px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
     }
 
     .info-label {
-      color: rgba(255, 255, 255, 0.75);
+      color: rgba(255, 255, 255, 0.85);
       display: block;
-      margin-bottom: 4px;
-      font-size: 11px;
-      font-weight: 500;
+      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 600;
     }
 
     .info-value {
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 15px;
     }
 
     .content {
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 20px;
     }
 
     .card {
       background: white;
-      border-radius: 10px;
-      padding: 18px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     .card-title {
-      font-size: 17px;
+      font-size: 19px;
       font-weight: 700;
       color: #be185d;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #fbcfe8;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid #fbcfe8;
       text-align: center;
     }
 
@@ -253,9 +256,9 @@ export class PdfService {
     }
 
     td {
-      padding: 12px 14px;
+      padding: 14px 16px;
       border: 1px solid #e5e7eb;
-      font-size: 13px;
+      font-size: 15px;
       line-height: 1.7;
       vertical-align: top;
     }
@@ -263,7 +266,7 @@ export class PdfService {
     td:first-child {
       color: #374151;
       width: 40%;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     td:last-child {
@@ -275,7 +278,7 @@ export class PdfService {
 <body>
   <div class="container">
     <div class="header-card">
-      <div class="avatar">${isMale ? '👨' : '👩'}</div>
+      <div class="avatar">${isMale ? 'M' : 'F'}</div>
       <div class="biodata-number">
         Biodata #${isMale ? 'NG' : 'NB'}-${user.userId}
       </div>
