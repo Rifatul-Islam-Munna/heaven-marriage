@@ -921,8 +921,13 @@ async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
  async sendToUser(user: UserDocument) {
     const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
     const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
+      const completionPercentage = this.calculateDataCompletion(user);
+       if (completionPercentage < 55) {
+    this.logger.warn(`User ${user.userId} data is only ${completionPercentage}% complete. Skipping PDF send.`);
+    return false;
+  }
     if(user?.isPdfSend) return;
-
+    
     try {
       // Generate PDF
       this.logger.log(`Generating PDF for user ${user.userId}`);
@@ -949,7 +954,84 @@ async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
       return false;
     }
   }
+ private calculateDataCompletion(user: UserDocument): number {
+  const fields = [
+    // Basic Info (10 fields)
+    user.name,
+    user.userId,
+    user.email,
+    user.phoneNumber,
+    user.gender,
+    user.maritalStatus,
+    user.age,
+    user.bloodGroup,
+    user.weight,
+    user.nationality,
 
+    // Address (4 fields)
+    user.address?.district,
+    user.address?.upazila,
+    user.address?.permanentAddress,
+    user.address?.presentAddress,
+
+    // Education (6 fields)
+    user.educationInfo?.educationMethod,
+    user.educationInfo?.highestEducation,
+    user.educationInfo?.highestEducationBoard,
+    user.educationInfo?.highestEducationGroup,
+    user.educationInfo?.highestEducationPassingYear,
+    user.educationInfo?.educationBackground,
+
+    // Family (8 fields)
+    user.familyInfo?.isFatherAlive,
+    user.familyInfo?.fathersProfession,
+    user.familyInfo?.isMotherAlive,
+    user.familyInfo?.mothersProfession,
+    user.familyInfo?.brotherCount,
+    user.familyInfo?.sisterCount,
+    user.familyInfo?.familyFinancial,
+    user.familyInfo?.familyReligiousCondition,
+
+    // Personal (10 fields)
+    user.personalInformation?.height,
+    user.personalInformation?.skinTone,
+    user.personalInformation?.outsideClothes,
+    user.personalInformation?.prayerFiverTimeFrom,
+    user.personalInformation?.reciteQuran,
+    user.personalInformation?.fiqhFollow,
+    user.personalInformation?.digitalMedia,
+    user.personalInformation?.islamicStudy,
+    user.personalInformation?.physicalStructure,
+    user.personalInformation?.maharaNonMahram,
+
+    // Occupation (3 fields)
+    user.occupational?.profession,
+    user.occupational?.workingDetails,
+    user.occupational?.salary,
+
+    // Marriage Info (5 fields - conditional based on gender)
+    user.marriageInformationWomen?.isGuardiansAgreed || user.marriageInformationMan?.isGuardiansAgreed,
+    user.marriageInformationWomen?.jobAfterMarriage || user.marriageInformationMan?.wifeJobAfterMarriage,
+    user.marriageInformationWomen?.studyAfterMarriage || user.marriageInformationMan?.allowWifeStudyAfterMarriage,
+    user.marriageInformationWomen?.thoughtsOnMarriage || user.marriageInformationMan?.thoughtsOnMarriage,
+    user.marriageInformationWomen?.polygamyConsentOptions || user.marriageInformationMan?.livingPlaceAfterMarriage,
+
+    // Expected Partner (5 fields)
+    user.expectedLifePartner?.age,
+    user.expectedLifePartner?.education,
+    user.expectedLifePartner?.profession,
+    user.expectedLifePartner?.district,
+    user.expectedLifePartner?.maritalStatus,
+  ];
+
+  const totalFields = fields.length;
+  const filledFields = fields.filter(
+    field => field !== null && field !== undefined && field !== ''
+  ).length;
+
+  const percentage = Math.round((filledFields / totalFields) * 100);
+  return percentage;
+}
 
 async findUserAndSendToTelegram(id: string) {
   const user = await this.userModel.findById(id).exec();
