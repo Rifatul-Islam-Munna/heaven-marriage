@@ -23,8 +23,10 @@ export class PdfService {
         '--disable-gpu',
         '--no-first-run',
         '--no-zygote',
-        '--font-render-hinting=none', // Better font rendering
+        '--single-process',
         '--disable-accelerated-2d-canvas',
+         '--disable-extensions',
+         '--disable-software-rasterizer'
       ],
     });
 
