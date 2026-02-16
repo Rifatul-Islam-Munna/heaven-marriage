@@ -203,7 +203,7 @@ UserSchema.index({
   name: 'text',
   email: 'text',
   userId:"text",
-  _id:"text",
+
   phoneNumber:"text",
   'address.presentAddress': 'text',
   'address.district': 'text',
@@ -215,9 +215,9 @@ UserSchema.index({
   weights: {
     name: 10,              // Most important
     email: 5,
-    userId: 4,
+    userId: 8,
     phoneNumber:5,
-    _id:3,
+    
 
     'occupational.profession': 5,
     'address.district': 3,

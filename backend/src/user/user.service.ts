@@ -264,7 +264,9 @@ async findUserAndUpdated() {
   const limit = 10;
   const skip = (page - 1) * limit;
   const pipeline: any[] = [];
-pipeline.push({
+  const isBiodataNumber = query && /^\d+$/.test(query.trim());
+
+/* pipeline.push({
   $match: {
     $and: [
       { isPublished: { $eq: true } },
@@ -273,37 +275,51 @@ pipeline.push({
       { isPublishFromAdmin: { $ne: null } }
     ]
   }
-});
+}); */
+  const firstMatch: any = {
+    $and: [
+      { isPublished: { $eq: true } },
+      { isPublished: { $ne: null } },
+      { isPublishFromAdmin: { $eq: true } },
+      { isPublishFromAdmin: { $ne: null } }
+    ]
+  };
 
   // 1. Fuzzy Search Stage (only if query provided)
- if (query) { 
-    console.log('Adding text search stage for:', query);
-    
-    // Use $text instead of $search (works with local MongoDB)
-    pipeline.push({
-      $match: {
-        $text: { 
-          $search: query,
-          $caseSensitive: false,
-          $diacriticSensitive: false
-        }
+   if (query && !isBiodataNumber) {
+    firstMatch.$and.push({
+      $text: { 
+        $search: query,
+        $caseSensitive: false,
+        $diacriticSensitive: false
       }
     });
-
-    // Add text score for sorting/filtering
+  }
+   pipeline.push({ $match: firstMatch });
+  if (query && !isBiodataNumber) {
     pipeline.push({
       $addFields: { 
         searchScore: { $meta: 'textScore' } 
       }
     });
-
-    // Optional: Sort by relevance
+    
     pipeline.push({
       $sort: { searchScore: -1 }
     });
   }
 
-
+  if (query && isBiodataNumber) {
+    const numericQuery = parseInt(query);
+    pipeline.push({
+      $match: {
+        $or: [
+          { userId: query },                           // Exact match "000004"
+          { userId: String(numericQuery) },            // Match "4"
+          { userId: { $regex: `^0*${numericQuery}$` } } // Match with any leading zeros
+        ]
+      }
+    });
+  }
   // 2. Build $match conditions
   const matchConditions: any = {};
 
