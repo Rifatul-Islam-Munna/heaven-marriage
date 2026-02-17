@@ -374,10 +374,7 @@ export class PdfService {
       <div class="footer-brand">
         <strong>নিকাহ</strong> • Niqaha
       </div>
-      <a href="https://niqaha.com/biodata/${String(user.userId).padStart(6, '0')}" 
-         class="footer-link">
-        View Online: niqaha.com/biodata/${String(user.userId).padStart(6, '0')}
-      </a>
+    
       <div class="footer-tagline">
         হালাল ম্যাট্রিমনি • Halal Matrimony Platform
       </div>

@@ -17,24 +17,24 @@ export class UserController {
 
     @Post()
     @UseGuards(ThrottlerGuard)
-    @Throttle({default:{limit:10, ttl:3600000}}) 
+    @Throttle({default:{limit:100, ttl:3600000}}) 
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }
   @Post('verify-otp')
       @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:20,ttl:1800000}}) 
+  @Throttle({default:{limit:200,ttl:1800000}}) 
   verifyOtp(@Body() createUserDto: OtpstringDto) {
     return this.userService.verifyOtp(createUserDto.otp);
   }
   @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:60,ttl:1800000}}) 
+  @Throttle({default:{limit:600,ttl:1800000}}) 
   @Post('login-user')
   logInUser(@Body() createUserDto: LoginDto) {
     return this.userService.loginUser(createUserDto);
   }
   @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:10,ttl:1800000}}) 
+  @Throttle({default:{limit:100,ttl:1800000}}) 
   @Post('login-user-with-google')
   LoginWithGoogle(@Body() createUserDto: FindOneTokenDto) {
     return this.userService.loginWithGoogle(createUserDto.id);
@@ -144,7 +144,7 @@ export class UserController {
   update( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
     return this.userService.updatedFullUserInformation( updateUserDto,req.user?.id);
   }
-    @Throttle({default:{limit:60,ttl:60}}) 
+  @Throttle({default:{limit:60,ttl:60}}) 
   @Patch('update-user-password')
   @UseGuards(AuthGuard)
   updatePassword( @Body() updateUserDto: ResetPasswordDto,@Req() req:ExpressRequest) {
