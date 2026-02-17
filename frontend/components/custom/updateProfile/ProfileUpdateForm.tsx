@@ -169,6 +169,10 @@ export default function ProfileUpdateForm() {
               <div key={index} className="flex-1 flex items-center">
                 <div className="flex flex-col items-center flex-1">
                   <div
+                    onClick={() => {
+                      setCurrentStep(index);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
                     className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all duration-200 ${
                       index < currentStep
                         ? "bg-green-500 text-white"
