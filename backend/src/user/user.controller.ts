@@ -139,7 +139,7 @@ export class UserController {
    
   }
   @UseGuards(AuthGuard,ThrottlerGuard )
-  @Throttle({default:{limit:5, ttl:1800000}}) 
+  @Throttle({default:{limit:500, ttl:1800000}}) 
   @Patch('update-user')
   update( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
     return this.userService.updatedFullUserInformation( updateUserDto,req.user?.id);

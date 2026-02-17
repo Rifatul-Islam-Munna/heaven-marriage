@@ -698,7 +698,7 @@ async findOne(id: FindOneDto) {
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin')
+      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin userId')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }) // Latest users first

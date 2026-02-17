@@ -65,6 +65,7 @@ interface User {
   numberOfConnections: number;
   isPublished?: boolean;
   isPublishFromAdmin?: boolean;
+  userId: string;
 }
 
 interface PaginatedUsersResponse {
@@ -227,6 +228,7 @@ export default function AdminUsersTable() {
         <Table>
           <TableHeader>
             <TableRow className="bg-pink-50">
+              <TableHead className="font-heading font-semibold">আইডি</TableHead>
               <TableHead className="font-heading font-semibold">নাম</TableHead>
               <TableHead className="font-heading font-semibold">
                 ইমেইল
@@ -264,6 +266,7 @@ export default function AdminUsersTable() {
             ) : (
               users.map((user) => (
                 <TableRow key={user._id} className="hover:bg-pink-50/50">
+                  <TableCell className="font-medium">{user?.userId}</TableCell>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user?.email}</TableCell>
                   <TableCell>{user?.phoneNumber}</TableCell>
