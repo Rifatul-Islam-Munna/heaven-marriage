@@ -16,16 +16,35 @@ import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CustomQuestionModule } from './custom-question/custom-question.module';
+import { Request } from 'express';
 @Module({
   imports: [
-   ThrottlerModule.forRoot({
-     throttlers: [
-       {
-        ttl: 60,
-        limit: 120
-       }
-     ]
-   }),
+      ThrottlerModule.forRoot([{
+      ttl: 60000, // 60 seconds
+      limit: 1000, // 10 requests per ttl
+      getTracker: (req) => {
+    // Helper to get first valid value
+    const getHeader = (headerName: string): string | null => {
+      const value = req.headers[headerName];
+      if (!value) return null;
+      
+      const str = typeof value === 'string' ? value : value[0];
+      return str?.trim() || null;
+    };
+    
+    // Priority order for your stack
+    const ip = 
+      getHeader('cf-connecting-ip') ||           // Cloudflare (most reliable)
+      getHeader('x-forwarded-for')?.split(',')[0]?.trim() || // Proxies
+      getHeader('x-real-ip') ||                  // Nginx/Easypanel
+      getHeader('true-client-ip') ||             // Cloudflare Enterprise
+      getHeader('x-client-ip') ||                // Other proxies
+      req.ip ||                                  // Express fallback
+      'unknown';
+    
+    return ip;
+  }
+    }]),
     ConfigModule.forRoot({
       isGlobal: true,
     }),

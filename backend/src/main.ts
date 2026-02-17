@@ -9,8 +9,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './lib/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
+
   app.use(compression());
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+  }));
   app.use(cookieParser());
   app.enableCors({origin:"*", compression: true, credentials: true});
   app.use(json({limit: '20mb'}));

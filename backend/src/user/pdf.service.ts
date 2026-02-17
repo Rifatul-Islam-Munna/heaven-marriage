@@ -283,6 +283,12 @@ export class PdfService {
         Biodata #${isMale ? 'NG' : 'NB'}-${user.userId}
       </div>
       <span class="gender-badge">${isMale ? 'MALE' : 'FEMALE'}</span>
+        <div class="brand-link">
+    <a href="https://niqaha.com/biodata/${String(user.userId)}" 
+       style="color: white; text-decoration: none; font-weight: 600; font-size: 14px; opacity: 0.9;">
+      🔗 niqaha.com/biodata/${String(user.userId)}
+    </a>
+  </div>
 
       <div class="quick-info">
         ${this.renderQuickInfo('Marital Status', user.maritalStatus)}
@@ -363,6 +369,18 @@ export class PdfService {
             Object.entries(user.customFields).map(([key, value]) => [key, value])
           ) 
         : ''}
+    </div>
+     <div class="footer-card">
+      <div class="footer-brand">
+        <strong>নিকাহ</strong> • Niqaha
+      </div>
+      <a href="https://niqaha.com/biodata/${String(user.userId).padStart(6, '0')}" 
+         class="footer-link">
+        View Online: niqaha.com/biodata/${String(user.userId).padStart(6, '0')}
+      </a>
+      <div class="footer-tagline">
+        হালাল ম্যাট্রিমনি • Halal Matrimony Platform
+      </div>
     </div>
   </div>
 </body>
