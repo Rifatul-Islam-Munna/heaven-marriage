@@ -112,11 +112,11 @@ export class TelegramService {
         this.logger.warn(`Channel ${options.channel} is not configured`);
         return false;
       }
-
+      const sanitizedFilename = Buffer.from(options.filename, 'utf-8').toString('utf-8');
       const formData = new FormData();
       formData.append('chat_id', channelId);
       formData.append('document', options.document, {
-        filename: options.filename,
+        filename: sanitizedFilename,
         contentType: 'application/pdf',
       });
 
