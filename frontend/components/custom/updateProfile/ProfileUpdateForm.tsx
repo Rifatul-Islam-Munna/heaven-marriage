@@ -81,12 +81,11 @@ export default function ProfileUpdateForm() {
       !formData?.age ||
       !formData?.personalInformation?.height ||
       !formData?.personalInformation?.skinTone ||
-      !formData?.bloodGroup ||
       !formData?.weight ||
       !formData?.nationality
     ) {
       toast.error(
-        "বৈবাহিক অবস্থা, বয়স, উচ্চতা, ত্বকের রং, রক্তের গ্রুপ, ওজন এবং জাতীয়তা - এই তথ্যগুলি আবশ্যক",
+        "বৈবাহিক অবস্থা, বয়স, উচ্চতা, ত্বকের রং,  ওজন এবং জাতীয়তা - এই তথ্যগুলি আবশ্যক",
         { duration: 10000, style: { background: "red", color: "white" } },
       );
       return;
