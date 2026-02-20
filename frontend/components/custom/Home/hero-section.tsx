@@ -158,29 +158,65 @@ export default function HeroSection() {
             className="animate-in fade-in slide-in-from-bottom-4 duration-1000 pt-4"
             style={{ animationDelay: "0.6s", animationFillMode: "both" }}
           >
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              {/* Primary / More attractive */}
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              {/* Primary */}
               <Button
                 size="lg"
-                className="group h-14 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-600 px-10 font-heading text-lg font-bold text-white shadow-2xl shadow-pink-500/60 transition-all hover:scale-105 hover:shadow-pink-500/80 active:scale-[1.02]"
+                className="group  animate-bounce  relative h-14 w-full overflow-hidden rounded-full px-10 font-heading text-[17px] font-extrabold text-white sm:w-auto"
                 asChild
               >
-                <Link href="/signup" className="flex items-center gap-2">
-                  বায়ো ডাটা তৈরি করুন
-                  <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                <Link
+                  href="/signup"
+                  className="flex items-center justify-center gap-2"
+                >
+                  {/* Glow + gradient layers */}
+                  <span className="pointer-events-none absolute inset-0">
+                    <span className="absolute -inset-24 bg-[radial-gradient(circle_at_30%_30%,rgba(236,72,153,0.8),transparent_55%)] opacity-60 blur-2xl" />
+                    <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-600" />
+                    <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-rose-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  </span>
+
+                  {/* Glass edge */}
+                  <span className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/15" />
+
+                  {/* Content */}
+                  <span className="relative flex items-center gap-2">
+                    <span className="relative">
+                      {/* Pulse glow behind text */}
+                      <span className="absolute -inset-x-3 -inset-y-2 rounded-full bg-pink-400/25 blur-md animate-pulse" />
+
+                      {/* Text shimmer */}
+                      <span className="relative inline-block bg-gradient-to-r from-white via-pink-100 to-white bg-[length:220%_100%] bg-clip-text text-transparent animate-[shimmer_1.6s_linear_infinite]">
+                        বায়োডাটা তৈরি করুন
+                      </span>
+                    </span>
+
+                    <ArrowUpRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  </span>
+
+                  {/* Shine sweep */}
+                  <span className="pointer-events-none absolute -left-24 top-0 h-full w-24 rotate-12 bg-white/20 blur-md transition-all duration-500 group-hover:left-[110%]" />
                 </Link>
               </Button>
 
-              {/* Secondary / Outline */}
+              {/* Secondary */}
               <Button
                 size="lg"
                 variant="outline"
-                className="group h-14 border-pink-300/60 bg-transparent px-10 font-heading text-lg font-bold text-pink-100 shadow-lg transition-all hover:scale-105 hover:border-pink-300 hover:bg-pink-500/10"
+                className="group relative h-14 w-full rounded-full border-white/15 bg-white/5 px-10 font-heading text-[17px] font-extrabold text-white backdrop-blur sm:w-auto"
                 asChild
               >
-                <Link href="/about" className="flex items-center gap-2">
-                  আমাদের সম্পর্কে জানুন
-                  <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                <Link
+                  href="/about"
+                  className="flex items-center justify-center gap-2"
+                >
+                  <span className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/10" />
+                  <span className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-r from-pink-500/15 to-fuchsia-500/15 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <span className="relative flex items-center gap-2">
+                    আমাদের সম্পর্কে জানুন
+                    <ArrowUpRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  </span>
                 </Link>
               </Button>
             </div>
