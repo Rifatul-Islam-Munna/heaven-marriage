@@ -158,16 +158,32 @@ export default function HeroSection() {
             className="animate-in fade-in slide-in-from-bottom-4 duration-1000 pt-4"
             style={{ animationDelay: "0.6s", animationFillMode: "both" }}
           >
-            <Button
-              size="lg"
-              className="group h-14 bg-pink-600 px-10 font-heading text-lg font-bold shadow-2xl shadow-pink-500/50 transition-all hover:scale-105 hover:bg-pink-700 hover:shadow-pink-500/70"
-              asChild
-            >
-              <Link href="/about" className="flex items-center gap-2">
-                আমাদের সম্পর্কে জানুন
-                <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-              </Link>
-            </Button>
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+              {/* Primary / More attractive */}
+              <Button
+                size="lg"
+                className="group h-14 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-600 px-10 font-heading text-lg font-bold text-white shadow-2xl shadow-pink-500/60 transition-all hover:scale-105 hover:shadow-pink-500/80 active:scale-[1.02]"
+                asChild
+              >
+                <Link href="/signup" className="flex items-center gap-2">
+                  বায়ো ডাটা তৈরি করুন
+                  <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                </Link>
+              </Button>
+
+              {/* Secondary / Outline */}
+              <Button
+                size="lg"
+                variant="outline"
+                className="group h-14 border-pink-300/60 bg-transparent px-10 font-heading text-lg font-bold text-pink-100 shadow-lg transition-all hover:scale-105 hover:border-pink-300 hover:bg-pink-500/10"
+                asChild
+              >
+                <Link href="/about" className="flex items-center gap-2">
+                  আমাদের সম্পর্কে জানুন
+                  <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* Trust Indicators */}

@@ -106,8 +106,15 @@ export const educationMediumOptions = [
 export const skinColorOptions = [
   { value: "very_fair", label: "উজ্জ্বল ফর্সা", gender: "both" },
   { value: "fair", label: "ফর্সা", gender: "both" },
+
+  // Bright tan: male vs female wording
   { value: "bright_tan_male", label: "উজ্জ্বল শ্যামলা", gender: "male" },
+  { value: "bright_tan_female", label: "উজ্জ্বল শ্যামলী", gender: "female" },
+
+  // Tan: male vs female wording
   { value: "tan_male", label: "শ্যামলা", gender: "male" },
+  { value: "tan_female", label: "শ্যামলী", gender: "female" },
+
   { value: "dark", label: "কালো", gender: "both" },
 ];
 export const fiqhOptions = [

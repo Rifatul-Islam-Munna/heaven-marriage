@@ -31,9 +31,11 @@ import { logOutUser } from "@/actions/auth";
 const navItems = [
   { label: "হোম", href: "/" },
   { label: "আমাদের সম্পর্কে", href: "/about" },
+
   { label: "জিজ্ঞাসা", href: "/faq" },
   { label: "নির্দেশনা", href: "/guidelines" },
   { label: "যোগাযোগ", href: "/contact" },
+  { label: "প্রাইসিং", href: "/pricing" },
 ];
 
 // Language options

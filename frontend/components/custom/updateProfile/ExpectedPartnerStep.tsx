@@ -30,49 +30,76 @@ import { skinColorOptions } from "@/staticData/all-data";
 
 const educationalOptions = [
   {
-    id: 1,
-    bn: "আলেমা + হাফেজা",
-    en: "Alema + Hafeza",
-  },
-  {
     id: 2,
     bn: "আলেমা",
     en: "Alema",
+    gender: "female",
   },
   {
     id: 3,
     bn: "হাফেজা",
     en: "Hafeza",
+    gender: "female",
+  },
+  {
+    id: 22,
+    bn: "আলেম",
+    en: "Alem",
+    gender: "male",
+  },
+  {
+    id: 32,
+    bn: "হাফেজ",
+    en: "Hafez",
+    gender: "male",
   },
   {
     id: 4,
     bn: "মাদ্রাসা পড়ুয়া",
     en: "Madrasa Student",
+    gender: "all",
   },
   {
     id: 5,
     bn: "দ্বীনদার জেনারেল শিক্ষিত",
     en: "Religious General Educated",
+    gender: "all",
   },
   {
     id: 6,
     bn: "জেনারেল শিক্ষিত",
     en: "General Educated",
+    gender: "all",
   },
   {
     id: 7,
     bn: "হোম স্কুলিং",
     en: "Home Schooling",
+    gender: "all",
   },
   {
     id: 8,
     bn: "যেকোনো",
     en: "Any",
+    gender: "all",
   },
   {
-    id: 9,
+    id: 22,
+    bn: "আলেম",
+    en: "Alem",
+    gender: "male",
+  },
+  {
+    id: 32,
+    bn: "হাফেজ",
+    en: "Hafez",
+    gender: "male",
+  },
+  {
+    id: 90,
     bn: "শিক্ষাগত ব্যাকগ্রাউন্ডের ব্যাপারে কোনো সমস্যা নেই।",
     en: "No issue regarding educational background",
+    gender: "all",
   },
 ];
 
@@ -216,7 +243,7 @@ export function ExpectedPartnerStep({
   const formData = useProfileStore((state) => state.formData);
   const updateNestedField = useProfileStore((state) => state.updateNestedField);
   const [heightOpen, setHeightOpen] = useState(false);
-
+  console.log("partnerGender", partnerGender);
   // Filter options based on partner gender
   const filteredSkinColorOptions = skinColorOptions.filter(
     (option) =>
@@ -234,14 +261,12 @@ export function ExpectedPartnerStep({
 
   const filteredEducationalOptions =
     partnerGender === "male"
-      ? educationalOptions.map((opt) => ({
-          ...opt,
-          bn: opt.bn
-            .replace("আলেমা", "আলেম")
-            .replace("হাফেজা", "হাফেজ")
-            .replace("পড়ুয়া", "পড়ুয়া"),
-        }))
-      : educationalOptions;
+      ? educationalOptions.filter(
+          (opt) => opt.gender === "male" || opt.gender === "all",
+        )
+      : educationalOptions.filter(
+          (opt) => opt.gender === "female" || opt.gender === "all",
+        );
 
   return (
     <div className="space-y-6">
