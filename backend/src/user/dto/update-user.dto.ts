@@ -331,6 +331,15 @@ export class AdminUserDto{
   @IsOptional()
   @IsString()
   gender?: string = 'all';
+  @ApiPropertyOptional({
+    description: 'Gender filter',
+    example: 'published',
+    default: 'all',
+    enum: ['all', 'true', 'false'],
+  })
+  @IsOptional()
+  @IsString()
+  isPublished?: string = 'all';
 }
 
 

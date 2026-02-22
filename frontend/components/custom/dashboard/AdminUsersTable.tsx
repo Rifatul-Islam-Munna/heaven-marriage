@@ -90,12 +90,20 @@ export default function AdminUsersTable() {
     null,
   );
   const [connectionValue, setConnectionValue] = useState<string>("");
+  const [publish, setPublish] = useState<string>("all");
   const router = useRouter();
+  const query = new URLSearchParams();
+  query.set("page", page.toString());
+  query.set("query", text);
+  query.set("gender", gender);
+  if (publish) {
+    query.set("isPublished", publish);
+  }
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
-    ["admin-users", page, text, gender],
-    `/user/get-all-user-for-admin?page=${page}&query=${text}&gender=${gender}`,
+    ["admin-users", page, text, gender, publish],
+    `/user/get-all-user-for-admin?${query.toString()}`,
   );
 
   // Delete user mutation
@@ -219,6 +227,16 @@ export default function AdminUsersTable() {
             <SelectItem value="all">সকল</SelectItem>
             <SelectItem value="male">পুরুষ</SelectItem>
             <SelectItem value="female">মহিলা</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={publish} onValueChange={(value) => setPublish(value)}>
+          <SelectTrigger className="w-full sm:w-40 font-heading">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">সকল</SelectItem>
+            <SelectItem value="true">প্রকাশিত</SelectItem>
+            <SelectItem value="false">অপ্রকাশিত</SelectItem>
           </SelectContent>
         </Select>
       </div>

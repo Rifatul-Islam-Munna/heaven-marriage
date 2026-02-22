@@ -677,9 +677,10 @@ async findOne(id: FindOneDto) {
 
 
  async getUserForAdmin(query: AdminUserDto) {
-  const { page = 1, gender = 'all', query: searchQuery } = query;
+  const { page = 1, gender = 'all', query: searchQuery,isPublished } = query;
   const limit = 10;
   const skip = (page - 1) * limit;
+  this.logger.debug("searchQuery->",isPublished)
 
   // Build filter
   const filter: any = {};
@@ -693,6 +694,10 @@ async findOne(id: FindOneDto) {
   if (gender && gender !== 'all') {
     filter.gender = gender;
   }
+  
+  if (isPublished !== undefined && isPublished !== null && isPublished !== 'all') {
+  filter.isPublishFromAdmin =  isPublished === 'true';
+}
 
   // Execute query with pagination
   const [data, totalItems] = await Promise.all([
