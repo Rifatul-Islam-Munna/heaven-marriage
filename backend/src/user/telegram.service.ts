@@ -113,11 +113,15 @@ export class TelegramService {
         return false;
       }
       const sanitizedFilename = Buffer.from(options.filename, 'utf-8').toString('utf-8');
+      const encodedFilename = encodeURIComponent(options.filename);
       const formData = new FormData();
       formData.append('chat_id', channelId);
       formData.append('document', options.document, {
-        filename: sanitizedFilename,
+         knownLength: options.document.length,
         contentType: 'application/pdf',
+         header: {
+    'Content-Disposition': `form-data; name="document"; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`,
+  },
       });
 
       if (options.caption) {
