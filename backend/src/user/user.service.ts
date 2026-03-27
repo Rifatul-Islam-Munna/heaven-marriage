@@ -87,13 +87,12 @@ export class UserService  implements OnModuleInit{
   }
   const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-  const {phoneNumber,name,whatsapp} = createUserDto
+  const {phoneNumber,name} = createUserDto
   const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
   const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
   const getOtp = await this.otpService.generateUniqueOTP()
     const finalData ={
       phoneNumber,
-      whatsapp,
       name,
       password:passwordHash,
       userId:userIdCount,
