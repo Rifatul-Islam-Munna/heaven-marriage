@@ -321,6 +321,18 @@ export class AdminUserDto{
   @Min(1)
   page?: number = 1;
 
+  @ApiPropertyOptional({
+    description: 'Users per page',
+    example: 100,
+    default: 10,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number = 10;
+
   // Gender filter
   @ApiPropertyOptional({
     description: 'Gender filter',

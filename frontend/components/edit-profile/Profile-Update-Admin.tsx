@@ -7,6 +7,10 @@ import {
   Check,
   Eye,
   EyeOff,
+  Loader2,
+  MessageCircle,
+  Phone,
+  Send,
   Trash2,
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
@@ -24,6 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { toast } from "sonner";
 import { BasicInfoStep } from "../custom/updateProfile/BasicInfoStep";
@@ -36,6 +47,11 @@ import { MarriageInfoStep } from "../custom/updateProfile/MarriageInfoStep";
 import { ExpectedPartnerStep } from "../custom/updateProfile/ExpectedPartnerStep";
 import { CustomQuestionsStep } from "../custom/updateProfile/CustomQuestionsStep";
 import { PledgeStep } from "../custom/updateProfile/PledgeStep";
+import { User } from "@/@types/user";
+import { buildBiodataWhatsappShareUrlForNumber } from "@/lib/biodata-whatsapp-share";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useDebounce } from "use-debounce";
 
 const steps = [
   "মৌলিক তথ্য",
@@ -50,6 +66,23 @@ const steps = [
   "অঙ্গীকার",
 ];
 
+interface ShareRecipient {
+  _id: string;
+  name: string;
+  phoneNumber: string;
+  userId?: string;
+}
+
+interface ShareRecipientsResponse {
+  data: ShareRecipient[];
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function ProfileUpdateForm({ id }: { id: string }) {
   const currentStep = useProfileStore((state) => state.currentStep);
   const setCurrentStep = useProfileStore((state) => state.setCurrentStep);
@@ -60,6 +93,10 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   // Alert dialog states
   const [showHideAlert, setShowHideAlert] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [recipientPage, setRecipientPage] = useState(1);
+  const [debouncedRecipientSearch] = useDebounce(recipientSearch, 400);
 
   console.log("current-data", getFormData());
 
@@ -70,11 +107,28 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     }
   };
 
-  const { data, isLoading, refetch } = useQueryWrapper(
+  const { data, isLoading, refetch } = useQueryWrapper<User>(
     ["get-my-profile", id],
     `/user/get-user-profile-admin?id=${id}`,
     {
       enabled: !!id,
+    },
+  );
+
+  const recipientsQuery = new URLSearchParams();
+  recipientsQuery.set("page", recipientPage.toString());
+  recipientsQuery.set("limit", "100");
+  recipientsQuery.set("query", debouncedRecipientSearch);
+
+  const {
+    data: recipientsData,
+    isLoading: isRecipientsLoading,
+    isFetching: isRecipientsFetching,
+  } = useQueryWrapper<ShareRecipientsResponse>(
+    ["admin-share-recipients", recipientPage, debouncedRecipientSearch],
+    `/user/get-all-user-for-admin?${recipientsQuery.toString()}`,
+    {
+      enabled: shareDialogOpen,
     },
   );
 
@@ -84,7 +138,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     url: "/user/update-user-admin",
     mutationKey: ["update-user"],
     successMessage: "User Updated",
-    onSuccess: (data) => {
+    onSuccess: () => {
       return router.push("/dashboard");
     },
   });
@@ -118,7 +172,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     if (data) {
       initializeForm(data);
     }
-  }, [data]);
+  }, [data, initializeForm]);
 
   const handlePrevious = () => {
     if (currentStep > 0) {
@@ -169,6 +223,89 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     setShowDeleteAlert(false);
   };
 
+  const getShareProfile = (): User | undefined => {
+    if (!data) return undefined;
+
+    const formData = getFormData() as Partial<User>;
+
+    return {
+      ...data,
+      ...formData,
+      address: {
+        ...data.address,
+        ...formData.address,
+      },
+      educationInfo: {
+        ...data.educationInfo,
+        ...formData.educationInfo,
+      },
+      familyInfo: {
+        ...data.familyInfo,
+        ...formData.familyInfo,
+      },
+      personalInformation: {
+        ...data.personalInformation,
+        ...formData.personalInformation,
+      },
+      occupational: {
+        ...data.occupational,
+        ...formData.occupational,
+      },
+      marriageInformationWomen: {
+        ...data.marriageInformationWomen,
+        ...formData.marriageInformationWomen,
+      },
+      marriageInformationMan: {
+        ...data.marriageInformationMan,
+        ...formData.marriageInformationMan,
+      },
+      expectedLifePartner: {
+        ...data.expectedLifePartner,
+        ...formData.expectedLifePartner,
+      },
+      pledge: {
+        ...data.pledge,
+        ...formData.pledge,
+      },
+      customFields: {
+        ...data.customFields,
+        ...formData.customFields,
+      },
+    } as User;
+  };
+
+  const handleOpenShareDialog = () => {
+    setRecipientSearch("");
+    setRecipientPage(1);
+    setShareDialogOpen(true);
+  };
+
+  const handleWhatsAppShare = (recipient: ShareRecipient) => {
+    if (typeof window === "undefined") return;
+
+    const profile = getShareProfile();
+    if (!profile) {
+      toast.error("প্রোফাইল তথ্য এখনো লোড হয়নি");
+      return;
+    }
+
+    if (!recipient.phoneNumber) {
+      toast.error("à¦à¦‡ à¦¬à§à¦¯à¦¬à¦¹à¦¾à¦°à¦•à¦¾à¦°à§€à¦° à¦•à§‹à¦¨ à¦®à§‹à¦¬à¦¾à¦‡à¦² à¦¨à¦®à§à¦¬à¦° à¦¨à§‡à¦‡");
+      return;
+    }
+
+    const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
+      profile,
+      window.location.origin,
+      recipient.phoneNumber,
+    );
+
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    setShareDialogOpen(false);
+  };
+
+  const recipients = recipientsData?.data ?? [];
+
   const renderStep = () => {
     switch (currentStep) {
       case 0:
@@ -202,6 +339,16 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
         {/* Action Buttons - Hide/Unhide and Delete */}
         <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
           <Button
+            onClick={handleOpenShareDialog}
+            disabled={isLoading || !data}
+            variant="outline"
+            className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
+          >
+            <MessageCircle className="w-4 h-4" />
+            WhatsApp শেয়ার
+          </Button>
+
+          <Button
             onClick={() => setShowHideAlert(true)}
             disabled={isTogglingVisibility || isLoading}
             variant="outline"
@@ -234,6 +381,115 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             মুছে ফেলুন
           </Button>
         </div>
+
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>WhatsApp এ শেয়ার করুন</DialogTitle>
+              <DialogDescription>
+                যাকে এই বায়োডাটা পাঠাতে চান তাকে সিলেক্ট করুন।
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  value={recipientSearch}
+                  onChange={(e) => {
+                    setRecipientSearch(e.target.value);
+                    setRecipientPage(1);
+                  }}
+                  placeholder="নাম, ফোন বা বায়োডাটা নম্বর দিয়ে খুঁজুন"
+                />
+                <p className="text-xs text-muted-foreground">
+                  ইউজার সিলেক্ট করলে তার নাম্বারে WhatsApp খুলে যাবে।
+                </p>
+              </div>
+
+              <div className="rounded-lg border">
+                {isRecipientsLoading ? (
+                  <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ইউজার লোড হচ্ছে...
+                  </div>
+                ) : recipients.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                    কোন ইউজার পাওয়া যায়নি।
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[360px]">
+                    <div className="divide-y">
+                      {recipients.map((recipient) => (
+                        <div
+                          key={recipient._id}
+                          className="flex items-center justify-between gap-3 p-4"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <p className="truncate font-medium text-gray-900">
+                              {recipient.name || "নাম নেই"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              বায়োডাটা: {recipient.userId || "N/A"}
+                            </p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Phone className="h-3.5 w-3.5" />
+                              <span>{recipient.phoneNumber || "নাম্বার নেই"}</span>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            onClick={() => handleWhatsAppShare(recipient)}
+                            disabled={!recipient.phoneNumber}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Send className="h-4 w-4" />
+                            শেয়ার
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  মোট {recipientsData?.totalItems ?? 0} জন ইউজার
+                  {isRecipientsFetching && !isRecipientsLoading ? " - আপডেট হচ্ছে..." : ""}
+                </p>
+
+                {Boolean(recipientsData?.totalPages && recipientsData.totalPages > 1) && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRecipientPage((page) => Math.max(1, page - 1))}
+                      disabled={!recipientsData?.hasPreviousPage || isRecipientsFetching}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      আগের
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {recipientPage} / {recipientsData?.totalPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRecipientPage((page) => page + 1)}
+                      disabled={!recipientsData?.hasNextPage || isRecipientsFetching}
+                    >
+                      পরের
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">

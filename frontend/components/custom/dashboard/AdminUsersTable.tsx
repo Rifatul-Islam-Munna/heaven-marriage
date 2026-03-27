@@ -28,17 +28,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Share2,
   Trash2,
   CheckCircle,
   XCircle,
   Loader2,
   Mail,
   Phone,
+  Send,
   User as UserIcon,
   Check,
   X,
@@ -46,7 +55,7 @@ import {
   Users,
 } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "use-debounce";
@@ -54,6 +63,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import { parseAsInteger, useQueryState } from "nuqs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { User as BiodataUser } from "@/@types/user";
+import { buildBiodataWhatsappShareUrlForNumber } from "@/lib/biodata-whatsapp-share";
 interface User {
   _id: string;
   name: string;
@@ -78,6 +90,23 @@ interface PaginatedUsersResponse {
   hasPreviousPage: boolean;
 }
 
+interface ShareRecipient {
+  _id: string;
+  name: string;
+  phoneNumber: string;
+  userId?: string;
+}
+
+interface ShareRecipientsResponse {
+  data: ShareRecipient[];
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function AdminUsersTable() {
   const queryClient = useQueryClient();
 
@@ -91,6 +120,10 @@ export default function AdminUsersTable() {
   );
   const [connectionValue, setConnectionValue] = useState<string>("");
   const [publish, setPublish] = useState<string>("all");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedShareUser, setSelectedShareUser] = useState<User | null>(null);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [recipientPage, setRecipientPage] = useState(1);
   const router = useRouter();
   const query = new URLSearchParams();
   query.set("page", page.toString());
@@ -99,11 +132,40 @@ export default function AdminUsersTable() {
   if (publish) {
     query.set("isPublished", publish);
   }
+  const [recipientText] = useDebounce(recipientSearch, 400);
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
     ["admin-users", page, text, gender, publish],
     `/user/get-all-user-for-admin?${query.toString()}`,
+  );
+
+  const recipientsQuery = new URLSearchParams();
+  recipientsQuery.set("page", recipientPage.toString());
+  recipientsQuery.set("limit", "100");
+  recipientsQuery.set("query", recipientText);
+
+  const {
+    data: shareProfile,
+    isLoading: isShareProfileLoading,
+  } = useQueryWrapper<BiodataUser>(
+    ["admin-share-profile", selectedShareUser?._id],
+    `/user/get-user-profile-admin?id=${selectedShareUser?._id ?? ""}`,
+    {
+      enabled: shareDialogOpen && !!selectedShareUser?._id,
+    },
+  );
+
+  const {
+    data: recipientsData,
+    isLoading: isRecipientsLoading,
+    isFetching: isRecipientsFetching,
+  } = useQueryWrapper<ShareRecipientsResponse>(
+    ["admin-share-recipients", recipientPage, recipientText],
+    `/user/get-all-user-for-admin?${recipientsQuery.toString()}`,
+    {
+      enabled: shareDialogOpen,
+    },
   );
 
   // Delete user mutation
@@ -168,6 +230,36 @@ export default function AdminUsersTable() {
     });
   };
 
+  const handleOpenShareDialog = (user: User) => {
+    setSelectedShareUser(user);
+    setRecipientSearch("");
+    setRecipientPage(1);
+    setShareDialogOpen(true);
+  };
+
+  const handleWhatsAppShare = (recipient: ShareRecipient) => {
+    if (typeof window === "undefined") return;
+
+    if (!shareProfile) {
+      toast.error("Profile is still loading");
+      return;
+    }
+
+    if (!recipient.phoneNumber) {
+      toast.error("This user has no phone number");
+      return;
+    }
+
+    const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
+      shareProfile,
+      window.location.origin,
+      recipient.phoneNumber,
+    );
+
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    setShareDialogOpen(false);
+  };
+
   // Loading skeleton
   if (isLoading) {
     return (
@@ -194,6 +286,7 @@ export default function AdminUsersTable() {
   }
 
   const users = data?.data ?? [];
+  const recipients = recipientsData?.data ?? [];
   const totalPages = data?.totalPages ?? 1;
 
   return (
@@ -240,6 +333,124 @@ export default function AdminUsersTable() {
           </SelectContent>
         </Select>
       </div>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Share {selectedShareUser?.name ? `"${selectedShareUser.name}"` : "profile"} on WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              Choose a user, and WhatsApp will open with this biodata already filled in.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                value={recipientSearch}
+                onChange={(e) => {
+                  setRecipientSearch(e.target.value);
+                  setRecipientPage(1);
+                }}
+                placeholder="Search by name, phone, or biodata number"
+              />
+              <p className="text-xs text-muted-foreground">
+                The selected user&apos;s WhatsApp number will be used automatically.
+              </p>
+            </div>
+
+            <div className="rounded-lg border">
+              {isShareProfileLoading ? (
+                <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading selected profile...
+                </div>
+              ) : null}
+
+              {isRecipientsLoading ? (
+                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading users...
+                </div>
+              ) : recipients.length === 0 ? (
+                <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                  No users found.
+                </div>
+              ) : (
+                <ScrollArea className="h-[360px]">
+                  <div className="divide-y">
+                    {recipients.map((recipient) => (
+                      <div
+                        key={recipient._id}
+                        className="flex items-center justify-between gap-3 p-4"
+                      >
+                        <div className="min-w-0 space-y-1">
+                          <p className="truncate font-medium text-gray-900">
+                            {recipient.name || "Unnamed user"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Biodata: {recipient.userId || "N/A"}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Phone className="h-3.5 w-3.5" />
+                            <span>{recipient.phoneNumber || "No phone number"}</span>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => handleWhatsAppShare(recipient)}
+                          disabled={!recipient.phoneNumber || !shareProfile}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <Send className="h-4 w-4" />
+                          Share
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Total users: {recipientsData?.totalItems ?? 0}
+                {isRecipientsFetching && !isRecipientsLoading ? " - updating..." : ""}
+              </p>
+
+              {Boolean(recipientsData?.totalPages && recipientsData.totalPages > 1) && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRecipientPage((currentPage) => Math.max(1, currentPage - 1))}
+                    disabled={!recipientsData?.hasPreviousPage || isRecipientsFetching}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {recipientPage} / {recipientsData?.totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRecipientPage((currentPage) => currentPage + 1)}
+                    disabled={!recipientsData?.hasNextPage || isRecipientsFetching}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Desktop Table View */}
       <div className="hidden md:block border rounded-lg overflow-hidden">
@@ -377,24 +588,40 @@ export default function AdminUsersTable() {
                     </Button>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        router.push(`/dashboard/edit-profile/${user._id}`)
-                      }
-                      className="text-green-600 hover:text-green-700 hover:bg-red-50"
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteUserId(user._id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenShareDialog(user)}
+                        className="text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                        title="Share profile"
+                        aria-label={`Share ${user.name} profile`}
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          router.push(`/dashboard/edit-profile/${user._id}`)
+                        }
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        title="Edit profile"
+                        aria-label={`Edit ${user.name} profile`}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteUserId(user._id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete profile"
+                        aria-label={`Delete ${user.name} profile`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -528,10 +755,22 @@ export default function AdminUsersTable() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => handleOpenShareDialog(user)}
+                    className="text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                    title="Share profile"
+                    aria-label={`Share ${user.name} profile`}
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() =>
                       router.push(`/dashboard/edit-profile/${user._id}`)
                     }
-                    className="text-green-600 hover:text-green-700 hover:bg-red-50"
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    title="Edit profile"
+                    aria-label={`Edit ${user.name} profile`}
                   >
                     <Edit className="h-3.5 w-3.5" />
                   </Button>
@@ -540,6 +779,8 @@ export default function AdminUsersTable() {
                     size="sm"
                     onClick={() => setDeleteUserId(user._id)}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Delete profile"
+                    aria-label={`Delete ${user.name} profile`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

@@ -677,8 +677,7 @@ async findOne(id: FindOneDto) {
 
 
  async getUserForAdmin(query: AdminUserDto) {
-  const { page = 1, gender = 'all', query: searchQuery,isPublished } = query;
-  const limit = 10;
+  const { page = 1, limit = 10, gender = 'all', query: searchQuery,isPublished } = query;
   const skip = (page - 1) * limit;
   this.logger.debug("searchQuery->",isPublished)
 
