@@ -397,7 +397,7 @@ const User = () => {
             onClick={() => setShowHideAlert(true)}
             disabled={isTogglingVisibility}
             variant="outline"
-            className={`flex items-center gap-2 ${
+            className={`hidden items-center gap-2 ${
               user?.isPublished
                 ? "border-orange-500 text-orange-600 hover:bg-orange-50"
                 : "border-green-500 text-green-600 hover:bg-green-50"
