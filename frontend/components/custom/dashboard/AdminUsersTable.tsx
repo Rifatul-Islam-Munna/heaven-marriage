@@ -71,6 +71,7 @@ interface User {
   name: string;
   email: string;
   phoneNumber: string;
+  whatsapp?: string;
   maritalStatus: string;
   isSubscriber: boolean;
   isOtpVerified: boolean;
@@ -93,7 +94,8 @@ interface PaginatedUsersResponse {
 interface ShareRecipient {
   _id: string;
   name: string;
-  phoneNumber: string;
+  phoneNumber?: string;
+  whatsapp?: string;
   userId?: string;
 }
 
@@ -245,15 +247,17 @@ export default function AdminUsersTable() {
       return;
     }
 
-    if (!recipient.phoneNumber) {
-      toast.error("This user has no phone number");
+    const recipientWhatsapp = recipient.whatsapp || recipient.phoneNumber;
+
+    if (!recipientWhatsapp) {
+      toast.error("This user has no WhatsApp number");
       return;
     }
 
     const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
       shareProfile,
       window.location.origin,
-      recipient.phoneNumber,
+      recipientWhatsapp,
     );
 
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
@@ -394,14 +398,21 @@ export default function AdminUsersTable() {
                           </p>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Phone className="h-3.5 w-3.5" />
-                            <span>{recipient.phoneNumber || "No phone number"}</span>
+                            <span>
+                              {recipient.whatsapp ||
+                                recipient.phoneNumber ||
+                                "No WhatsApp number"}
+                            </span>
                           </div>
                         </div>
 
                         <Button
                           type="button"
                           onClick={() => handleWhatsAppShare(recipient)}
-                          disabled={!recipient.phoneNumber || !shareProfile}
+                          disabled={
+                            !(recipient.whatsapp || recipient.phoneNumber) ||
+                            !shareProfile
+                          }
                           className="bg-green-600 hover:bg-green-700"
                         >
                           <Send className="h-4 w-4" />

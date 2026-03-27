@@ -103,6 +103,8 @@ const formatMaleStudyJobPreference = (user: User) =>
   );
 
 export const buildBiodataWhatsappText = (user: User, origin: string) => {
+  const contactWhatsapp =
+    cleanText(user?.whatsapp) || cleanText(user?.phoneNumber);
   const isFemale = user.gender === "female";
   const publicProfileId = cleanText(user.userId) || cleanText(user._id);
   const biodataNumber = publicProfileId || "N/A";
@@ -160,8 +162,8 @@ export const buildBiodataWhatsappText = (user: User, origin: string) => {
     cleanText(user.expectedLifePartner?.expectedQuality)
       ? `${isFemale ? "কেমন পাত্র চানঃ" : "কেমন পাত্রী চানঃ"} ${cleanText(user.expectedLifePartner?.expectedQuality)}`
       : "",
-    cleanText(user.phoneNumber)
-      ? `আপনার হোয়াটসঅ্যাপ নাম্বারঃ ${cleanText(user.phoneNumber)}`
+    contactWhatsapp
+      ? `আপনার হোয়াটসঅ্যাপ নাম্বারঃ ${contactWhatsapp}`
       : "",
     "",
     `${isFemale ? "পাত্রীর" : "পাত্রের"} বিস্তারিত বায়োডাটা লিংকঃ`,

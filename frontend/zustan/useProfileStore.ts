@@ -13,8 +13,8 @@ interface ProfileStore {
   
   // Actions
   setCurrentStep: (step: number) => void;
-  updateField: (field: keyof User, value: any) => void;
-  updateNestedField: (parent: keyof User, field: string, value: any) => void;
+  updateField: (field: keyof User, value: User[keyof User]) => void;
+  updateNestedField: (parent: keyof User, field: string, value: unknown) => void;
   
   // NEW: Custom fields actions ✅
   updateCustomField: (questionKey: string, answer: string) => void;
@@ -35,6 +35,7 @@ const getInitialFormData = (): Partial<User> => ({
   userId: '',
   email: '',
   phoneNumber: '',
+  whatsapp: '',
   gender: '',
   maritalStatus: '',
   age: undefined,
@@ -166,7 +167,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       formData: {
         ...state.formData,
         [parent]: {
-          ...(state.formData[parent] as any),
+          ...((state.formData[parent] as Record<string, unknown> | undefined) ??
+            {}),
           [field]: value
         }
       }

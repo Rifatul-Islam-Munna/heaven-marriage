@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 export function BasicInfoStep() {
   const formData = useProfileStore((state) => state.formData);
   const updateField = useProfileStore((state) => state.updateField);
-  const filterOutstatus = marriedStatus.filter((item) => item.id !== 1);
   const shouldShowEmail = useProfileStore((state) => state.shouldShowEmail); // ✅
   const shouldShowPhoneNumber = useProfileStore(
     (state) => state.shouldShowPhoneNumber,
@@ -79,6 +78,16 @@ export function BasicInfoStep() {
             />
           </div>
         )}
+
+        <div className="space-y-2">
+          <Label htmlFor="whatsapp">whatsapp নম্বর </Label>
+          <Input
+            id="whatsapp"
+            value={formData.whatsapp || ""}
+            onChange={(e) => updateField("whatsapp", e.target.value)}
+            placeholder="whatsapp নম্বর"
+          />
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="gender">লিঙ্গ *</Label>

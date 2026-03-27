@@ -121,6 +121,7 @@ export interface User {
   role: UserType;
   email?: string;
   phoneNumber: string;
+  whatsapp?: string;
   password: string;
   gender?: string;
   maritalStatus?: string;
@@ -155,6 +156,7 @@ export interface UserInfo {
   role: UserType;             // UserType.USER
   email: string;              // "rifat@example.com"
   phoneNumber: string;        // "+8801712345678"
+  whatsapp?: string;
   password: string;           // "securePassword123"
   isOtpVerified: boolean; 
   numberOfConnections?:number

@@ -69,7 +69,8 @@ const steps = [
 interface ShareRecipient {
   _id: string;
   name: string;
-  phoneNumber: string;
+  phoneNumber?: string;
+  whatsapp?: string;
   userId?: string;
 }
 
@@ -289,7 +290,9 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
       return;
     }
 
-    if (!recipient.phoneNumber) {
+    const recipientWhatsapp = recipient.whatsapp || recipient.phoneNumber;
+
+    if (!recipientWhatsapp) {
       toast.error("à¦à¦‡ à¦¬à§à¦¯à¦¬à¦¹à¦¾à¦°à¦•à¦¾à¦°à§€à¦° à¦•à§‹à¦¨ à¦®à§‹à¦¬à¦¾à¦‡à¦² à¦¨à¦®à§à¦¬à¦° à¦¨à§‡à¦‡");
       return;
     }
@@ -297,7 +300,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
       profile,
       window.location.origin,
-      recipient.phoneNumber,
+      recipientWhatsapp,
     );
 
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
@@ -433,14 +436,18 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
                             </p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Phone className="h-3.5 w-3.5" />
-                              <span>{recipient.phoneNumber || "নাম্বার নেই"}</span>
+                              <span>
+                                {recipient.whatsapp ||
+                                  recipient.phoneNumber ||
+                                  "No WhatsApp number"}
+                              </span>
                             </div>
                           </div>
 
                           <Button
                             type="button"
                             onClick={() => handleWhatsAppShare(recipient)}
-                            disabled={!recipient.phoneNumber}
+                            disabled={!(recipient.whatsapp || recipient.phoneNumber)}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             <Send className="h-4 w-4" />

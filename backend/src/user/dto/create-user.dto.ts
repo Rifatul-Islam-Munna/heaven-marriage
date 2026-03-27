@@ -466,6 +466,20 @@ export class CreateUserDto {
   @IsPhoneNumber('BD')
   phoneNumber: string;
 
+  @ApiPropertyOptional({
+    example: '01712345678',
+    description: 'WhatsApp number used for direct WhatsApp sharing',
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @Matches(/^$|(\+8801|01)[3-9]\d{8}$/, {
+    message: 'WhatsApp number must be valid Bangladesh number',
+  })
+  whatsapp?: string;
+
   @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
   @IsString()
   @IsNotEmpty()

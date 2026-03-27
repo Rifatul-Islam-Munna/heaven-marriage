@@ -87,12 +87,13 @@ export class UserService  implements OnModuleInit{
   }
   const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-  const {phoneNumber,name} = createUserDto
+  const {phoneNumber,name,whatsapp} = createUserDto
   const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
   const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
   const getOtp = await this.otpService.generateUniqueOTP()
     const finalData ={
       phoneNumber,
+      whatsapp,
       name,
       password:passwordHash,
       userId:userIdCount,
@@ -605,7 +606,7 @@ async findOne(id: FindOneDto) {
   if (isValidObjectId) {
     findOne = await this.userModel
       .findById(searchId)
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber ')
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -whatsapp ')
       .lean();
   }
   
@@ -613,7 +614,7 @@ async findOne(id: FindOneDto) {
   if (!findOne) {
     findOne = await this.userModel
       .findOne({ userId: searchId })
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber ')
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -whatsapp ')
       .lean();
   }
   
@@ -702,7 +703,7 @@ async findOne(id: FindOneDto) {
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin userId')
+      .select('name email phoneNumber whatsapp maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin userId')
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 }) // Latest users first

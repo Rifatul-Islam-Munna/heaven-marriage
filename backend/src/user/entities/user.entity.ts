@@ -31,6 +31,9 @@ export class User {
     phoneNumber:string;
 
     @Prop()
+    whatsapp?:string;
+
+    @Prop()
     password:string;
 
     @Prop()
@@ -207,6 +210,7 @@ UserSchema.index({
   userId:"text",
 
   phoneNumber:"text",
+  whatsapp:"text",
   'address.presentAddress': 'text',
   'address.district': 'text',
   'address.upazila': 'text',
@@ -219,6 +223,7 @@ UserSchema.index({
     email: 5,
     userId: 8,
     phoneNumber:5,
+    whatsapp:5,
     
 
     'occupational.profession': 5,
