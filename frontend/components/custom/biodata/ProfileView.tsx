@@ -78,7 +78,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
     1000,
     "bio-data-info",
   );
-
+  console.log("userData", userData);
   useEffect(() => {
     if (userData) {
       viewContentEvent({
@@ -191,10 +191,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     />
                   </div>
                 </div>
+                <h2 className="text-2xl text-center font-bold mb-2">
+                  নাম : {userData?.name ?? " Guest"}
+                </h2>
 
                 {/* Biodata Number */}
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold mb-2">
+                  <h2 className="text-xl text-gray-100 font-bold mb-2">
                     বায়োডাটা নং : {userData?.gender === "male" ? "NG" : "NB"}-
                     {userData?.userId}
                   </h2>

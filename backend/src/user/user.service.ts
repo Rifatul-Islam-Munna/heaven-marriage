@@ -279,8 +279,8 @@ async findUserAndUpdated() {
 }); */
   const firstMatch: any = {
     $and: [
-      { isPublished: { $eq: true } },
-      { isPublished: { $ne: null } },
+     /*  { isPublished: { $eq: true } },
+      { isPublished: { $ne: null } }, */
       { isPublishFromAdmin: { $eq: true } },
       { isPublishFromAdmin: { $ne: null } }
     ]
@@ -605,7 +605,7 @@ async findOne(id: FindOneDto) {
   if (isValidObjectId) {
     findOne = await this.userModel
       .findById(searchId)
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -name')
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber ')
       .lean();
   }
   
@@ -613,7 +613,7 @@ async findOne(id: FindOneDto) {
   if (!findOne) {
     findOne = await this.userModel
       .findOne({ userId: searchId })
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -name')
+      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber ')
       .lean();
   }
   
