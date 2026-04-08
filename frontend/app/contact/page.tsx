@@ -73,7 +73,7 @@ export default function ContactPage() {
     }
 
     if (formData.mobile.length < 11) {
-      toast.error("সঠিক মোবাইল নম্বর দিন");
+      toast.error("সঠিক হোয়াটসঅ্যাপ নাম্বার দিন");
       return;
     }
 
@@ -296,7 +296,7 @@ export default function ContactPage() {
                       htmlFor="mobile"
                       className="text-sm font-semibold text-gray-900"
                     >
-                      মোবাইল নম্বর <span className="text-red-500">*</span>
+                      হোয়াটসঅ্যাপ নাম্বার <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />

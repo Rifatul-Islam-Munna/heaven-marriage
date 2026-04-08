@@ -52,6 +52,7 @@ import {
   Check,
   X,
   Edit,
+  Copy,
   Users,
 } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
@@ -60,6 +61,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "use-debounce";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
@@ -67,6 +69,8 @@ import { User as BiodataUser } from "@/@types/user";
 import {
   BIODATA_WHATSAPP_GROUPS,
   BiodataWhatsappGroup,
+  buildBiodataWhatsappShareUrlForNumber,
+  copyBiodataWhatsappText,
   openBiodataWhatsappGroupShare,
 } from "@/lib/biodata-whatsapp-share";
 
@@ -95,6 +99,24 @@ interface PaginatedUsersResponse {
   hasPreviousPage: boolean;
 }
 
+interface ShareRecipient {
+  _id: string;
+  name: string;
+  phoneNumber?: string;
+  whatsapp?: string;
+  userId?: string;
+}
+
+interface ShareRecipientsResponse {
+  data: ShareRecipient[];
+  page: number;
+  limit: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function AdminUsersTable() {
   const queryClient = useQueryClient();
 
@@ -112,6 +134,8 @@ export default function AdminUsersTable() {
   const [connectionValue, setConnectionValue] = useState<string>("");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedShareUser, setSelectedShareUser] = useState<User | null>(null);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [recipientPage, setRecipientPage] = useState(1);
   const router = useRouter();
   const query = new URLSearchParams();
   query.set("page", tableFilters.page.toString());
@@ -120,6 +144,7 @@ export default function AdminUsersTable() {
   if (tableFilters.publish) {
     query.set("isPublished", tableFilters.publish);
   }
+  const [recipientText] = useDebounce(recipientSearch, 400);
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
@@ -135,6 +160,23 @@ export default function AdminUsersTable() {
     `/user/get-user-profile-admin?id=${selectedShareUser?._id ?? ""}`,
     {
       enabled: shareDialogOpen && !!selectedShareUser?._id,
+    },
+  );
+
+  const recipientsQuery = new URLSearchParams();
+  recipientsQuery.set("page", recipientPage.toString());
+  recipientsQuery.set("limit", "100");
+  recipientsQuery.set("query", recipientText);
+
+  const {
+    data: recipientsData,
+    isLoading: isRecipientsLoading,
+    isFetching: isRecipientsFetching,
+  } = useQueryWrapper<ShareRecipientsResponse>(
+    ["admin-share-recipients", recipientPage, recipientText],
+    `/user/get-all-user-for-admin?${recipientsQuery.toString()}`,
+    {
+      enabled: shareDialogOpen,
     },
   );
 
@@ -219,7 +261,43 @@ export default function AdminUsersTable() {
 
   const handleOpenShareDialog = (user: User) => {
     setSelectedShareUser(user);
+    setRecipientSearch("");
+    setRecipientPage(1);
     setShareDialogOpen(true);
+  };
+
+  const handleShareDialogChange = (open: boolean) => {
+    setShareDialogOpen(open);
+
+    if (!open) {
+      setRecipientSearch("");
+      setRecipientPage(1);
+    }
+  };
+
+  const handleDirectWhatsAppShare = (recipient: ShareRecipient) => {
+    if (typeof window === "undefined") return;
+
+    if (!shareProfile) {
+      toast.error("প্রোফাইল এখনো লোড হচ্ছে");
+      return;
+    }
+
+    const recipientWhatsapp = recipient.whatsapp || recipient.phoneNumber;
+
+    if (!recipientWhatsapp) {
+      toast.error("এই ব্যবহারকারীর WhatsApp নাম্বার নেই");
+      return;
+    }
+
+    const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
+      shareProfile,
+      window.location.origin,
+      recipientWhatsapp,
+    );
+
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    setShareDialogOpen(false);
   };
 
   const handleWhatsAppGroupShare = async (group: BiodataWhatsappGroup) => {
@@ -242,6 +320,32 @@ export default function AdminUsersTable() {
         : `${group.label} খুলে দেওয়া হয়েছে। প্রয়োজনে CV টেক্সট ম্যানুয়ালি কপি করে পাঠান।`,
     );
     setShareDialogOpen(false);
+  };
+
+  const handleCopyWhatsAppMessage = async () => {
+    if (typeof window === "undefined") return;
+
+    if (!shareProfile) {
+      toast.error("প্রোফাইল এখনো লোড হচ্ছে");
+      return;
+    }
+
+    const { copied } = await copyBiodataWhatsappText(
+      shareProfile,
+      window.location.origin,
+      {
+        includeContactNumber: false,
+      },
+    );
+
+    if (copied) {
+      toast.success(
+        "WhatsApp মেসেজ কপি করা হয়েছে। এতে ফোন নাম্বার রাখা হয়নি।",
+      );
+      return;
+    }
+
+    toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
   };
 
   // Loading skeleton
@@ -270,6 +374,7 @@ export default function AdminUsersTable() {
   }
 
   const users = data?.data ?? [];
+  const recipients = recipientsData?.data ?? [];
   const totalPages = data?.totalPages ?? 1;
 
   return (
@@ -320,16 +425,16 @@ export default function AdminUsersTable() {
         </Select>
       </div>
 
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog open={shareDialogOpen} onOpenChange={handleShareDialogChange}>
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>
               {selectedShareUser?.name
-                ? `"${selectedShareUser.name}" এর CV WhatsApp গ্রুপে পাঠান`
-                : "WhatsApp গ্রুপে CV পাঠান"}
+                ? `"${selectedShareUser.name}" এর CV WhatsApp এ পাঠান`
+                : "WhatsApp এ CV পাঠান"}
             </DialogTitle>
             <DialogDescription>
-              নিচ থেকে মেয়েদের বা ছেলেদের গ্রুপ বেছে নিন। CV text একই থাকবে।
+              এখানে ব্যক্তিগতভাবে এবং গ্রুপে দুইভাবেই WhatsApp share করতে পারবেন।
             </DialogDescription>
           </DialogHeader>
 
@@ -341,7 +446,148 @@ export default function AdminUsersTable() {
               </div>
             ) : null}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-start">
+              <div className="space-y-3 rounded-lg border p-4">
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-foreground">
+                  ব্যক্তিগত WhatsApp
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  এখান থেকে একজন নির্দিষ্ট ব্যবহারকারীকে সরাসরি WhatsApp-এ পাঠান।
+                </p>
+              </div>
+
+              <Input
+                value={recipientSearch}
+                onChange={(e) => {
+                  setRecipientSearch(e.target.value);
+                  setRecipientPage(1);
+                }}
+                placeholder="নাম, ফোন, বা বায়োডাটা নাম্বার দিয়ে খুঁজুন"
+              />
+
+              <div className="rounded-lg border">
+                {isRecipientsLoading ? (
+                  <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ব্যবহারকারীদের তালিকা লোড হচ্ছে...
+                  </div>
+                ) : recipients.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+                    কোনো ব্যবহারকারী পাওয়া যায়নি।
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[280px]">
+                    <div className="divide-y">
+                      {recipients.map((recipient) => {
+                        const recipientWhatsapp =
+                          recipient.whatsapp || recipient.phoneNumber;
+
+                        return (
+                          <div
+                            key={recipient._id}
+                            className="flex items-center justify-between gap-3 p-4"
+                          >
+                            <div className="min-w-0 space-y-1">
+                              <p className="truncate font-medium text-foreground">
+                                {recipient.name || "নাম নেই"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                বায়োডাটা: {recipient.userId || "N/A"}
+                              </p>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Phone className="h-3.5 w-3.5" />
+                                <span>
+                                  {recipientWhatsapp ||
+                                    "কোনো WhatsApp নাম্বার নেই"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={() =>
+                                handleDirectWhatsAppShare(recipient)
+                              }
+                              disabled={
+                                !recipientWhatsapp ||
+                                !shareProfile ||
+                                isShareProfileLoading
+                              }
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <Send className="h-4 w-4" />
+                              পাঠান
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  মোট ব্যবহারকারী: {recipientsData?.totalItems ?? 0}
+                  {isRecipientsFetching && !isRecipientsLoading
+                    ? " - আপডেট হচ্ছে..."
+                    : ""}
+                </p>
+
+                {Boolean(
+                  recipientsData?.totalPages && recipientsData.totalPages > 1,
+                ) && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setRecipientPage((currentPage) =>
+                          Math.max(1, currentPage - 1),
+                        )
+                      }
+                      disabled={
+                        !recipientsData?.hasPreviousPage || isRecipientsFetching
+                      }
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      আগের
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {recipientPage} / {recipientsData?.totalPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setRecipientPage((currentPage) => currentPage + 1)
+                      }
+                      disabled={
+                        !recipientsData?.hasNextPage || isRecipientsFetching
+                      }
+                    >
+                      পরের
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="space-y-2">
+              <p className="text-base font-semibold text-foreground">
+                WhatsApp গ্রুপ
+              </p>
+              <p className="text-sm text-muted-foreground">
+                আগের মতো এখান থেকে গ্রুপে CV পাঠাতে পারবেন।
+              </p>
+            </div>
+
+                <div className="grid gap-3">
               {BIODATA_WHATSAPP_GROUPS.map((group) => (
                 <Card key={group.id} className="border-dashed">
                   <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
@@ -368,8 +614,24 @@ export default function AdminUsersTable() {
               ))}
             </div>
 
-            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              গ্রুপ লিংক খোলার সময় CV টেক্সট কপি করার চেষ্টা করা হবে, যেন admin সহজে paste করে পাঠাতে পারেন।
+                <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p>
+                      গ্রুপে পাঠানো বা কপি করা মেসেজে ফোন নাম্বার রাখা হবে না। চাইলে এখান থেকে শুধু মেসেজ কপি করে WhatsApp-এ পেস্ট করতে পারবেন।
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCopyWhatsAppMessage}
+                      disabled={!shareProfile || isShareProfileLoading}
+                      className="shrink-0"
+                    >
+                      <Copy className="h-4 w-4" />
+                      মেসেজ কপি
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </DialogContent>

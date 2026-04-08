@@ -21,7 +21,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -43,6 +42,7 @@ import {
   User,
   Trash2,
   Eye,
+  MessageCircle,
   CheckCircle2,
   Circle,
   Inbox,
@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useDebounce } from "use-debounce";
+import { normalizeWhatsappPhoneNumber } from "@/lib/biodata-whatsapp-share";
 
 interface Contact {
   _id: string;
@@ -84,6 +85,13 @@ interface ContactStats {
   read: number;
   unread: number;
 }
+
+const buildWhatsappReplyMessage = (contact: Contact) =>
+  [
+    `আসসালামু আলাইকুম ${contact.name},`,
+    "আমরা আপনার কন্টাক্ট মেসেজ পেয়েছি।",
+    "শীঘ্রই আপনার সাথে যোগাযোগ করা হবে ইনশাআল্লাহ।",
+  ].join("\n\n");
 
 export default function AdminContactDashboard() {
   const queryClient = useQueryClient();
@@ -146,9 +154,26 @@ export default function AdminContactDashboard() {
     }
   };
 
+  const handleSendMessage = (contact: Contact) => {
+    if (typeof window === "undefined") return;
+
+    const whatsappNumber = normalizeWhatsappPhoneNumber(contact.mobile);
+
+    if (!whatsappNumber) {
+      toast.error("এই কন্টাক্টে কোনো WhatsApp নাম্বার নেই");
+      return;
+    }
+
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+      buildWhatsappReplyMessage(contact),
+    )}`;
+
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  };
+
   // Handle filter change
   const handleFilterChange = (value: string) => {
-    setFilter(value as any);
+    setFilter(value as "all" | "read" | "unread");
     setPage(1); // Reset to first page
   };
 
@@ -207,7 +232,7 @@ export default function AdminContactDashboard() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
-              placeholder="নাম, ইমেইল বা মোবাইল নম্বর খুঁজুন..."
+              placeholder="নাম, ইমেইল বা হোয়াটসঅ্যাপ নাম্বার খুঁজুন..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10 border-2"
@@ -349,6 +374,15 @@ export default function AdminContactDashboard() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleSendMessage(contact)}
+                        className="border-2 border-green-300 text-green-700 hover:bg-green-50"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Send Message
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setSelectedContact(contact)}
                         className="border-2"
                       >
@@ -438,7 +472,16 @@ export default function AdminContactDashboard() {
                   {contact.description}
                 </p>
 
-                <div className="flex items-center gap-2 pt-2 border-t">
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-2 border-green-300 text-green-700 hover:bg-green-50"
+                    onClick={() => handleSendMessage(contact)}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Send Message
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -603,7 +646,9 @@ export default function AdminContactDashboard() {
               </div>
 
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-gray-900">মোবাইল</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  হোয়াটসঅ্যাপ নাম্বার
+                </p>
                 <p className="text-sm text-gray-600 flex items-center gap-2">
                   <Phone className="h-4 w-4" />
                   {selectedContact.mobile}
@@ -626,7 +671,15 @@ export default function AdminContactDashboard() {
                 </p>
               </div>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => handleSendMessage(selectedContact)}
+                  className="border-2 border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Send Message
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleToggleRead(selectedContact)}

@@ -129,9 +129,32 @@ const formatMaleStudyJobPreference = (user: User) =>
     ", ",
   );
 
-export const buildBiodataWhatsappText = (user: User, origin: string) => {
-  const contactWhatsapp =
-    cleanText(user?.whatsapp) || cleanText(user?.phoneNumber);
+interface BuildBiodataWhatsappTextOptions {
+  includeContactNumber?: boolean;
+}
+
+const writeTextToClipboard = async (message: string) => {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+    return false;
+  }
+
+  try {
+    await navigator.clipboard.writeText(message);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const buildBiodataWhatsappText = (
+  user: User,
+  origin: string,
+  options: BuildBiodataWhatsappTextOptions = {},
+) => {
+  const { includeContactNumber = true } = options;
+  const contactWhatsapp = includeContactNumber
+    ? cleanText(user?.whatsapp) || cleanText(user?.phoneNumber)
+    : "";
   const isFemale = user.gender === "female";
   const publicProfileId = cleanText(user.userId) || cleanText(user._id);
   const biodataNumber = publicProfileId || "N/A";
@@ -237,29 +260,29 @@ export const buildBiodataWhatsappShareUrlForNumber = (
     : `https://wa.me/?text=${message}`;
 };
 
+export const copyBiodataWhatsappText = async (
+  user: User,
+  origin: string,
+  options: BuildBiodataWhatsappTextOptions = {},
+) => {
+  const message = buildBiodataWhatsappText(user, origin, options);
+  const copied = await writeTextToClipboard(message);
+
+  return { copied, message };
+};
+
 export const openBiodataWhatsappGroupShare = async (
   user: User,
   origin: string,
   inviteUrl: string,
 ) => {
-  const message = buildBiodataWhatsappText(user, origin);
-  const clipboardPromise =
-    typeof navigator !== "undefined" && navigator.clipboard?.writeText
-      ? navigator.clipboard.writeText(message)
-      : null;
+  const { copied, message } = await copyBiodataWhatsappText(user, origin, {
+    includeContactNumber: false,
+  });
 
   if (typeof window !== "undefined") {
     window.open(inviteUrl, "_blank", "noopener,noreferrer");
   }
 
-  if (!clipboardPromise) {
-    return { copied: false, message };
-  }
-
-  try {
-    await clipboardPromise;
-    return { copied: true, message };
-  } catch {
-    return { copied: false, message };
-  }
+  return { copied, message };
 };
