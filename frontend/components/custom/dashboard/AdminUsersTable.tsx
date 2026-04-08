@@ -63,9 +63,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import { parseAsInteger, useQueryState } from "nuqs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { User as BiodataUser } from "@/@types/user";
-import { buildBiodataWhatsappShareUrlForNumber } from "@/lib/biodata-whatsapp-share";
+import {
+  BIODATA_WHATSAPP_GROUPS,
+  BiodataWhatsappGroup,
+  openBiodataWhatsappGroupShare,
+} from "@/lib/biodata-whatsapp-share";
+
 interface User {
   _id: string;
   name: string;
@@ -91,24 +95,6 @@ interface PaginatedUsersResponse {
   hasPreviousPage: boolean;
 }
 
-interface ShareRecipient {
-  _id: string;
-  name: string;
-  phoneNumber?: string;
-  whatsapp?: string;
-  userId?: string;
-}
-
-interface ShareRecipientsResponse {
-  data: ShareRecipient[];
-  page: number;
-  limit: number;
-  totalItems: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
 export default function AdminUsersTable() {
   const queryClient = useQueryClient();
 
@@ -124,8 +110,6 @@ export default function AdminUsersTable() {
   const [publish, setPublish] = useState<string>("all");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedShareUser, setSelectedShareUser] = useState<User | null>(null);
-  const [recipientSearch, setRecipientSearch] = useState("");
-  const [recipientPage, setRecipientPage] = useState(1);
   const router = useRouter();
   const query = new URLSearchParams();
   query.set("page", page.toString());
@@ -134,18 +118,12 @@ export default function AdminUsersTable() {
   if (publish) {
     query.set("isPublished", publish);
   }
-  const [recipientText] = useDebounce(recipientSearch, 400);
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
     ["admin-users", page, text, gender, publish],
     `/user/get-all-user-for-admin?${query.toString()}`,
   );
-
-  const recipientsQuery = new URLSearchParams();
-  recipientsQuery.set("page", recipientPage.toString());
-  recipientsQuery.set("limit", "100");
-  recipientsQuery.set("query", recipientText);
 
   const {
     data: shareProfile,
@@ -155,18 +133,6 @@ export default function AdminUsersTable() {
     `/user/get-user-profile-admin?id=${selectedShareUser?._id ?? ""}`,
     {
       enabled: shareDialogOpen && !!selectedShareUser?._id,
-    },
-  );
-
-  const {
-    data: recipientsData,
-    isLoading: isRecipientsLoading,
-    isFetching: isRecipientsFetching,
-  } = useQueryWrapper<ShareRecipientsResponse>(
-    ["admin-share-recipients", recipientPage, recipientText],
-    `/user/get-all-user-for-admin?${recipientsQuery.toString()}`,
-    {
-      enabled: shareDialogOpen,
     },
   );
 
@@ -234,33 +200,28 @@ export default function AdminUsersTable() {
 
   const handleOpenShareDialog = (user: User) => {
     setSelectedShareUser(user);
-    setRecipientSearch("");
-    setRecipientPage(1);
     setShareDialogOpen(true);
   };
 
-  const handleWhatsAppShare = (recipient: ShareRecipient) => {
+  const handleWhatsAppGroupShare = async (group: BiodataWhatsappGroup) => {
     if (typeof window === "undefined") return;
 
     if (!shareProfile) {
-      toast.error("Profile is still loading");
+      toast.error("প্রোফাইল এখনো লোড হচ্ছে");
       return;
     }
 
-    const recipientWhatsapp = recipient.whatsapp || recipient.phoneNumber;
-
-    if (!recipientWhatsapp) {
-      toast.error("This user has no WhatsApp number");
-      return;
-    }
-
-    const whatsappUrl = buildBiodataWhatsappShareUrlForNumber(
+    const { copied } = await openBiodataWhatsappGroupShare(
       shareProfile,
       window.location.origin,
-      recipientWhatsapp,
+      group.inviteUrl,
     );
 
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    toast.success(
+      copied
+        ? `${group.label} এর জন্য CV টেক্সট কপি করা হয়েছে। এখন গ্রুপে পেস্ট করে পাঠান।`
+        : `${group.label} খুলে দেওয়া হয়েছে। প্রয়োজনে CV টেক্সট ম্যানুয়ালি কপি করে পাঠান।`,
+    );
     setShareDialogOpen(false);
   };
 
@@ -290,7 +251,6 @@ export default function AdminUsersTable() {
   }
 
   const users = data?.data ?? [];
-  const recipients = recipientsData?.data ?? [];
   const totalPages = data?.totalPages ?? 1;
 
   return (
@@ -342,122 +302,52 @@ export default function AdminUsersTable() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              Share {selectedShareUser?.name ? `"${selectedShareUser.name}"` : "profile"} on WhatsApp
+              {selectedShareUser?.name
+                ? `"${selectedShareUser.name}" এর CV WhatsApp গ্রুপে পাঠান`
+                : "WhatsApp গ্রুপে CV পাঠান"}
             </DialogTitle>
             <DialogDescription>
-              Choose a user, and WhatsApp will open with this biodata already filled in.
+              নিচ থেকে মেয়েদের বা ছেলেদের গ্রুপ বেছে নিন। CV text একই থাকবে।
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                value={recipientSearch}
-                onChange={(e) => {
-                  setRecipientSearch(e.target.value);
-                  setRecipientPage(1);
-                }}
-                placeholder="Search by name, phone, or biodata number"
-              />
-              <p className="text-xs text-muted-foreground">
-                The selected user&apos;s WhatsApp number will be used automatically.
-              </p>
+            {isShareProfileLoading ? (
+              <div className="flex h-24 items-center justify-center rounded-lg border text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                CV তৈরি হচ্ছে...
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {BIODATA_WHATSAPP_GROUPS.map((group) => (
+                <Card key={group.id} className="border-dashed">
+                  <CardContent className="flex h-full flex-col justify-between gap-4 p-5">
+                    <div className="space-y-1">
+                      <p className="text-base font-semibold text-foreground">
+                        {group.label}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {group.description}
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => handleWhatsAppGroupShare(group)}
+                      disabled={!shareProfile || isShareProfileLoading}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <Send className="h-4 w-4" />
+                      এই গ্রুপে পাঠান
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            <div className="rounded-lg border">
-              {isShareProfileLoading ? (
-                <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading selected profile...
-                </div>
-              ) : null}
-
-              {isRecipientsLoading ? (
-                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading users...
-                </div>
-              ) : recipients.length === 0 ? (
-                <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                  No users found.
-                </div>
-              ) : (
-                <ScrollArea className="h-[360px]">
-                  <div className="divide-y">
-                    {recipients.map((recipient) => (
-                      <div
-                        key={recipient._id}
-                        className="flex items-center justify-between gap-3 p-4"
-                      >
-                        <div className="min-w-0 space-y-1">
-                          <p className="truncate font-medium text-gray-900">
-                            {recipient.name || "Unnamed user"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Biodata: {recipient.userId || "N/A"}
-                          </p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Phone className="h-3.5 w-3.5" />
-                            <span>
-                              {recipient.whatsapp ||
-                                recipient.phoneNumber ||
-                                "No WhatsApp number"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="button"
-                          onClick={() => handleWhatsAppShare(recipient)}
-                          disabled={
-                            !(recipient.whatsapp || recipient.phoneNumber) ||
-                            !shareProfile
-                          }
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Send className="h-4 w-4" />
-                          Share
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                Total users: {recipientsData?.totalItems ?? 0}
-                {isRecipientsFetching && !isRecipientsLoading ? " - updating..." : ""}
-              </p>
-
-              {Boolean(recipientsData?.totalPages && recipientsData.totalPages > 1) && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRecipientPage((currentPage) => Math.max(1, currentPage - 1))}
-                    disabled={!recipientsData?.hasPreviousPage || isRecipientsFetching}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Prev
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    {recipientPage} / {recipientsData?.totalPages}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRecipientPage((currentPage) => currentPage + 1)}
-                    disabled={!recipientsData?.hasNextPage || isRecipientsFetching}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+              গ্রুপ লিংক খোলার সময় CV টেক্সট কপি করার চেষ্টা করা হবে, যেন admin সহজে paste করে পাঠাতে পারেন।
             </div>
           </div>
         </DialogContent>

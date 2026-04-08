@@ -8,10 +8,37 @@ import {
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 
+export interface BiodataWhatsappGroup {
+  id: "girls" | "boys";
+  label: string;
+  description: string;
+  inviteUrl: string;
+}
+
+export const BIODATA_WHATSAPP_GROUPS: BiodataWhatsappGroup[] = [
+  {
+    id: "girls",
+    label: "মেয়েদের গ্রুপ",
+    description: "এই গ্রুপে পাত্রীর CV পাঠাতে পারবেন।",
+    inviteUrl: "https://chat.whatsapp.com/Feorpv1yT9JAwpu93bkbvo?mode=gi_t",
+  },
+  {
+    id: "boys",
+    label: "ছেলেদের গ্রুপ",
+    description: "এই গ্রুপে পাত্রের CV পাঠাতে পারবেন।",
+    inviteUrl: "https://chat.whatsapp.com/BqVeBzM3ELL1a114s6bYyw?mode=gi_t",
+  },
+];
+
 const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
 
 const cleanText = (value?: string | null) =>
   value?.replace(/\s+/g, " ").trim() || "";
+
+const formatLabelValueLine = (label: string, value?: string) => {
+  const cleanedValue = cleanText(value);
+  return cleanedValue ? `*${label}* ${cleanedValue}` : "";
+};
 
 const toBanglaDigits = (value: string | number) =>
   String(value).replace(/\d/g, (digit) => banglaDigits[Number(digit)]);
@@ -124,49 +151,57 @@ export const buildBiodataWhatsappText = (user: User, origin: string) => {
   const lines = [
     "পাবলিক শর্ট সিভি",
     "",
-    `${isFemale ? "🌿🍂" : "🌿🍁"} ${isFemale ? "পাত্রীর" : "পাত্রের"} বায়োডাটা নাম্বারঃ ${biodataNumber}`,
+    `${isFemale ? "🌿🍂" : "🌿🍁"} *${isFemale ? "পাত্রীর" : "পাত্রের"} বায়োডাটা নাম্বারঃ* ${biodataNumber}`,
     "",
-    cleanText(user.name) ? `নামঃ ${cleanText(user.name)}` : "",
-    formatAge(user.age) ? `বয়সঃ ${formatAge(user.age)}` : "",
-    currentLocation ? `বর্তমান অবস্থানঃ ${currentLocation}` : "",
-    permanentLocation ? `স্থায়ী ঠিকানাঃ ${permanentLocation}` : "",
-    formatBirthYear(user.age) ? `জন্ম সনঃ ${formatBirthYear(user.age)}` : "",
-    formatEducationBackground(user)
-      ? `শিক্ষাগত ব্যাকগ্রাউন্ডঃ ${formatEducationBackground(user)}`
+    formatLabelValueLine("নামঃ", user.name),
+    formatLabelValueLine("বয়সঃ", formatAge(user.age)),
+    formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
+    formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
+    formatLabelValueLine("জন্ম সনঃ", formatBirthYear(user.age)),
+    formatLabelValueLine(
+      "শিক্ষাগত ব্যাকগ্রাউন্ডঃ",
+      formatEducationBackground(user),
+    ),
+    formatLabelValueLine("পড়াশুনাঃ", formatEducationSummary(user)),
+    formatLabelValueLine("পেশাঃ", formatProfession(user)),
+    formatLabelValueLine(
+      "উচ্চতাঃ",
+      formatHeight(user.personalInformation?.height),
+    ),
+    formatLabelValueLine(
+      "শারীরিক কাঠামোঃ",
+      user.personalInformation?.physicalStructure,
+    ),
+    formatLabelValueLine("গায়ের রঙঃ", user.personalInformation?.skinTone),
+    formatLabelValueLine(
+      "বৈবাহিক অবস্থাঃ",
+      formatMaritalStatus(user.maritalStatus),
+    ),
+    isFemale
+      ? formatLabelValueLine(
+          "আপনি কারোর ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রুবা'আ) হতে রাজি আছেন কি নাঃ",
+          formatFemaleMarriagePreference(user),
+        )
       : "",
-    formatEducationSummary(user)
-      ? `পড়াশুনাঃ ${formatEducationSummary(user)}`
+    !isFemale
+      ? formatLabelValueLine(
+          "বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন কি নাঃ",
+          user.marriageInformationMan?.wifeVailAfterMarriage,
+        )
       : "",
-    formatProfession(user) ? `পেশাঃ ${formatProfession(user)}` : "",
-    formatHeight(user.personalInformation?.height)
-      ? `উচ্চতাঃ ${formatHeight(user.personalInformation?.height)}`
+    !isFemale
+      ? formatLabelValueLine(
+          "স্ত্রীকে পড়াশোনা/চাকরি করতে দিতে চান কি নাঃ",
+          formatMaleStudyJobPreference(user),
+        )
       : "",
-    cleanText(user.personalInformation?.physicalStructure)
-      ? `শারীরিক কাঠামোঃ ${cleanText(user.personalInformation?.physicalStructure)}`
-      : "",
-    cleanText(user.personalInformation?.skinTone)
-      ? `গায়ের রঙঃ ${cleanText(user.personalInformation?.skinTone)}`
-      : "",
-    formatMaritalStatus(user.maritalStatus)
-      ? `বৈবাহিক অবস্থাঃ ${formatMaritalStatus(user.maritalStatus)}`
-      : "",
-    isFemale && formatFemaleMarriagePreference(user)
-      ? `আপনি কারোর ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রুবা'আ) হতে রাজি আছেন কি নাঃ ${formatFemaleMarriagePreference(user)}`
-      : "",
-    !isFemale && cleanText(user.marriageInformationMan?.wifeVailAfterMarriage)
-      ? `বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন কি নাঃ ${cleanText(user.marriageInformationMan?.wifeVailAfterMarriage)}`
-      : "",
-    !isFemale && formatMaleStudyJobPreference(user)
-      ? `স্ত্রীকে পড়াশোনা/চাকরি করতে দিতে চান কি নাঃ ${formatMaleStudyJobPreference(user)}`
-      : "",
-    cleanText(user.expectedLifePartner?.expectedQuality)
-      ? `${isFemale ? "কেমন পাত্র চানঃ" : "কেমন পাত্রী চানঃ"} ${cleanText(user.expectedLifePartner?.expectedQuality)}`
-      : "",
-    contactWhatsapp
-      ? `আপনার হোয়াটসঅ্যাপ নাম্বারঃ ${contactWhatsapp}`
-      : "",
+    formatLabelValueLine(
+      isFemale ? "কেমন পাত্র চানঃ" : "কেমন পাত্রী চানঃ",
+      user.expectedLifePartner?.expectedQuality,
+    ),
+    formatLabelValueLine("আপনার হোয়াটসঅ্যাপ নাম্বারঃ", contactWhatsapp),
     "",
-    `${isFemale ? "পাত্রীর" : "পাত্রের"} বিস্তারিত বায়োডাটা লিংকঃ`,
+    `*${isFemale ? "পাত্রীর" : "পাত্রের"} বিস্তারিত বায়োডাটা লিংকঃ*`,
     profileUrl,
   ];
 
@@ -200,4 +235,31 @@ export const buildBiodataWhatsappShareUrlForNumber = (
   return normalizedNumber
     ? `https://wa.me/${normalizedNumber}?text=${message}`
     : `https://wa.me/?text=${message}`;
+};
+
+export const openBiodataWhatsappGroupShare = async (
+  user: User,
+  origin: string,
+  inviteUrl: string,
+) => {
+  const message = buildBiodataWhatsappText(user, origin);
+  const clipboardPromise =
+    typeof navigator !== "undefined" && navigator.clipboard?.writeText
+      ? navigator.clipboard.writeText(message)
+      : null;
+
+  if (typeof window !== "undefined") {
+    window.open(inviteUrl, "_blank", "noopener,noreferrer");
+  }
+
+  if (!clipboardPromise) {
+    return { copied: false, message };
+  }
+
+  try {
+    await clipboardPromise;
+    return { copied: true, message };
+  } catch {
+    return { copied: false, message };
+  }
 };
