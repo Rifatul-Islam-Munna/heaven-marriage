@@ -62,7 +62,7 @@ import { useDebounce } from "use-debounce";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
-import { parseAsInteger, useQueryState } from "nuqs";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { User as BiodataUser } from "@/@types/user";
 import {
   BIODATA_WHATSAPP_GROUPS,
@@ -98,30 +98,32 @@ interface PaginatedUsersResponse {
 export default function AdminUsersTable() {
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
-  const [searchQuery, setSearchQuery] = useState("");
-  const [gender, setGender] = useState("all");
+  const [tableFilters, setTableFilters] = useQueryStates({
+    page: parseAsInteger.withDefault(1),
+    query: parseAsString.withDefault(""),
+    gender: parseAsString.withDefault("all"),
+    publish: parseAsString.withDefault("all"),
+  });
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const [text] = useDebounce(searchQuery, 1000);
+  const [text] = useDebounce(tableFilters.query, 1000);
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null,
   );
   const [connectionValue, setConnectionValue] = useState<string>("");
-  const [publish, setPublish] = useState<string>("all");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedShareUser, setSelectedShareUser] = useState<User | null>(null);
   const router = useRouter();
   const query = new URLSearchParams();
-  query.set("page", page.toString());
+  query.set("page", tableFilters.page.toString());
   query.set("query", text);
-  query.set("gender", gender);
-  if (publish) {
-    query.set("isPublished", publish);
+  query.set("gender", tableFilters.gender);
+  if (tableFilters.publish) {
+    query.set("isPublished", tableFilters.publish);
   }
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
-    ["admin-users", page, text, gender, publish],
+    ["admin-users", tableFilters.page, text, tableFilters.gender, tableFilters.publish],
     `/user/get-all-user-for-admin?${query.toString()}`,
   );
 
@@ -167,13 +169,30 @@ export default function AdminUsersTable() {
   });
 
   const handleSearch = (value: string) => {
-    setSearchQuery(value);
-    setPage(1);
+    void setTableFilters({
+      query: value,
+      page: 1,
+    });
   };
 
   const handleGenderFilter = (value: string) => {
-    setGender(value);
-    setPage(1);
+    void setTableFilters({
+      gender: value,
+      page: 1,
+    });
+  };
+
+  const handlePublishFilter = (value: string) => {
+    void setTableFilters({
+      publish: value,
+      page: 1,
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    void setTableFilters({
+      page: newPage,
+    });
   };
 
   const startEditingConnections = (userId: string, currentValue: number) => {
@@ -271,12 +290,12 @@ export default function AdminUsersTable() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="নাম, ইমেইল, ফোন বা আইডি দিয়ে খুঁজুন..."
-            value={searchQuery}
+            value={tableFilters.query}
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={gender} onValueChange={handleGenderFilter}>
+        <Select value={tableFilters.gender} onValueChange={handleGenderFilter}>
           <SelectTrigger className="w-full sm:w-40 font-heading">
             <SelectValue />
           </SelectTrigger>
@@ -286,7 +305,10 @@ export default function AdminUsersTable() {
             <SelectItem value="female">মহিলা</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={publish} onValueChange={(value) => setPublish(value)}>
+        <Select
+          value={tableFilters.publish}
+          onValueChange={handlePublishFilter}
+        >
           <SelectTrigger className="w-full sm:w-40 font-heading">
             <SelectValue />
           </SelectTrigger>
@@ -712,7 +734,7 @@ export default function AdminUsersTable() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(page - 1)}
+              onClick={() => handlePageChange(tableFilters.page - 1)}
               disabled={!data?.hasPreviousPage || isLoading}
               className="h-9 px-3"
             >
@@ -733,20 +755,22 @@ export default function AdminUsersTable() {
                   let pageNum;
                   if (totalPages <= 3) {
                     pageNum = i + 1;
-                  } else if (page <= 2) {
+                  } else if (tableFilters.page <= 2) {
                     pageNum = i + 1;
-                  } else if (page >= totalPages - 1) {
+                  } else if (tableFilters.page >= totalPages - 1) {
                     pageNum = totalPages - 2 + i;
                   } else {
-                    pageNum = page - 1 + i;
+                    pageNum = tableFilters.page - 1 + i;
                   }
 
                   return (
                     <Button
                       key={i}
-                      variant={page === pageNum ? "default" : "outline"}
+                      variant={
+                        tableFilters.page === pageNum ? "default" : "outline"
+                      }
                       size="icon"
-                      onClick={() => setPage(pageNum)}
+                      onClick={() => handlePageChange(pageNum)}
                       className="h-9 w-9 text-sm"
                     >
                       {pageNum}
@@ -759,7 +783,7 @@ export default function AdminUsersTable() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(page + 1)}
+              onClick={() => handlePageChange(tableFilters.page + 1)}
               disabled={!data?.hasNextPage || isLoading}
               className="h-9 px-3"
             >
