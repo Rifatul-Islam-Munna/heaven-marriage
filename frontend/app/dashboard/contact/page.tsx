@@ -365,9 +365,11 @@ export default function AdminContactDashboard() {
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-normal">
-                    <p className="text-sm text-gray-600 whitespace-normal break-words line-clamp-3">
-                      {contact.description}
-                    </p>
+                    <div className="max-h-[4.5rem] overflow-y-auto pr-2">
+                      <p className="text-sm leading-6 text-gray-600 whitespace-pre-wrap break-words">
+                        {contact.description}
+                      </p>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <p className="text-xs text-gray-500">
