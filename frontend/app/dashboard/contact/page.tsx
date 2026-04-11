@@ -92,6 +92,8 @@ const buildWhatsappReplyMessage = (contact: Contact) =>
     "niqaha.com থেকে বলছি। আপনি niqaha.com ওয়েভসাইটে নক দিয়েছিলেন। ",
     "আমরা আপনার কন্টাক্ট মেসেজ পেয়েছি।",
     "শীঘ্রই আপনার সাথে যোগাযোগ করা হবে  ইনশাআল্লাহ।",
+    `আমাদের ম্যারিজ মিডিয়া এজেন্সি সম্পর্কে বিস্তারিত জানতে ভিজিট করুন....⬇️
+https://niqaha.com/about `,
   ].join("\n\n");
 
 export default function AdminContactDashboard() {
@@ -311,7 +313,9 @@ export default function AdminContactDashboard() {
               <TableHead className="font-semibold w-[5%]">স্ট্যাটাস</TableHead>
               <TableHead className="font-semibold w-[15%]">নাম</TableHead>
               <TableHead className="font-semibold w-[15%]">যোগাযোগ</TableHead>
-              <TableHead className="font-semibold w-[30%]">মেসেজ</TableHead>
+              <TableHead className="font-semibold w-[30%] max-w-2xs">
+                মেসেজ
+              </TableHead>
               <TableHead className="font-semibold w-[15%]">সময়</TableHead>
               <TableHead className="font-semibold text-right w-[20%]">
                 অ্যাকশন
