@@ -89,8 +89,9 @@ interface ContactStats {
 const buildWhatsappReplyMessage = (contact: Contact) =>
   [
     `আসসালামু আলাইকুম ${contact.name},`,
+    "niqaha.com থেকে বলছি। আপনি niqaha.com ওয়েভসাইটে নক দিয়েছিলেন। ",
     "আমরা আপনার কন্টাক্ট মেসেজ পেয়েছি।",
-    "শীঘ্রই আপনার সাথে যোগাযোগ করা হবে ইনশাআল্লাহ।",
+    "শীঘ্রই আপনার সাথে যোগাযোগ করা হবে  ইনশাআল্লাহ।",
   ].join("\n\n");
 
 export default function AdminContactDashboard() {
