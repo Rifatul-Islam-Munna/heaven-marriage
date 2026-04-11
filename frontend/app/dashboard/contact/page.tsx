@@ -307,13 +307,13 @@ export default function AdminContactDashboard() {
 
       {/* Desktop Table View */}
       <div className="hidden md:block border-2 border-gray-200 rounded-lg overflow-hidden">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="bg-gray-50">
               <TableHead className="font-semibold w-[5%]">স্ট্যাটাস</TableHead>
               <TableHead className="font-semibold w-[15%]">নাম</TableHead>
               <TableHead className="font-semibold w-[15%]">যোগাযোগ</TableHead>
-              <TableHead className="font-semibold w-[30%] max-w-2xs">
+              <TableHead className="font-semibold w-[30%] whitespace-normal">
                 মেসেজ
               </TableHead>
               <TableHead className="font-semibold w-[15%]">সময়</TableHead>
@@ -338,7 +338,7 @@ export default function AdminContactDashboard() {
               contacts.map((contact) => (
                 <TableRow
                   key={contact._id}
-                  className={`hover:bg-gray-50 ${!contact.isRead ? "bg-blue-50/30" : ""}`}
+                  className={`hover:bg-gray-50 [&>td]:align-top ${!contact.isRead ? "bg-blue-50/30" : ""}`}
                 >
                   <TableCell>
                     {contact.isRead ? (
@@ -364,8 +364,8 @@ export default function AdminContactDashboard() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <p className="text-sm text-gray-600 line-clamp-2">
+                  <TableCell className="whitespace-normal">
+                    <p className="text-sm text-gray-600 whitespace-normal break-words line-clamp-3">
                       {contact.description}
                     </p>
                   </TableCell>
@@ -375,7 +375,7 @@ export default function AdminContactDashboard() {
                     </p>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
