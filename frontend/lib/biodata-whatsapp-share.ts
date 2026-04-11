@@ -251,9 +251,12 @@ export const buildBiodataWhatsappShareUrlForNumber = (
   user: User,
   origin: string,
   phoneNumber?: string,
+  options: BuildBiodataWhatsappTextOptions = {},
 ) => {
   const normalizedNumber = normalizeWhatsappPhoneNumber(phoneNumber);
-  const message = encodeURIComponent(buildBiodataWhatsappText(user, origin));
+  const message = encodeURIComponent(
+    buildBiodataWhatsappText(user, origin, options),
+  );
 
   return normalizedNumber
     ? `https://wa.me/${normalizedNumber}?text=${message}`
@@ -277,7 +280,7 @@ export const openBiodataWhatsappGroupShare = async (
   inviteUrl: string,
 ) => {
   const { copied, message } = await copyBiodataWhatsappText(user, origin, {
-    includeContactNumber: false,
+    includeContactNumber: true,
   });
 
   if (typeof window !== "undefined") {

@@ -294,6 +294,9 @@ export default function AdminUsersTable() {
       shareProfile,
       window.location.origin,
       recipientWhatsapp,
+      {
+        includeContactNumber: false,
+      },
     );
 
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
