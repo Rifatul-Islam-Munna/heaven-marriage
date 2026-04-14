@@ -200,6 +200,10 @@ export const buildBiodataWhatsappText = (
       "বৈবাহিক অবস্থাঃ",
       formatMaritalStatus(user.maritalStatus),
     ),
+    !isFemale ? formatLabelValueLine(
+      "মাসিক আয়",
+      user?.occupational?.salary
+    ) : "",
     isFemale
       ? formatLabelValueLine(
           "আপনি কারোর ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রুবা'আ) হতে রাজি আছেন কি নাঃ",
