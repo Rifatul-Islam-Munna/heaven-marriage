@@ -55,6 +55,7 @@ import {
   Copy,
   Users,
 } from "lucide-react";
+import { GetRequestNormal } from "@/api-hooks/api-hooks";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -134,6 +135,7 @@ export default function AdminUsersTable() {
   const [connectionValue, setConnectionValue] = useState<string>("");
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedShareUser, setSelectedShareUser] = useState<User | null>(null);
+  const [copyingUserId, setCopyingUserId] = useState<string | null>(null);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [recipientPage, setRecipientPage] = useState(1);
   const router = useRouter();
@@ -349,6 +351,46 @@ export default function AdminUsersTable() {
     }
 
     toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
+  };
+
+  const handleCopyProfileFromAction = async (user: User) => {
+    if (typeof window === "undefined") return;
+
+    setCopyingUserId(user._id);
+
+    try {
+      const profile = await queryClient.fetchQuery({
+        queryKey: ["admin-share-profile", user._id],
+        queryFn: () =>
+          GetRequestNormal<BiodataUser>(
+            `/user/get-user-profile-admin?id=${user._id}`,
+          ),
+        staleTime: 5 * 60 * 1000,
+      });
+
+      const { copied } = await copyBiodataWhatsappText(
+        profile,
+        window.location.origin,
+        {
+          includeContactNumber: false,
+        },
+      );
+
+      if (copied) {
+        toast.success(
+          `"${user.name}" এর WhatsApp মেসেজ কপি করা হয়েছে। এতে ফোন নাম্বার রাখা হয়নি।`,
+        );
+        return;
+      }
+
+      toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
+    } catch {
+      toast.error("কপি করার জন্য প্রোফাইল লোড করা যায়নি। আবার চেষ্টা করুন।");
+    } finally {
+      setCopyingUserId((currentUserId) =>
+        currentUserId === user._id ? null : currentUserId,
+      );
+    }
   };
 
   // Loading skeleton
@@ -790,6 +832,21 @@ export default function AdminUsersTable() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => void handleCopyProfileFromAction(user)}
+                        disabled={copyingUserId === user._id}
+                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                        title="Copy details"
+                        aria-label={`Copy ${user.name} details`}
+                      >
+                        {copyingUserId === user._id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() =>
                           router.push(`/dashboard/edit-profile/${user._id}`)
                         }
@@ -949,6 +1006,21 @@ export default function AdminUsersTable() {
                     aria-label={`Share ${user.name} profile`}
                   >
                     <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleCopyProfileFromAction(user)}
+                    disabled={copyingUserId === user._id}
+                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                    title="Copy details"
+                    aria-label={`Copy ${user.name} details`}
+                  >
+                    {copyingUserId === user._id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
