@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Phone, Loader2 } from "lucide-react";
 import { User } from "@/@types/user";
+import { GetRequestNormal } from "@/api-hooks/api-hooks";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import {
@@ -20,7 +21,7 @@ import {
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { useUser } from "@/lib/useUser";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requestNumber } from "@/actions/auth";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -38,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
 import { viewContentEvent } from "@/lib/google-tag-manager";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface ProfileViewProps {
   id: string;
@@ -71,6 +72,8 @@ const InfoRow = ({
 };
 
 export default function ProfileView({ id }: ProfileViewProps) {
+  const queryClient = useQueryClient();
+  const [isCheckingNumberAccess, setIsCheckingNumberAccess] = useState(false);
   const { data: userData, isLoading } = useQueryWrapper<User>(
     ["get-user", id],
     `/user/get-one-user?id=${id}`,
@@ -101,7 +104,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
     successMessage: "Added to shortlist",
   });
 
-  const { mutate: RequestPhoneNumber, isPending: isLoadingNumber } =
+  const { mutateAsync: RequestPhoneNumber, isPending: isLoadingNumber } =
     useMutation({
       mutationKey: ["request-number"],
       mutationFn: (payload: { userId: string; requestUserId: string }) =>
@@ -115,6 +118,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
       },
     });
   const { user } = useUser();
+  const isRequestingNumber = isLoadingNumber || isCheckingNumberAccess;
 
   if (isLoading) {
     return (
@@ -156,12 +160,64 @@ export default function ProfileView({ id }: ProfileViewProps) {
     return `${banglaFeet}' ${banglaInches}"`;
   };
 
-  const handelRequestForNumber = () => {
-    if ((user?.numberOfConnections ?? 0) <= 0) return router.push("/#pricing");
-    RequestPhoneNumber({
-      userId: user?._id,
-      requestUserId: userData._id,
-    });
+  const handelRequestForNumber = async () => {
+    if (!user?._id) {
+      router.push("/login");
+      return;
+    }
+
+    if (!userData._id) {
+      toast.error("Profile not found");
+      return;
+    }
+
+    setIsCheckingNumberAccess(true);
+
+    try {
+      const currentUser = await queryClient.fetchQuery({
+        queryKey: ["number-request-user-profile", user._id],
+        queryFn: () =>
+          GetRequestNormal<User>(
+            "/user/get-my-profile",
+            0,
+            "number-request-user-profile",
+          ),
+        staleTime: 0,
+      });
+
+      if ((currentUser?.numberOfConnections ?? 0) <= 0) {
+        router.push("/#pricing");
+        return;
+      }
+
+      const result = await RequestPhoneNumber({
+        userId: currentUser._id ?? user._id,
+        requestUserId: userData._id,
+      });
+
+      if (result?.data) {
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: ["number-request-user-profile"],
+            exact: false,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["get-my-profile"],
+            exact: false,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["get-my-profile-for-success"],
+            exact: false,
+          }),
+        ]);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
+    } finally {
+      setIsCheckingNumberAccess(false);
+    }
   };
 
   return (
@@ -295,10 +351,10 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        disabled={isLoadingNumber}
+                        disabled={isRequestingNumber}
                         className="w-full bg-green-600 hover:bg-green-700 text-white"
                       >
-                        {isLoadingNumber ? (
+                        {isRequestingNumber ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
                           <Phone className="w-4 h-4 mr-2" />
@@ -330,6 +386,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         <AlertDialogCancel>না, বাতিল করুন</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handelRequestForNumber}
+                          disabled={isRequestingNumber}
                           className="bg-green-600 hover:bg-green-700"
                         >
                           হ্যাঁ, নিশ্চিত করুন
