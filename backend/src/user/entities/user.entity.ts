@@ -27,8 +27,8 @@ export class User {
 
     @Prop()
     email:string
-    @Prop({unique:true})
-    phoneNumber:string;
+    @Prop({ type: String })
+    phoneNumber?: string | null;
 
     @Prop()
     whatsapp?:string;
@@ -204,6 +204,17 @@ isPdfSend :boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+UserSchema.index(
+  { phoneNumber: 1 },
+  {
+    name: 'phoneNumber_1',
+    unique: true,
+    partialFilterExpression: {
+      phoneNumber: { $type: 'string' },
+    },
+  },
+);
+
 UserSchema.index({ 
   name: 'text',
   email: 'text',

@@ -27,6 +27,7 @@ export class UserService  implements OnModuleInit{
   private logger = new Logger(UserService.name)
   constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService){}
    async onModuleInit() {
+    await this.ensurePhoneNumberIndex();
     const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
     if(!findOneAdmin){
       const rewPAssword =  this.configService.get<string>('ADMIN_PASSWORD') as string
@@ -40,6 +41,39 @@ export class UserService  implements OnModuleInit{
      })
     }
    }
+  private async ensurePhoneNumberIndex() {
+    const currentIndexes = await this.userModel.collection.indexes();
+    const hasExpectedPhoneIndex = currentIndexes.some(
+      (index) =>
+        index.name === 'phoneNumber_1' &&
+        index.unique === true &&
+        index.partialFilterExpression?.phoneNumber?.$type === 'string',
+    );
+
+    if (hasExpectedPhoneIndex) {
+      return;
+    }
+
+    const legacyPhoneIndex = currentIndexes.find(
+      (index) => index.name === 'phoneNumber_1',
+    );
+
+    if (legacyPhoneIndex) {
+      this.logger.warn('Replacing legacy phoneNumber_1 index so null phone numbers are allowed');
+      await this.userModel.collection.dropIndex('phoneNumber_1');
+    }
+
+    await this.userModel.collection.createIndex(
+      { phoneNumber: 1 },
+      {
+        name: 'phoneNumber_1',
+        unique: true,
+        partialFilterExpression: {
+          phoneNumber: { $type: 'string' },
+        },
+      },
+    );
+  }
   async create(createUserDto: CreateUserDto) {
     
     if(!createUserDto.phoneNumber || !createUserDto.password){
@@ -802,6 +836,9 @@ async createRequestNumber(payload:RequestNumberDto){
   if(!finUser){
     throw new HttpException('User not found', 400);
   }
+  if(!finUser.phoneNumber){
+    throw new HttpException('Your phone number is missing', 400);
+  }
   if(finUser?.numberOfConnections <=0){
     throw new HttpException('Not enough connections', 400);
   }
@@ -865,7 +902,7 @@ async getMyRequests (userId:string, query:PaginationDto){
 
 async RequestForOtpRestPassword(payload:ReqForDto){
   const findOneUser = await this.userModel.findOne({phoneNumber:payload.phoneNumber}).lean();
-  if(!findOneUser){
+  if(!findOneUser || !findOneUser.phoneNumber){
     throw new HttpException('User not found', 400);
   }
         const newOtp = await this.otpService.generateUniqueOTP();
