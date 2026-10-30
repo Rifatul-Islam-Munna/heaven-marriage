@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { Menu, X, Heart, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,7 +79,7 @@ export default function Navbar() {
             {navItems.map((item) => (
               <Link
                 key={item.href}
-                href={item.href}
+                href={item.href as Route}
                 className="font-heading text-base md:text-sm lg:text-base font-medium text-foreground transition-colors hover:text-primary"
               >
                 {item.label}
@@ -165,7 +166,7 @@ export default function Navbar() {
                   {navItems.map((item, index) => (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={item.href as Route}
                       onClick={() => setIsOpen(false)}
                       className="group flex items-center justify-between rounded-lg px-4 py-3 font-heading text-base font-medium text-foreground transition-all hover:bg-accent hover:text-primary"
                       style={{

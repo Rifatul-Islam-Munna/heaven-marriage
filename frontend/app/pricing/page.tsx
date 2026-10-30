@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import ManualConnectionPayment from "@/components/custom/common/ManualConnectionPayment";
+import PolicyLinks from "@/components/custom/common/PolicyLinks";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
@@ -121,6 +123,7 @@ const PricingPage = () => {
       <div className="container mx-auto max-w-7xl">
         {/* Back Button */}
 
+        <ManualConnectionPayment />
         {/* Header */}
         <div className="text-center mb-12 md:mb-16">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
@@ -206,6 +209,7 @@ const PricingPage = () => {
                     </div>
                   </div>
 
+                  <p className="text-xs text-gray-600 mb-3">একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।</p><PolicyLinks />
                   {/* CTA Button */}
                   <Button
                     onClick={() => mutate({ id: pricing._id })}

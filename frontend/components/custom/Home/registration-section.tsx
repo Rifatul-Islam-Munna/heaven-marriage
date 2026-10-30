@@ -18,7 +18,7 @@ export default function RegistrationSection() {
           <div className="mb-4 inline-flex items-center gap-2 text-pink-600">
             <Heart className="h-5 w-5 fill-pink-600" />
             <span className="text-sm font-medium">
-              HMS-এর মাধ্যমে বিবাহ করার আবেদন হতে হলে:
+              Niqaha.com-এর মাধ্যমে বিবাহ করার আবেদন হতে হলে:
             </span>
           </div>
 

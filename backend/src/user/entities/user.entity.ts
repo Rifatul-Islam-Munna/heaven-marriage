@@ -63,10 +63,30 @@ export class User {
 
     @Prop()
     isSubscriber:boolean
-    @Prop()
+    @Prop({default:0})
     numberOfConnections:number
 
 
+
+    @Prop({default:false}) isPhoneVerified:boolean;
+    @Prop({default:false}) isEmailVerified:boolean;
+    @Prop({default:0}) authVersion:number;
+    @Prop({default:'draft'}) biodataStatus:string;
+    @Prop({default:'pending'}) verificationStatus:string;
+    @Prop() statusReason:string;
+    @Prop() fatherName:string;
+    @Prop() motherName:string;
+    @Prop() guardianPhone:string;
+    @Prop({default:0}) draftStep:number;
+    @Prop() draftSavedAt:Date;
+    @Prop({default:false}) deletionRequested:boolean;
+    @Prop({default:0}) profileViews:number;
+    @Prop({default:0}) profileInterests:number;
+    @Prop({default:0}) profileContactRequests:number;
+    @Prop({type:[Object],default:[]}) connectionAdjustments:any[];
+    @Prop({type:[Object],default:[]}) connectionUnlocks:any[];
+    @Prop({type:[Object],default:[]}) connectionGrants:any[];
+    @Prop({type:[String],default:[]}) creditedPaymentIds:string[];
     // up those for the account creation 
 
      @Prop({type:Object})

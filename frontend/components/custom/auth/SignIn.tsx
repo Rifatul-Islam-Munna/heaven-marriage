@@ -80,12 +80,13 @@ export default function SignIn() {
                 htmlFor="phoneNumber"
                 className="text-gray-700 font-medium"
               >
-                মোবাইল নম্বর
+                মোবাইল নম্বর অথবা ইমেইল
               </Label>
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
-                type="tel"
+                type="text"
+                autoComplete="username"
                 placeholder="০১৭১২৩৪৫৬৭৮"
                 value={formData.phoneNumber}
                 onChange={handleChange}

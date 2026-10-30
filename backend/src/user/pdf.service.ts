@@ -42,7 +42,7 @@ export class PdfService {
 
       const htmlContent = this.generateHtml(user);
       await page.setContent(htmlContent, { 
-        waitUntil: 'networkidle0',
+        waitUntil: 'load',
         timeout: 30000 
       });
 

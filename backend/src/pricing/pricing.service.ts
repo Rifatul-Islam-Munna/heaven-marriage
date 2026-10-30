@@ -14,8 +14,9 @@ export class PricingService {
     return await newPricing.save();
   }
 
+  async findAllAdmin(){return this.pricingModel.find({}).lean();}
   async findAll(): Promise<Pricing[]> {
-    return await this.pricingModel.find().exec();
+    return await this.pricingModel.find({disabled:{$ne:true}}).exec();
   }
 
   async findOne(id: string): Promise<Pricing> {
@@ -29,7 +30,7 @@ export class PricingService {
 
   async update( updatePricingDto: UpdatePricingDto): Promise<Pricing> {
     const updatedPricing = await this.pricingModel
-      .findByIdAndUpdate(updatePricingDto.id, updatePricingDto, { new: true })
+      .findByIdAndUpdate(updatePricingDto.id, updatePricingDto, { new: true,runValidators:true })
       .exec();
     if (!updatedPricing) {
       throw new NotFoundException(`Pricing   not found`);

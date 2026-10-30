@@ -13,21 +13,21 @@ import {
   EyeOff,
   CheckCircle2,
 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { toast } from "sonner";
 
 const VerifyAndResetPassword = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const phoneNumber = searchParams.get("phone") || "";
+  const [phoneNumber,setPhoneNumber]=useState("");
+  useEffect(()=>{setPhoneNumber(sessionStorage.getItem("niqaha_reset_subject")||"");},[]);
 
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [timer, setTimer] = useState(120);
+  const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
   // Verify OTP and Reset Password mutation (combined)
@@ -37,22 +37,32 @@ const VerifyAndResetPassword = () => {
     mutationKey: ["verify-reset-password"],
     successMessage: "পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে",
     onSuccess: () => {
-      router.push("/login");
+      for (const key of ["niqaha_reset_subject","niqaha_reset_challenge","niqaha_reset_sent_at"]) sessionStorage.removeItem(key);
+      router.replace("/login");
     },
   });
 
   // Resend OTP mutation
   const { mutate: resendOtp, isPending: isResending } = useCommonMutationApi({
     method: "POST",
-    url: "/auth/forgot-password-send-otp",
+    url: "/user/forgot-password-send-otp",
     mutationKey: ["resend-otp"],
     successMessage: "ওটিপি পুনরায় পাঠানো হয়েছে",
-    onSuccess: () => {
-      setTimer(120);
+    onSuccess: (data) => {
+      sessionStorage.setItem("niqaha_reset_challenge",data.challengeId);
+      sessionStorage.setItem("niqaha_reset_sent_at",String(Date.now()));
+      setOtp("");
+      setTimer(60);
       setCanResend(false);
     },
   });
 
+  useEffect(() => {
+    const sent = Number(sessionStorage.getItem("niqaha_reset_sent_at") || Date.now());
+    const remaining = Math.max(0, Math.ceil((sent + 60000 - Date.now()) / 1000));
+    setTimer(remaining);
+    setCanResend(remaining === 0);
+  }, []);
   // Countdown timer
   useEffect(() => {
     if (timer > 0) {
@@ -67,7 +77,7 @@ const VerifyAndResetPassword = () => {
 
   // Redirect if no phone number
   useEffect(() => {
-    if (!phoneNumber) {
+    if (!sessionStorage.getItem("niqaha_reset_subject") || !sessionStorage.getItem("niqaha_reset_challenge")) {
       router.push("/forgot/req-for-otp");
     }
   }, [phoneNumber, router]);
@@ -98,8 +108,8 @@ const VerifyAndResetPassword = () => {
       return;
     }
 
-    if (newPassword.length < 8) {
-      toast.error("পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে", {
+    if (newPassword.length < 8 || newPassword.length > 50) {
+      toast.error("পাসওয়ার্ড ৮ থেকে ৫০ অক্ষরের হতে হবে", {
         duration: 5000,
         style: { background: "red", color: "white" },
       });
@@ -113,9 +123,11 @@ const VerifyAndResetPassword = () => {
       return;
     }
 
+    if (isPending || isResending) return;
     // Verify OTP and Reset password
     resetPassword({
       phoneNumber,
+      challengeId:sessionStorage.getItem("niqaha_reset_challenge"),
       otp,
       newPassword,
     });
@@ -124,7 +136,7 @@ const VerifyAndResetPassword = () => {
   // Password strength indicator
   const getPasswordStrength = (password: string) => {
     if (password.length === 0) return { text: "", color: "", width: "0%" };
-    if (password.length < 6)
+    if (password.length < 8)
       return { text: "দুর্বল", color: "bg-red-500", width: "33%" };
     if (password.length < 10)
       return { text: "মধ্যম", color: "bg-yellow-500", width: "66%" };
@@ -146,7 +158,7 @@ const VerifyAndResetPassword = () => {
           </h1>
           <p className="text-xs sm:text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{phoneNumber}</span>{" "}
-            নম্বরে পাঠানো ওটিপি দিন
+            এ পাঠানো ওটিপি দিন
           </p>
         </div>
 
@@ -185,17 +197,21 @@ const VerifyAndResetPassword = () => {
                   inputMode="numeric"
                   placeholder="৬ সংখ্যার কোড"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setOtp(e.target.value.replace(/[০-৯]/g,n=>String("০১২৩৪৫৬৭৮৯".indexOf(n))).replace(/\D/g, ""))}
                   className="h-11 text-xl text-center tracking-[0.5em] font-bold border-2 border-gray-300 focus:border-pink-500 focus:ring-pink-500"
                   maxLength={6}
                   disabled={isPending}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                 />
                 <p className="text-[10px] sm:text-xs text-gray-500 text-center">
-                  আপনার ফোনে পাঠানো ৬ সংখ্যার কোড লিখুন
+                  ফোন বা ইমেইলে পাঠানো ৬ সংখ্যার কোড লিখুন। কোডের মেয়াদ ১০ মিনিট।
                 </p>
               </div>
 
+              <Button type="button" variant="ghost" className="w-full text-pink-600" disabled={!canResend || isResending || isPending}
+                onClick={() => { if (canResend && !isResending) resendOtp({ phoneNumber }); }}>
+                {isResending ? "পাঠানো হচ্ছে..." : canResend ? "আবার OTP পাঠান" : `আবার পাঠাতে অপেক্ষা করুন (${formatTime(timer)})`}
+              </Button>
               {/* Divider - Compact */}
               <div className="relative my-3">
                 <div className="absolute inset-0 flex items-center">
@@ -220,6 +236,7 @@ const VerifyAndResetPassword = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <Input
                     id="newPassword"
+                    minLength={8} maxLength={50} autoComplete="new-password"
                     type={showPassword ? "text" : "password"}
                     placeholder="কমপক্ষে ৮ অক্ষর"
                     value={newPassword}
@@ -270,6 +287,7 @@ const VerifyAndResetPassword = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <Input
                     id="confirmPassword"
+                    minLength={8} maxLength={50} autoComplete="new-password"
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="পাসওয়ার্ড আবার লিখুন"
                     value={confirmPassword}
@@ -302,11 +320,7 @@ const VerifyAndResetPassword = () => {
                 <p className="text-[10px] sm:text-xs font-semibold text-blue-900 mb-0.5">
                   পাসওয়ার্ড নির্দেশনা:
                 </p>
-                <ul className="text-[10px] text-blue-800 space-y-0">
-                  <li>
-                    • কমপক্ষে ৬ অক্ষর • বড়/ছোট হাতের অক্ষর • সংখ্যা ও বিশেষ
-                    চিহ্ন
-                  </li>
+                <ul className="text-[10px] text-blue-800 space-y-0"><li>পাসওয়ার্ড ৮ থেকে ৫০ অক্ষরের হতে হবে। একটি নতুন ও শক্তিশালী পাসওয়ার্ড ব্যবহার করুন।</li>
                 </ul>
               </div>
 

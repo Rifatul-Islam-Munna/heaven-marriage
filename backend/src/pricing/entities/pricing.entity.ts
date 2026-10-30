@@ -6,6 +6,8 @@ export type PricingDocument = HydratedDocument<Pricing>;
 
 @Schema()
 export class Pricing  {
+  @Prop({default:false}) disabled:boolean;
+  @Prop() validityDays?:number;
   @Prop({ required: true })
   title?: string;
 

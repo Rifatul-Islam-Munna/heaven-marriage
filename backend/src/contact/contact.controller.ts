@@ -1,5 +1,6 @@
 // contact/contact.controller.ts
 import {
+  UseGuards,
   Controller,
   Get,
   Post,
@@ -16,6 +17,11 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { AuthGuard } from 'src/lib/auth.guard';
+import { RolesGuard } from 'src/lib/roles.guard';
+import { Roles } from 'src/lib/roles.decorator';
+import { UserType } from 'src/user/entities/user.entity';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { ContactService } from './contact.service';
 import { CreateContactDto, IdDto, QueryContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
@@ -27,6 +33,8 @@ export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
   // Create contact (public - for users)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({default:{limit:5,ttl:600000}})
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a contact message' })
@@ -40,6 +48,8 @@ export class ContactController {
   }
 
   // Get all contacts (admin only)
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Get()
   @ApiBearerAuth() // If authentication required
   @ApiOperation({ summary: 'Get all contact messages with pagination (Admin)' })
@@ -52,6 +62,8 @@ export class ContactController {
   }
 
   // Get single contact
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Get('get-one')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get contact by ID (Admin)' })
@@ -65,6 +77,8 @@ export class ContactController {
   }
 
   // Update contact (mark as read)
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Patch('mark-as-read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark contact as read (Admin)' })
@@ -78,6 +92,8 @@ export class ContactController {
   }
 
   // Delete contact
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Delete('delete')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
@@ -92,6 +108,8 @@ export class ContactController {
   }
 
   // Get unread count
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Get('unread-count')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get unread contact count (Admin)' })
@@ -104,6 +122,8 @@ export class ContactController {
   }
 
   // Get statistics
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Get('stats')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get contact statistics (Admin)' })

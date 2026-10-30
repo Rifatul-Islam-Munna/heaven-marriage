@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
-
 @Injectable()
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
@@ -17,11 +16,13 @@ export class SmsService {
     private readonly configService: ConfigService,
   ) {
     this.apiKey = this.configService.get<string>('BULKSMSBD_API_KEY') as string;
-    this.senderId = this.configService.get<string>('BULKSMSBD_SENDER_ID') as string;
+    this.senderId = this.configService.get<string>(
+      'BULKSMSBD_SENDER_ID',
+    ) as string;
     this.apiUrl = this.configService.get<string>('BULKSMSBD_API_URL') as string;
 
     if (!this.apiKey || !this.senderId || !this.apiUrl) {
-      throw new Error('BulkSMSBD configuration is missing in environment variables');
+      this.logger.warn('Bangladesh SMS is not configured');
     }
   }
 
@@ -30,40 +31,42 @@ export class SmsService {
    */
   async sendSms(sendSmsDto: { number: string; message: string }) {
     const { number, message } = sendSmsDto;
+    if (!this.apiKey || !this.senderId || !this.apiUrl)
+      throw new HttpException('SMS service is unavailable', 503);
 
     try {
-      this.logger.log(`Sending SMS to ${number}`);
-
-      const params = {
-        api_key: this.apiKey,
-        type: 'text',
-        number: this.formatPhoneNumber(number),
-        senderid: this.senderId,
-        message: message,
-      };
-
       const response = await firstValueFrom(
-        this.httpService.get(this.apiUrl, { params }),
+        this.httpService.get(this.apiUrl, {
+          params: {
+            api_key: this.apiKey,
+            type: 'text',
+            number: this.formatPhoneNumber(number),
+            senderid: this.senderId,
+            message,
+          },
+          timeout: 15000,
+        }),
       );
-
-      this.logger.log(`SMS sent successfully to ${number}. Response: ${JSON.stringify(response.data)}`);
-
-      return {
-        success: true,
-        message: 'SMS sent successfully',
-        recipient: number,
-        response: response.data,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to send SMS to ${number}:`, error.message);
-      
+      const payload =
+        typeof response.data === 'string'
+          ? JSON.parse(response.data)
+          : response.data;
+      // BulkSMSBD returns response_code 202 for successful submission over HTTP 200.
+      if (Number(payload?.response_code) !== 202) {
+        this.logger.warn(
+          'SMS provider rejected submission (code ' +
+            String(payload?.response_code || 'unknown') +
+            ')',
+        );
+        throw new Error('Provider rejected submission');
+      }
+      return { success: true, message: 'SMS submitted successfully' };
+    } catch {
+      // Provider request objects contain the OTP and API key; do not log them.
+      this.logger.warn('SMS submission failed');
       throw new HttpException(
-        {
-          success: false,
-          message: 'Failed to send SMS',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        'SMS service could not send the code. Please retry or use email.',
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
   }
@@ -100,8 +103,8 @@ export class SmsService {
    * Send OTP SMS
    */
   async sendOtpSms(number: string, otp: string) {
-      const message = `আপনার Niqaha OTP হল: ${otp}। এই কোডটি ২৫ মিনিটের মধ্যে মেয়াদ শেষ হবে। কারো সাথে শেয়ার করবেন না।`;
-    
+    const message = `আপনার Niqaha OTP হল: ${otp}। এই কোডটি ২৫ মিনিটের মধ্যে মেয়াদ শেষ হবে। কারো সাথে শেয়ার করবেন না।`;
+
     return this.sendSms({ number, message });
   }
 

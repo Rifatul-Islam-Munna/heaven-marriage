@@ -52,7 +52,7 @@ export class BkashService implements OnModuleInit {
         ),
       );
 
-      this.logger.log('API Response:', response.data);
+
 
       // Check if bKash returned an error
       if (response.data.statusCode && response.data.statusCode !== '0000') {
@@ -147,7 +147,7 @@ export class BkashService implements OnModuleInit {
             currency: 'BDT',
             intent: 'sale',
             merchantInvoiceNumber:
-              'INV-' + Math.random().toString(36).substring(2, 9),
+              userId,
            
           },
           {
@@ -171,6 +171,11 @@ export class BkashService implements OnModuleInit {
     }
   }
 
+  async queryPayment(paymentID:string):Promise<any> {
+    await this.ensureAccessToken();
+    const response=await lastValueFrom(this.httpService.post(this.BKASH_BASE_URL+'/payment/status',{paymentID},{headers:{Authorization:'Bearer '+this.accessToken,'X-App-Key':this.BKASH_APP_KEY},timeout:15000}));
+    return response.data;
+  }
   async executePayment(paymentID: string): Promise<any> {
     await this.ensureAccessToken();
 
@@ -188,12 +193,12 @@ export class BkashService implements OnModuleInit {
         ),
       );
 
-      console.log(response.data);
+
       return response.data;
     } catch (error) {
       this.logger.error(
         'Error executing payment:',
-        error.response || error.message,
+        error.message,
       );
       throw error;
     }

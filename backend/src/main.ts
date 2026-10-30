@@ -9,7 +9,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './lib/all-exceptions.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.getHttpAdapter().getInstance().set('trust proxy', true);
+  app.getHttpAdapter().getInstance().set('trust proxy', process.env.TRUSTED_PROXIES || 'loopback, linklocal, uniquelocal');
 
   app.use(compression());
   app.use(helmet({
@@ -17,7 +17,8 @@ async function bootstrap() {
     crossOriginEmbedderPolicy: false
   }));
   app.use(cookieParser());
-  app.enableCors({origin:"*", compression: true, credentials: true});
+  app.enableCors({origin:(process.env.FRONTEND_URL || 'http://localhost:3000').split(','), credentials:true});
+  app.use((req,res,next)=>{res.setHeader('Cache-Control','private, no-store');next();});
   app.use(json({limit: '20mb'}));
   app.use(urlencoded({extended:true,limit: '20mb'}));
   app.useGlobalPipes(
@@ -29,7 +30,7 @@ async function bootstrap() {
   //here i will use global filters
   app.useGlobalFilters(new AllExceptionsFilter())
 
-    if (process.env.NODE_ENV !== 'development' || process.env.ENABLE_SWAGGER === 'true') {
+    if (process.env.NODE_ENV === 'development' || process.env.ENABLE_SWAGGER === 'true') {
     const config = new DocumentBuilder()
       .setTitle('niqab')
       .setDescription('the halal mraage')

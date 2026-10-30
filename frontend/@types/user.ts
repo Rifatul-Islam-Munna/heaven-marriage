@@ -113,6 +113,15 @@ export interface Pledge {
 }
 
 export interface User {
+ completion?:{percentage:number,remaining:string[],nextStep:number};
+ fatherName?:string;
+ motherName?:string;
+ guardianPhone?:string;
+ identityUnlocked?:boolean;
+ verificationStatus?:string;
+ accountType?:string;
+ isVerified?:boolean;
+ draftStep?:number;
   _id?: string;
   name: string;
   isPublished?: boolean;

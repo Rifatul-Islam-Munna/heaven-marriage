@@ -1,29 +1,33 @@
 "use client";
-
-import { useEffect } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { pageViewEvent } from "@/lib/google-tag-manager";
-
-
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { contactEvent, pageViewEvent, safePage } from "./google-tag-manager";
 export function PageViewTracker() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
+  const last = useRef<string | null>(null);
   useEffect(() => {
-    const url =
-      pathname +
-      (searchParams?.toString() ? `?${searchParams.toString()}` : "");
-
-    // Small delay to ensure document.title is updated
-    const timer = setTimeout(() => {
-      pageViewEvent({
-        url: url,
-        page_title: document.title,
-      });
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [pathname, searchParams]);
-
+    if (last.current !== pathname && safePage(pathname) !== "/private") {
+      last.current = pathname;
+      pageViewEvent();
+    }
+  }, [pathname]);
+  useEffect(() => {
+    const listener = (event: MouseEvent) => {
+      const link = (event.target as Element)?.closest?.("a");
+      if (!link) return;
+      const href = link.getAttribute("href") || "";
+      if (href.startsWith("tel:")) contactEvent("call");
+      else if (/^https:\/\/(wa\.me|api\.whatsapp\.com)\//.test(href))
+        contactEvent("whatsapp");
+      else if (
+        /^https:\/\/(m\.me\/|(?:www\.)?messenger\.com\/t\/|(?:www\.)?facebook\.com\/messages\/t\/)/.test(
+          href,
+        )
+      )
+        contactEvent("messenger");
+    };
+    document.addEventListener("click", listener);
+    return () => document.removeEventListener("click", listener);
+  }, []);
   return null;
 }

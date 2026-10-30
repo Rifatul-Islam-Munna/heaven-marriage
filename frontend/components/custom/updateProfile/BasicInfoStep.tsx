@@ -27,7 +27,7 @@ import {
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export function BasicInfoStep() {
+export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
   const formData = useProfileStore((state) => state.formData);
   const updateField = useProfileStore((state) => state.updateField);
   const shouldShowEmail = useProfileStore((state) => state.shouldShowEmail); // ✅
@@ -46,7 +46,9 @@ export function BasicInfoStep() {
   const [countryOpen, setCountryOpen] = useState(false);
   return (
     <div className="space-y-6">
+      {!admin && <p className="text-sm text-gray-600">ফোন বা ইমেইল যোগ/পরিবর্তন করতে <a className="text-pink-600 underline" href="/profile">ড্যাশবোর্ডের যাচাই অপশন</a> ব্যবহার করুন।</p>}
       <div className="grid md:grid-cols-2 gap-4">
+        {(["fatherName","motherName","guardianPhone"] as const).map((field)=><div key={field} className="space-y-2"><Label htmlFor={field}>{field==="fatherName"?"পিতার নাম":field==="motherName"?"মাতার নাম":"অভিভাবকের মোবাইল নম্বর"}</Label><Input id={field} type={field==="guardianPhone"?"tel":"text"} value={formData[field]||""} onChange={e=>updateField(field,e.target.value)} className="border-pink-200" /></div>)}
         <div className="space-y-2">
           <Label htmlFor="name">নাম *</Label>
           <Input
@@ -56,22 +58,24 @@ export function BasicInfoStep() {
             placeholder="আপনার পূর্ণ নাম"
           />
         </div>
-        {shouldShowEmail && (
+        {!admin && shouldShowEmail && (
           <div className="space-y-2">
             <Label htmlFor="name">ইমেইল </Label>
             <Input
               id="name"
+              readOnly
               value={formData.email || ""}
               onChange={(e) => updateField("email", e.target.value)}
               placeholder="আপনার পূর্ণ ইমেইল"
             />
           </div>
         )}
-        {shouldShowPhoneNumber && (
+        {!admin && shouldShowPhoneNumber && (
           <div className="space-y-2">
             <Label htmlFor="name">মোবাইল নম্বর </Label>
             <Input
               id="name"
+              readOnly
               value={formData.phoneNumber || ""}
               onChange={(e) => updateField("phoneNumber", e.target.value)}
               placeholder="আপনার পূর্ণ মোবাইল নম্বর"

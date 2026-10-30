@@ -6,14 +6,15 @@ import {User, UserInfo} from "@/@types/user"
  type userData ={
     user:User,
     access_token:string,
-    message:string
+    message:string,
+    isNewUser?:boolean
  }
 export const loginUser = async (phoneNumber: string, password: string) => {
-    const [data, error] = await PostRequestAxios<userData>("/user/login-user",{phoneNumber,password});
+    const [data, error] = await PostRequestAxios<userData>("/user/login-user",{phoneNumber,password},false);
     if(data){
     const cookie = await cookies();
-   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
-   cookie.set("user", JSON.stringify(data?.user) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
+   cookie.set("user", JSON.stringify(data?.user) || "",{  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
     }
    
    return {data,error};
@@ -21,11 +22,11 @@ export const loginUser = async (phoneNumber: string, password: string) => {
 }
 export const loginWithGoogle = async (idToken:string)=>{
 
-    const [data, error] = await PostRequestAxios<userData>("/user/login-user-with-google",{id:idToken});
+    const [data, error] = await PostRequestAxios<userData>("/user/login-user-with-google",{id:idToken},false);
     if(data){
-        console.log("getting-data",data)
+
     const cookie = await cookies();
-   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+   cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
    const userSaveData = {
     _id:data?.user?._id,
     name:data?.user?.name,
@@ -36,7 +37,7 @@ export const loginWithGoogle = async (idToken:string)=>{
     role:data?.user?.role,
     gender:data?.user?.gender
    }
-   cookie.set("user", JSON.stringify(userSaveData) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+   cookie.set("user", JSON.stringify(userSaveData) || "",{  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
     }
    
    return {data,error};
@@ -58,12 +59,12 @@ export const getUser = async ()=>{
 }
 
 export const requestNumber = async (payoad:{userId:string, requestUserId:string}) => {
-    const [data, error] = await PostRequestAxios("/user/request-for-number",payoad);
-    console.log("requestNumberdata",data);
+    const [data, error] = await PostRequestAxios<{userData:Record<string,unknown>}>("/user/request-for-number",payoad);
+
     if(data){
         const cookie = await cookies();
 
-        cookie.set("user", JSON.stringify(data?.userData) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+        cookie.set("user", JSON.stringify(data?.userData) || "",{  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
     }
     return {data,error};
 }
@@ -71,16 +72,16 @@ export const requestNumber = async (payoad:{userId:string, requestUserId:string}
 export const setUserData = async (data:Record<string,any>) =>{
      const cookie = await cookies();
 
-        cookie.set("user", JSON.stringify(data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+        cookie.set("user", JSON.stringify(data) || "",{  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
 }
 
 export const setOtpData = async (payoad:Record<string,any>) =>{
-    const [data, error] = await PostRequestAxios("/user/verify-otp",payoad);
+    const [data, error] = await PostRequestAxios<{data:User,access_token:string}>("/user/verify-otp",payoad);
     if(data){
         const cookie = await cookies();
-        cookie.set("user", JSON.stringify(data?.data) || "",{  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
-           cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: true,path:"/", maxAge:60*60*24*10 });
+        cookie.set("user", JSON.stringify(data?.data) || "",{  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
+           cookie.set("access_token", data?.access_token || "", {  httpOnly: true,secure: process.env.NODE_ENV === "production",sameSite:"lax",path:"/", maxAge:60*60*24*10 });
     }
-    console.log("setOtpdata--------------> dadad ------------>",data);
+
     return {data,error};
 }

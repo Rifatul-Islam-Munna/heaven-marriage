@@ -16,7 +16,7 @@ import {
   IsPhoneNumber,
   IsObject,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { UserType } from '../entities/user.entity';
 
 // Nested DTOs
@@ -138,9 +138,10 @@ class FamilyInfoDto {
   mothersProfession?: string;
 
   @ApiPropertyOptional({ example: 2, minimum: 0 })
-  @IsString()
+  @IsNumber()
   @IsOptional()
- 
+  @Min(0)
+  @Transform(({value})=>Number(value))
   brotherCount?: number;
 
   @ApiPropertyOptional({ example: '1 married, 1 studying' })
@@ -149,8 +150,10 @@ class FamilyInfoDto {
   brotherInformation?: string;
 
   @ApiPropertyOptional({ example: 1, minimum: 0 })
-  @IsString()
+  @IsNumber()
   @IsOptional()
+  @Min(0)
+  @Transform(({value})=>Number(value))
   sisterCount?: number;
 
   @ApiPropertyOptional({ example: '1 married' })
@@ -259,9 +262,9 @@ class PersonalInformationDto {
   @ApiPropertyOptional({ example: 165, minimum: 100, maximum: 250 })
   @IsNumber()
   @IsOptional()
-  @Min(100)
+  @Min(3)
   @Max(250)
-  @Transform(({ value }) => Number(value))
+  @Transform(({ value }) => value===0||value===""?undefined:Number(value))
   height?: number;
 
   @ApiPropertyOptional({ example: 'Fair', description: 'Skin tone' })
@@ -457,14 +460,9 @@ export class CreateUserDto {
   @IsOptional()
   role?: UserType.USER;
 
-  @ApiProperty({ example: '01712345678' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Matches(/^(\+8801|01)[3-9]\d{8}$/, {
-    message: 'Phone number must be valid Bangladesh number',
-  })
-  @IsPhoneNumber('BD')
-  phoneNumber: string;
+  phoneNumber?: string;
 
   @ApiPropertyOptional({
     example: '01712345678',
@@ -481,7 +479,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
   @IsString()
   @IsNotEmpty()
-  @MinLength(7)
+  @MinLength(8)
   @MaxLength(50)
  /*  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
     message: 'Password must contain uppercase, lowercase, number and special character',
@@ -492,7 +490,7 @@ export class CreateUserDto {
   @ApiPropertyOptional({ example: 'ahmed@example.com' })
  
   @IsOptional()
-  @Transform(({ value }) => value?.toLowerCase().trim())
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
   email?: string;
 
   @ApiPropertyOptional({ example: 'Male', enum: ['Male', 'Female'] })
@@ -574,6 +572,7 @@ export class CreateUserDto {
 
   // NESTED OPTIONAL OBJECTS
   @ApiPropertyOptional({ type: AddressDto })
+  @Type(() => AddressDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -584,6 +583,7 @@ export class CreateUserDto {
   address?: AddressDto;
 
   @ApiPropertyOptional({ type: EducationInfoDto })
+  @Type(() => EducationInfoDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -594,6 +594,7 @@ export class CreateUserDto {
   educationInfo?: EducationInfoDto;
 
   @ApiPropertyOptional({ type: FamilyInfoDto })
+  @Type(() => FamilyInfoDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -604,6 +605,7 @@ export class CreateUserDto {
   familyInfo?: FamilyInfoDto;
 
   @ApiPropertyOptional({ type: PersonalInformationDto })
+  @Type(() => PersonalInformationDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -614,6 +616,7 @@ export class CreateUserDto {
   personalInformation?: PersonalInformationDto;
 
   @ApiPropertyOptional({ type: OccupationalDto })
+  @Type(() => OccupationalDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -624,6 +627,7 @@ export class CreateUserDto {
   occupational?: OccupationalDto;
 
   @ApiPropertyOptional({ type: MarriageInformationWomenDto })
+  @Type(() => MarriageInformationWomenDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -634,6 +638,7 @@ export class CreateUserDto {
   marriageInformationWomen?: MarriageInformationWomenDto;
 
   @ApiPropertyOptional({ type: MarriageInformationManDto })
+  @Type(() => MarriageInformationManDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -644,6 +649,7 @@ export class CreateUserDto {
   marriageInformationMan?: MarriageInformationManDto;
 
   @ApiPropertyOptional({ type: ExpectedLifePartnerDto })
+  @Type(() => ExpectedLifePartnerDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {
@@ -654,6 +660,7 @@ export class CreateUserDto {
   expectedLifePartner?: ExpectedLifePartnerDto;
 
   @ApiPropertyOptional({ type: PledgeDto })
+  @Type(() => PledgeDto)
   @ValidateNested()
   @IsOptional()
   @Transform(({ value }) => {

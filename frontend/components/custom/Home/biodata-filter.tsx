@@ -1,4 +1,6 @@
 "use client";
+import type { Route } from "next";
+import { searchEvent } from "@/lib/google-tag-manager";
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -67,6 +69,7 @@ export default function BiodataFilter() {
   }, [gender]);
 
   const handleSearch = () => {
+    searchEvent();
     const params = new URLSearchParams();
 
     if (gender !== "all") params.set("gender", gender);
@@ -77,7 +80,7 @@ export default function BiodataFilter() {
     if (query.trim()) params.set("query", query.trim());
 
     const searchString = params.toString();
-    router.push(`/biodata${searchString ? `?${searchString}` : ""}`);
+    router.push(`/biodata${searchString ? `?${searchString}` : ""}` as Route);
   };
 
   const handleReset = () => {

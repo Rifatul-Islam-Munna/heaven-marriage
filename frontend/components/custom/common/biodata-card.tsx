@@ -1,5 +1,7 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { leadEvent } from "@/lib/google-tag-manager";
 import { useState } from "react";
 import Link from "next/link";
 import { Heart, ArrowRight, Loader2 } from "lucide-react";
@@ -72,7 +74,8 @@ export default function BiodataCard({
     url: "/user/add-to-shortlist",
     mutationKey: ["add-to-shortlist"],
     successMessage: "Added to shortlist",
-    onSuccess() {
+    onSuccess(data) {
+      if(data.created)leadEvent(String(id),"interest");
       setIsFavorite(true);
       client.refetchQueries({ queryKey: ["get-shortlist"], exact: false });
     },
@@ -92,6 +95,7 @@ export default function BiodataCard({
         className,
       )}
     >
+      {isVerified&&<Badge variant="secondary">Verified</Badge>}
       {/* Main Layout: 3-Column Grid */}
       <div className="flex items-end gap-3">
         <div className=" flex gap-3  lg:gap-4 items-center  flex-1">

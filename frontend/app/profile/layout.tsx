@@ -39,6 +39,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 
   const profileCompletion = useMemo(() => {
+    if(user?.completion)return user.completion.percentage;
     if (!user) return 0;
 
     let totalFields = 0;
@@ -261,6 +262,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           title: "শুরু করুন",
           url: "/profile",
           items: [
+            { title: "AI দিয়ে বায়োডাটা", url: "/profile/ai-profile" },
             {
               title: "প্রোফাইল",
               url: "/profile",
@@ -315,13 +317,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const sidebarSide = isMobile ? "right" : "left";
 
   return (
-    <SidebarProvider side={sidebarSide}>
-      {!isMobile && <AppSidebar data={sidebarData} side="left" />}
+    <SidebarProvider>
+      {!isMobile && <AppSidebar data={sidebarData} />}
       <SidebarInset className="w-full">
         <SidebarHeader isMobile={isMobile} />
         <div className="flex flex-1 flex-col gap-4">{children}</div>
       </SidebarInset>
-      {isMobile && <AppSidebar data={sidebarData} side="right" />}
+      {isMobile && <AppSidebar data={sidebarData} />}
     </SidebarProvider>
   );
 };

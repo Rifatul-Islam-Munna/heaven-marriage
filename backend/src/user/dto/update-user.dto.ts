@@ -1,27 +1,36 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CreateUserDto } from './create-user.dto';
-import { IsArray, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsIn, IsDateString, IsArray, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
+ @IsOptional() @IsString() adjustmentReason?:string;
+ @IsOptional() @IsString() requestId?:string;
+ @IsOptional() @IsString() fatherName?:string;
+ @IsOptional() @IsString() motherName?:string;
+ @IsOptional() @IsString() guardianPhone?:string;
+ @IsOptional() @IsString() verificationStatus?:string;
+ @IsOptional() @IsString() statusReason?:string;
+ @IsOptional() draftStep?:number;
+ @IsOptional() submit?:boolean;
     @ApiProperty({example:"mongo id"})
     @IsMongoId()
     @IsOptional()
     id:string;
     @ApiProperty({example:"mongo id"})
-  
+
     _v:string;
     @ApiProperty({example:"mongo id"})
-   
+
     updatedAt:string;
     @ApiProperty({example:"mongo id"})
-   
+
     createdAt:string;
     @ApiProperty({example:"5"})
     @Transform(({ value }) => parseInt(value, 10))
-    @IsInt() 
+    @IsInt()
     @IsOptional()
-   
+
     numberOfConnections:number;
 }
 
@@ -30,16 +39,16 @@ export class LoginDto{
      @ApiProperty({ example: '01712345678' })
       @IsString()
       @IsNotEmpty()
-      @IsPhoneNumber('BD')
+
       /* @Matches(/^(\+8801|01)[3-9]\d{8}$/, {
         message: 'Phone number must be valid Bangladesh number',
       }) */
       phoneNumber: string;
-    
+
       @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
       @IsString()
       @IsNotEmpty()
-      @MinLength(7)
+      @MinLength(1)
       @MaxLength(50)
       /* @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
         message: 'Password must contain uppercase, lowercase, number and special character',
@@ -205,7 +214,7 @@ export class UserFilterDto {
   @Type(() => Number)
   @IsInt()
   @Min(10)
-  ageMin?: number = 16;
+  ageMin?: number;
 
   @ApiPropertyOptional({
     description: 'Maximum age',
@@ -216,7 +225,7 @@ export class UserFilterDto {
   @Type(() => Number)
   @IsInt()
   @Max(100)
-  ageMax?: number = 100;
+  ageMax?: number;
 
   @ApiPropertyOptional({
     description: 'Minimum height (in feet)',
@@ -238,7 +247,7 @@ export class UserFilterDto {
   @Type(() => Number)
   @IsNumber()
   @Max(1200)
-  heightMax?: number = 900 ;
+  heightMax?: number ;
 
   // Location filters
   @ApiPropertyOptional({
@@ -284,7 +293,7 @@ export class FindOneDto {
 export class FindOneTokenDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
- 
+
   id: string;
 }
 
@@ -292,90 +301,48 @@ export class ResetPasswordDto{
     @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
   oldPassword: string;
-  
+
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
+  @MinLength(8)
+  @MaxLength(100)
   newPassword: string;
 
 }
 
-export class AdminUserDto{
-    @ApiPropertyOptional({
-    description: 'Search term for name (fuzzy search)',
-    example: 'John',
-  })
-  @IsOptional()
-  @IsString()
-  @Transform(({ value }) => value?.trim())
-  query?: string;
+export class AdminUserDto extends UserFilterDto {
+ @IsOptional() @IsIn(['true','false','all']) phoneVerified?:string;
+ @IsOptional() @IsIn(['true','false','all']) emailVerified?:string;
+ @IsOptional() @IsIn(['true','false','all']) hasPhone?:string;
+ @IsOptional() @IsIn(['true','false','all']) hasEmail?:string;
+ @IsOptional() @IsIn(['user','admin','editor','all']) role?:string;
+ @IsOptional() @IsDateString() registeredFrom?:string;
+ @IsOptional() @IsDateString() registeredTo?:string;
+ @IsOptional() @Type(()=>Number) @IsInt() @Min(0) connectionsMin?:number;
+ @IsOptional() @Type(()=>Number) @IsInt() @Min(0) connectionsMax?:number;
+ @IsOptional() @IsIn(['newest','oldest','ageAsc','ageDesc','connectionsAsc','connectionsDesc']) sort?:string;
 
-  // Pagination
-  @ApiPropertyOptional({
-    description: 'Page number for pagination',
-    example: 1,
-    default: 1,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
-
-  @ApiPropertyOptional({
-    description: 'Users per page',
-    example: 100,
-    default: 10,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 10;
-
-  // Gender filter
-  @ApiPropertyOptional({
-    description: 'Gender filter',
-    example: 'male',
-    default: 'all',
-    enum: ['all', 'male', 'female'],
-  })
-  @IsOptional()
-  @IsString()
-  gender?: string = 'all';
-  @ApiPropertyOptional({
-    description: 'Gender filter',
-    example: 'published',
-    default: 'all',
-    enum: ['all', 'true', 'false'],
-  })
-  @IsOptional()
-  @IsString()
-  isPublished?: string = 'all';
+ @IsOptional() @Type(()=>Number) @IsInt() @Min(1) @Max(200) limit?:number=10;
+ @IsOptional() @IsString() isPublished?:string;
+ @IsOptional() @IsString() accountType?:string;
+ @IsOptional() @IsString() verificationStatus?:string;
+ @IsOptional() @IsString() biodataStatus?:string;
 }
 
-
 export class OtpstringDto{
+ @IsString() challengeId:string;
     @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   @IsString()
   otp: string;
 }
 
 
-export class ReqForDto{
-  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
-  @IsPhoneNumber("BD")
-  phoneNumber: string;
+export class ReqForDto {
+ @IsOptional() @IsString() @MaxLength(254) email?:string;
+ @IsOptional() @IsString() @MaxLength(254) phoneNumber?:string;
 }
-export class NewPasswordResetWithOtp{
-  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
-  @IsPhoneNumber("BD")
-  phoneNumber: string;
-  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
-  @IsString()
-  otp: string;
-  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
-  @IsString()
-  newPassword: string;
-
+export class NewPasswordResetWithOtp extends ReqForDto {
+ @IsString() @IsNotEmpty() challengeId:string;
+ @IsString() @Matches(/^\d{6}$/) otp:string;
+ @IsString() @MinLength(8) @MaxLength(50) newPassword:string;
 }

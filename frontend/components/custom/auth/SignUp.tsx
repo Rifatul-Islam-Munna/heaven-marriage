@@ -1,5 +1,6 @@
 "use client";
 
+import LoginWithGoogle from "./GoogleLogin";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,9 +19,11 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 export default function SignUp() {
   const router = useRouter();
+  const [mode,setMode]=useState<"phone"|"email">("phone");
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
+    email: "",
     password: "",
     gender: "",
   });
@@ -28,17 +31,19 @@ export default function SignUp() {
   const { mutate, isPending } = useCommonMutationApi({
     url: "/user",
     method: "POST",
-    successMessage: "আপনার মোবাইল নম্বরে OTP পাঠানো হয়েছে",
+    successMessage: mode === "email" ? "আপনার ইমেইলে OTP পাঠানো হয়েছে" : "আপনার মোবাইল নম্বরে OTP পাঠানো হয়েছে",
     mutationKey: ["user-created"],
-    onSuccess: () => {
+    onSuccess: (data) => {
+      sessionStorage.setItem("niqaha_challenge",data.challengeId);
+      sessionStorage.setItem("niqaha_registration_method",mode);
       router.push("/otp");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate(formData);
-    console.log("Signup Data:", formData);
+    mutate({...formData,phoneNumber:mode==="phone"?formData.phoneNumber:undefined,email:mode==="email"?formData.email:undefined});
+
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +75,7 @@ export default function SignUp() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex gap-3"><Button type="button" variant={mode==="phone"?"default":"outline"} onClick={()=>setMode("phone")}>মোবাইল OTP</Button><Button type="button" variant={mode==="email"?"default":"outline"} onClick={()=>setMode("email")}>Email OTP</Button></div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-gray-700 font-medium">
@@ -92,14 +98,14 @@ export default function SignUp() {
                 htmlFor="phoneNumber"
                 className="text-gray-700 font-medium"
               >
-                মোবাইল নম্বর
+                {mode==="email"?"ইমেইল":"মোবাইল (+country code)"}
               </Label>
               <Input
                 id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                placeholder="০১৭১২৩৪৫৬৭৮"
-                value={formData.phoneNumber}
+                name={mode==="email"?"email":"phoneNumber"}
+                type={mode==="email"?"email":"tel"}
+                placeholder={mode==="email"?"name@example.com":"+8801712345678"}
+                value={mode==="email"?formData.email:formData.phoneNumber}
                 onChange={handleChange}
                 required
                 className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
@@ -149,6 +155,8 @@ export default function SignUp() {
                 id="password"
                 name="password"
                 type="password"
+                minLength={8}
+                autoComplete="new-password"
                 placeholder="একটি শক্তিশালী পাসওয়ার্ড তৈরি করুন"
                 value={formData.password}
                 onChange={handleChange}
@@ -175,6 +183,7 @@ export default function SignUp() {
               </a>
             </p>
           </form>
+          <div className="mt-5 space-y-4"><p className="text-center text-sm text-gray-500">অথবা Google দিয়ে অ্যাকাউন্ট তৈরি করুন</p><LoginWithGoogle signup /></div>
         </CardContent>
       </Card>
     </div>

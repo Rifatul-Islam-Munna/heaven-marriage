@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 
+import ProfileDiscovery from "@/components/custom/Home/ProfileDiscovery";
 import AboutSection from "@/components/custom/Home/about-sections";
 import BiodataFilter from "@/components/custom/Home/biodata-filter";
 import CreateBiodataSection from "@/components/custom/Home/CreateBiodataSection";
@@ -14,7 +15,7 @@ import PricingSection from "@/components/custom/Home/PricingSection";
 
 const SITE_NAME = "Niqaha";
 const SITE_URL = "https://niqaha.com";
-const OG_IMAGE = `${SITE_URL}/logo.png`; // create this
+const OG_IMAGE = `${SITE_URL}/opengraph-image`; // create this
 const BN_TITLE = "হালাল ম্যাট্রিমনি বাংলাদেশ | Niqaha";
 const BN_DESC =
   "Niqaha বাংলাদেশের হালাল ম্যাট্রিমনি প্ল্যাটফর্ম। বায়োডাটা তৈরি করুন, উপযুক্ত প্রোফাইল খুঁজুন এবং নিরাপদভাবে প্রস্তাব আদান-প্রদান করুন।";
@@ -24,16 +25,11 @@ export const metadata: Metadata = {
   title: BN_TITLE,
   description: BN_DESC,
   alternates: {
-    canonical: "/bn",
-    languages: {
-      "bn-BD": "/bn",
-      en: "/",
-      "x-default": "/",
-    },
+    canonical: "/",
   },
   openGraph: {
     type: "website",
-    url: `${SITE_URL}/bn`,
+    url: SITE_URL,
     siteName: SITE_NAME,
     title: BN_TITLE,
     description: BN_DESC,
@@ -53,7 +49,7 @@ export default function PageBn() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: SITE_NAME,
-    url: `${SITE_URL}/bn`,
+    url: SITE_URL,
     inLanguage: "bn-BD",
   };
 
@@ -81,6 +77,7 @@ export default function PageBn() {
       {/* Ideally your HeroSection should show Bangla H1 + intro text on /bn */}
       <HeroSection />
       <BiodataFilter />
+      <ProfileDiscovery />
       <CreateBiodataSection />
       <PricingSection />
       <AboutSection />

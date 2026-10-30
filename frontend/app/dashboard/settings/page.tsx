@@ -1,4 +1,5 @@
 "use client";
+import MessengerSettingsCard from "@/components/custom/dashboard/MessengerSettingsCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -77,6 +78,7 @@ const Setting = () => {
         </p>
       </div>
 
+      <MessengerSettingsCard />
       <Card>
         <CardHeader>
           <CardTitle className="font-heading flex items-center gap-2">

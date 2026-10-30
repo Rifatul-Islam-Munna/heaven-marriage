@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, IsBoolean, IsInt, Max } from 'class-validator';
 
 export class CreatePricingDto {
+ @IsOptional() @IsBoolean() disabled?:boolean;
+ @IsOptional() @IsInt() @Min(1) @Max(3650) validityDays?:number;
   @IsString()
   @IsNotEmpty()
   title?: string;
@@ -25,7 +27,8 @@ export class CreatePricingDto {
   @IsNumber()
   @IsOptional()
   @Transform(({ value }) => parseInt(value, 10))
-  @Min(0)
+  @Min(1)
+  @IsInt()
   numberOfConnections?: number;
 }
 

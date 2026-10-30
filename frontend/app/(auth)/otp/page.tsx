@@ -1,5 +1,7 @@
 "use client";
 
+import { registrationEvent } from "@/lib/google-tag-manager";
+import { PostRequestAxios } from "@/api-hooks/api-hooks";
 import { useState } from "react";
 import {
   InputOTP,
@@ -35,6 +37,9 @@ function OTP() {
         toast.error(data?.error?.message);
         return;
       }
+      sessionStorage.removeItem("niqaha_challenge");
+      registrationEvent(String(data.data?.data?._id || "verified"), sessionStorage.getItem("niqaha_registration_method") === "email" ? "email" : "phone");
+      sessionStorage.removeItem("niqaha_registration_method");
       router.push("/profile/my-profile");
     },
   });
@@ -45,7 +50,9 @@ function OTP() {
       return;
     }
 
-    mutate({ otp: otp });
+    const challengeId=sessionStorage.getItem("niqaha_challenge");
+    if(!challengeId){toast.error("Please start registration again");return;}
+    mutate({ otp, challengeId });
   };
 
   return (
@@ -96,6 +103,7 @@ function OTP() {
           </InputOTP>
         </div>
 
+        <Button variant="outline" onClick={async()=>{const challengeId=sessionStorage.getItem("niqaha_challenge");const [data,error]=await PostRequestAxios<{challengeId:string}>("/user/resend-otp",{challengeId});if(data){sessionStorage.setItem("niqaha_challenge",data.challengeId);toast.success("OTP resent");}else toast.error(error?.message||"Unable to resend");}}>OTP আবার পাঠান</Button>
         <Button
           onClick={verifyOtp}
           disabled={otp.length !== 6 || isPending}

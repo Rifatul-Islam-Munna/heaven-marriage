@@ -1,4 +1,5 @@
 "use client";
+import VerifyContact from "@/components/custom/profile/VerifyContact";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -51,7 +52,7 @@ const Setting = () => {
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
+    if (passwordData.newPassword.length < 8) {
       toast.error("ত্রুটি", {
         description: "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে",
       });

@@ -209,7 +209,7 @@ const ShortList = () => {
             upazila={biodata?.address?.upazila ?? ""}
             education={biodata?.educationInfo?.highestEducation ?? ""}
             profession={biodata?.occupational?.profession ?? ""}
-            gender={biodata?.gender ?? ""}
+            gender={biodata?.gender === "female" ? "female" : "male"}
             height={biodata?.personalInformation?.height?.toString() ?? ""}
             id={biodata?._id ?? ""}
             isForShortList={true}

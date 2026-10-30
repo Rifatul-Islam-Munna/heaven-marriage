@@ -15,12 +15,12 @@ export default function OfficeHoursSection() {
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-3 text-base text-muted-foreground md:text-lg">
               <Clock className="h-5 w-5 flex-shrink-0 text-pink-600" />
-              <p>শনিবার সকাল ০৯ টা থেকে রাত ০৯ টা পর্যন্ত।</p>
+              <p>শনিবার থেকে বৃহস্পতিবার: সকাল ৯টা থেকে রাত ৯টা।</p>
             </div>
 
             <div className="flex items-center justify-center gap-3 text-base text-muted-foreground md:text-lg">
               <Calendar className="h-5 w-5 flex-shrink-0 text-pink-600" />
-              <p>সপ্তাহে সোমবার ব্যতিত বাকি ৬ দিনই অফিস খোলা থাকবে।</p>
+              <p>শুক্রবার অফিস বন্ধ। বিশেষ প্রয়োজনে ফোনে যোগাযোগ করুন।</p>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { leadEvent } from "@/lib/google-tag-manager";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,8 @@ export default function ContactPage() {
     method: "POST",
     url: "/contact",
     successMessage: "আপনার বার্তা সফলভাবে পাঠানো হয়েছে",
-    onSuccess: () => {
+    onSuccess: (data) => {
+      leadEvent(String(data._id));
       setFormData({ name: "", email: "", mobile: "", description: "" });
       setCaptchaInput("");
       loadCaptchaEnginge(6); // Reload captcha
@@ -129,7 +131,7 @@ export default function ContactPage() {
                       ইমেইল
                     </h3>
                     <a
-                      href="niqahabd@gmail.com "
+                      href="mailto:niqahabd@gmail.com"
                       className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
                     >
                       niqahabd@gmail.com
@@ -144,15 +146,15 @@ export default function ContactPage() {
                   </div>
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                      ফোন (WhatsApp)
+                      ফোন ও WhatsApp
                     </h3>
                     {/* General Inquiries */}
                     <div>
                       <p className="text-xs text-gray-500 mb-1">
-                        রেনডম জিজ্ঞাসাবাদ বা তথ্যের জন্য
+                        পেমেন্ট ও সাধারণ জিজ্ঞাসা — শুধু কল
                       </p>
                       <a
-                        href="https://wa.me/8801748919251"
+                        href="tel:+8801748919251"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
@@ -171,8 +173,8 @@ export default function ContactPage() {
                         rel="noopener noreferrer"
                         className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
                       >
-                        01927877581
-                      </a>
+                        WhatsApp: 01927877581
+                      </a><a className="block text-sm text-pink-600" href="tel:+8801927877581">কল করুন: 01927877581</a>
                     </div>
                     {/* For Brides */}
                     <div>
@@ -185,8 +187,8 @@ export default function ContactPage() {
                         rel="noopener noreferrer"
                         className="text-sm text-gray-600 hover:text-pink-600 transition-colors"
                       >
-                        01610371038
-                      </a>
+                        WhatsApp: 01610371038
+                      </a><a className="block text-sm text-pink-600" href="tel:+8801610371038">কল করুন: 01610371038</a>
                     </div>
                   </div>
                 </div>
@@ -201,7 +203,7 @@ export default function ContactPage() {
                       ঠিকানা
                     </h3>
                     <p className="text-sm text-gray-600">
-                      চট্টগ্রাম, আগ্রাবাদ, লাকি প্লাজা ৩য় তলা
+                      Sylhet, Bishwanath, Dashghar
                     </p>
                   </div>
                 </div>
@@ -217,14 +219,14 @@ export default function ContactPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">শনি - শুক্র </span>
+                  <span className="text-gray-600">শনি - বৃহস্পতি </span>
                   <span className="font-semibold text-gray-900">
                     সকাল ০৯:০০ - রাত ০৯:০০
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">সোমবার </span>
-                  <span className="font-semibold text-gray-900">বন্ধ</span>
+                  <span className="text-gray-600">শুক্রবার </span>
+                  <span className="font-semibold text-gray-900">অফিস বন্ধ; জরুরি প্রয়োজনে কল করুন</span>
                 </div>
               </CardContent>
             </Card>

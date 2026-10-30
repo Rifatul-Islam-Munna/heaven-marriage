@@ -188,13 +188,14 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
         {data?.docs?.map((biodata) => (
           <BiodataCard
             key={biodata._id}
+            isVerified={biodata.isVerified}
             age={biodata?.age ?? 0}
             biodataNumber={biodata?.userId ?? ""}
             district={biodata?.address?.district ?? ""}
             upazila={biodata?.address?.upazila ?? ""}
             education={biodata?.educationInfo?.highestEducation ?? ""}
             profession={biodata?.occupational?.profession ?? ""}
-            gender={biodata?.gender ?? ""}
+            gender={biodata?.gender === "female" ? "female" : "male"}
             height={biodata?.personalInformation?.height ?? ""}
             id={biodata._id ?? ""}
             skinTone={biodata?.personalInformation?.skinTone ?? ""}

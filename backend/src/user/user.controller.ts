@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuard
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, NewPasswordResetWithOtp, OtpstringDto, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
-import { AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
+import { OptionalAuthGuard, AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
 import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
 import { RolesGuard } from 'src/lib/roles.guard';
 import { Roles } from 'src/lib/roles.decorator';
@@ -11,30 +11,34 @@ import { type Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { RequestNumberDto } from './dto/request-number.dto';
 @Controller('user')
+@UseGuards(ThrottlerGuard)
 export class UserController {
   private logger = new Logger(UserController.name)
   constructor(private readonly userService: UserService) {}
 
     @Post()
     @UseGuards(ThrottlerGuard)
-    @Throttle({default:{limit:100, ttl:3600000}}) 
+    @Throttle({default:{limit:20, ttl:3600000}})
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }
+  @Post('resend-otp')
+  @Throttle({default:{limit:5,ttl:600000}})
+  resendOtp(@Body() p:{challengeId:string}) {return this.userService.resendOtp(p.challengeId);}
   @Post('verify-otp')
       @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:200,ttl:1800000}}) 
+  @Throttle({default:{limit:30,ttl:1800000}})
   verifyOtp(@Body() createUserDto: OtpstringDto) {
-    return this.userService.verifyOtp(createUserDto.otp);
+    return this.userService.verifyOtp(createUserDto);
   }
   @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:600,ttl:1800000}}) 
+  @Throttle({default:{limit:30,ttl:1800000}})
   @Post('login-user')
   logInUser(@Body() createUserDto: LoginDto) {
     return this.userService.loginUser(createUserDto);
   }
   @UseGuards(ThrottlerGuard)
-  @Throttle({default:{limit:100,ttl:1800000}}) 
+  @Throttle({default:{limit:100,ttl:1800000}})
   @Post('login-user-with-google')
   LoginWithGoogle(@Body() createUserDto: FindOneTokenDto) {
     return this.userService.loginWithGoogle(createUserDto.id);
@@ -50,26 +54,26 @@ export class UserController {
     return this.userService.removeFromShortList(createUserDto,req?.user?.id);
   }
 
-  @Throttle({default:{limit:20,ttl:60}}) 
+  @Throttle({default:{limit:20,ttl:60}})
   @Post('request-for-number')
   @UseGuards(AuthGuard)
-  RequestForNumber(@Body() createUserDto: RequestNumberDto) {
-    return this.userService.createRequestNumber(createUserDto);
+  RequestForNumber(@Body() createUserDto: RequestNumberDto,@Req() req:ExpressRequest) {
+    return this.userService.createRequestNumber(createUserDto,req.user.id);
   }
 
 
-  @Throttle({default:{limit:2,ttl:60}}) 
+  @Throttle({default:{limit:2,ttl:60}})
   @UseGuards(AuthGuard)
   @Post("Buy-packages")
   BuyPackages(@Body() id: FindOneDto,@Req() req:ExpressRequest) {
     return this.userService.createPayment(id?.id,req.user?.id);
   }
-  @Throttle({default:{limit:10,ttl:3600000}}) 
+  @Throttle({default:{limit:10,ttl:3600000}})
   @Post("forgot-password-send-otp")
   RequestForOtpReqPassword(@Body() id: ReqForDto) {
     return this.userService.RequestForOtpRestPassword(id);
   }
-  @Throttle({default:{limit:30,ttl:3600000}}) 
+  @Throttle({default:{limit:30,ttl:3600000}})
   @Post("verify-and-reset-password")
   RestPasswordWithOtp(@Body() id: NewPasswordResetWithOtp) {
     return this.userService.ResetPasswordWithOtp(id);
@@ -84,11 +88,12 @@ export class UserController {
   async getMyShortList(@Req() req:ExpressRequest,@Query() query: PaginationDto) {
     return this.userService.getShortlist(req?.user?.id,query);
   }
- 
+
 
   @Get('get-one-user')
-  findOne(@Query() id: FindOneDto) {
-    return this.userService.findOne(id);
+  @UseGuards(OptionalAuthGuard)
+  findOne(@Query() id: FindOneDto,@Req() req:ExpressRequest) {
+    return this.userService.findOne(id,req.user?.id,req.user?.role);
   }
   @Get('get-all-user-for-admin')
   @UseGuards(AuthGuard,RolesGuard)
@@ -103,7 +108,8 @@ export class UserController {
   getMyProfile(@Req() req:ExpressRequest) {
     return this.userService.finMyProfile(req.user?.id);
   }
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
   @Get("get-user-profile-admin")
   getUserProfile(@Query() id: FindOneDto) {
     return this.userService.finMyProfile(id?.id);
@@ -116,8 +122,8 @@ export class UserController {
   }
 
 
- 
-  @Throttle({default:{limit:60,ttl:60}}) 
+
+  @Throttle({default:{limit:60,ttl:60}})
   @Get("execute-payment-callback")
  async executePayment( @Query('paymentID') paymentID: string,
     @Query('status') status: string,
@@ -135,16 +141,16 @@ export class UserController {
            return res.redirect(`${frontendBaseUrl}/payment/failed`);
       }
    return   res.redirect(`${frontendBaseUrl}/payment/failed`);
-      
-   
+
+
   }
   @UseGuards(AuthGuard,ThrottlerGuard )
-  @Throttle({default:{limit:500, ttl:1800000}}) 
+  @Throttle({default:{limit:500, ttl:1800000}})
   @Patch('update-user')
   update( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
     return this.userService.updatedFullUserInformation( updateUserDto,req.user?.id);
   }
-  @Throttle({default:{limit:60,ttl:60}}) 
+  @Throttle({default:{limit:60,ttl:60}})
   @Patch('update-user-password')
   @UseGuards(AuthGuard)
   updatePassword( @Body() updateUserDto: ResetPasswordDto,@Req() req:ExpressRequest) {
@@ -154,14 +160,14 @@ export class UserController {
   @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
   @Throttle({default:{limit:200, ttl:3600000}})
   @Roles(UserType.ADMIN)
-  UpdateUserAdmin( @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update( updateUserDto);
+  UpdateUserAdmin( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
+    return this.userService.update( updateUserDto,req.user.id);
   }
   @Patch('update-user-subscriber')
     @UseGuards(AuthGuard,RolesGuard)
   @Roles(UserType.ADMIN)
-  UpdateUserSubscriber( @Body() updateUserDto: FindOneDto) {
-    return this.userService.toggleSubscription( updateUserDto.id);
+  UpdateUserSubscriber( @Body() updateUserDto: FindOneDto,@Req() req:ExpressRequest) {
+    return this.userService.toggleSubscription( updateUserDto.id,req.user.id);
   }
 
   @Delete('delete-my-account')
@@ -173,10 +179,10 @@ export class UserController {
   @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
   @Throttle({default:{limit:200, ttl:3600000}})
   @Roles(UserType.ADMIN)
-  
-  deleteUser(@Query() id: FindOneDto) {
-    return this.userService.remove(id);
+
+  deleteUser(@Query() id: FindOneDto,@Req() req:ExpressRequest) {
+    return this.userService.remove(id,req.user.id);
   }
 
- 
+
 }

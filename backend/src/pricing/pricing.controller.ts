@@ -18,6 +18,10 @@ export class PricingController {
     return this.pricingService.create(createPricingDto);
   }
 
+  @Get('admin/all')
+  @UseGuards(AuthGuard,RolesGuard)
+  @Roles(UserType.ADMIN)
+  adminAll(){return this.pricingService.findAllAdmin();}
   @Get()
   findAll() {
     return this.pricingService.findAll();

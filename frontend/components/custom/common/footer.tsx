@@ -1,5 +1,7 @@
 "use client";
+import PolicyLinks from "./PolicyLinks";
 import Link from "next/link";
+import type { Route } from "next";
 import {
   Heart,
   Mail,
@@ -30,9 +32,9 @@ const socialLinks = [
     icon: Facebook,
   },
   {
-    name: "WhatsApp",
-    href: "https://wa.me/01748919251",
-    icon: FaWhatsapp, // Using lucide's MessageCircle instead
+    name: "Call Niqaha.com",
+    href: "tel:+8801748919251",
+    icon: Phone, // Using lucide's MessageCircle instead
   },
   {
     name: "Instagram",
@@ -86,8 +88,9 @@ export default function Footer() {
                 className="flex items-center justify-center md:justify-start gap-2 transition-colors hover:text-pink-600"
               >
                 <Phone className="h-4 w-4" />
-                <span>01748919251</span>
+                <span>01748919251 — শুধু কল</span>
               </a>
+              <p>Sylhet, Bishwanath, Dashghar</p>
             </div>
           </div>
 
@@ -100,7 +103,7 @@ export default function Footer() {
               {navItems.map((item) => (
                 <li key={item.href}>
                   <Link
-                    href={item.href}
+                    href={item.href as Route}
                     className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-pink-600 group"
                   >
                     <ChevronRight className="h-4 w-4 text-pink-600 group-hover:translate-x-1 transition-transform" />
@@ -140,13 +143,14 @@ export default function Footer() {
                 অফিস টাইম
               </h5>
               <p className="text-xs text-muted-foreground">
-                শনি - শুক্র: সকাল ০৯:০০ - রাত ০৯:০০
+                শনি - বৃহস্পতি: সকাল ০৯:০০ - রাত ০৯:০০
               </p>
-              <p className="text-xs text-pink-600">সোমবার বন্ধ</p>
+              <p className="text-xs text-pink-600">শুক্রবার অফিস বন্ধ; জরুরি প্রয়োজনে কল করুন</p>
             </div>
           </div>
         </div>
 
+        <PolicyLinks />
         {/* Bottom */}
         <div className="mt-8 border-t border-pink-200 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">

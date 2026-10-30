@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heart, Phone, Loader2 } from "lucide-react";
 import { User } from "@/@types/user";
+import { PostRequestAxios } from "@/api-hooks/api-hooks";
 import { GetRequestNormal } from "@/api-hooks/api-hooks";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
@@ -38,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
-import { viewContentEvent } from "@/lib/google-tag-manager";
+import { leadEvent, viewContentEvent } from "@/lib/google-tag-manager";
 import { useEffect, useState } from "react";
 
 interface ProfileViewProps {
@@ -74,14 +75,14 @@ const InfoRow = ({
 export default function ProfileView({ id }: ProfileViewProps) {
   const queryClient = useQueryClient();
   const [isCheckingNumberAccess, setIsCheckingNumberAccess] = useState(false);
-  const { data: userData, isLoading } = useQueryWrapper<User>(
+  const { data: userData, isLoading, refetch } = useQueryWrapper<User>(
     ["get-user", id],
     `/user/get-one-user?id=${id}`,
-    { enabled: !!id, staleTime: 2 * 60 * 60 * 1000 },
-    1000,
+    { enabled: !!id, staleTime: 0 },
+    0,
     "bio-data-info",
   );
-  console.log("userData", userData);
+
   useEffect(() => {
     if (userData) {
       viewContentEvent({
@@ -92,7 +93,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
         district: userData.address?.district,
         education: userData.educationInfo?.highestEducation,
         profession: userData.occupational?.profession,
-      });
+      }, String(userData._id));
     }
   }, [userData]);
   const router = useRouter();
@@ -102,6 +103,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
     url: "/user/add-to-shortlist",
     mutationKey: ["add-to-shortlist"],
     successMessage: "Added to shortlist",
+    onSuccess: (data)=>{if(data.created)leadEvent(String(id),"interest");},
   });
 
   const { mutateAsync: RequestPhoneNumber, isPending: isLoadingNumber } =
@@ -118,6 +120,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
       },
     });
   const { user } = useUser();
+  useEffect(()=>{if(user?._id&&userData?._id)void PostRequestAxios("/platform/visit/"+userData._id,{});},[user?._id,userData?._id]);
   const isRequestingNumber = isLoadingNumber || isCheckingNumberAccess;
 
   if (isLoading) {
@@ -185,7 +188,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
         staleTime: 0,
       });
 
-      if ((currentUser?.numberOfConnections ?? 0) <= 0) {
+      if (!userData.identityUnlocked && (currentUser?.numberOfConnections ?? 0) <= 0) {
         router.push("/#pricing");
         return;
       }
@@ -196,6 +199,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
       });
 
       if (result?.data) {
+        await refetch();
         await Promise.all([
           queryClient.invalidateQueries({
             queryKey: ["number-request-user-profile"],
@@ -248,7 +252,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   </div>
                 </div>
                 <h2 className="text-2xl text-center font-bold mb-2">
-                  নাম : {userData?.name ?? " Guest"}
+                  নাম : <span className={userData.identityUnlocked?"":"blur-sm select-none"}>{userData?.name || "পরিচয় সংরক্ষিত"}</span>
                 </h2>
 
                 {/* Biodata Number */}
@@ -359,7 +363,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         ) : (
                           <Phone className="w-4 h-4 mr-2" />
                         )}
-                        মোবাইল নম্বর নিন
+                        {userData.identityUnlocked?"পরিচয় ও যোগাযোগ দেখুন":"পরিচয় ও যোগাযোগ আনলক করুন"}
                       </Button>
                     </AlertDialogTrigger>
 
@@ -370,7 +374,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-base space-y-2">
                           <p>
-                            এই বায়োডাটার নম্বর দেখতে আপনার{" "}
+                            এই বায়োডাটার পরিচয় ও যোগাযোগ দেখতে আপনার{" "}
                             <span className="font-bold text-green-600">
                               ১টি কানেকশন
                             </span>{" "}
@@ -396,6 +400,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   </AlertDialog>
 
                   <ShareButton />
+                  <Button variant="outline" className="w-full" onClick={async()=>{if(!user?._id){router.push("/login");return;}const message=window.prompt("রিপোর্টের কারণ লিখুন");if(!message)return;const [data,error]=await PostRequestAxios("/platform/request/report",{targetId:userData._id,message});if(data)toast.success("Report submitted");else toast.error(error?.message||"Unable to report");}}>প্রোফাইল রিপোর্ট করুন</Button>
                 </div>
               </CardContent>
             </Card>
@@ -403,6 +408,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
 
           {/* Right Side - Information Tables */}
           <div className="space-y-6">
+            <Card className="shadow-none"><CardContent className="p-6"><h2 className="text-xl font-bold text-pink-700 mb-4">পরিচয় ও যোগাযোগ</h2><table className="w-full"><tbody><InfoRow label="পিতার নাম" value={userData.fatherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow label="মাতার নাম" value={userData.motherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow label="মোবাইল" value={userData.phoneNumber}/><InfoRow label="WhatsApp" value={userData.whatsapp}/><InfoRow label="অভিভাবকের নম্বর" value={userData.guardianPhone}/></tbody></table><div className="mt-3 flex gap-2"><Badge>{userData.isSubscriber?"Premium":"General"}</Badge>{userData.isVerified&&<Badge>Verified</Badge>}</div></CardContent></Card>
             {/* ঠিকানা */}
             <Card className=" shadow-none">
               <CardContent className="p-6">

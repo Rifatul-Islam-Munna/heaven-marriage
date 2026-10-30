@@ -13,11 +13,14 @@ import { ExpectedPartnerStep } from "./ExpectedPartnerStep";
 import { PledgeStep } from "./PledgeStep";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import { CustomQuestionsStep } from "./CustomQuestionsStep";
 import { toast } from "sonner";
+import { PatchRequestAxios } from "@/api-hooks/api-hooks";
+import { missingFields } from "@/lib/profile-validation";
+import AiBiodataAssistant from "./AiBiodataAssistant";
 import { useUser } from "@/lib/useUser";
 
 const steps = [
@@ -38,9 +41,28 @@ export default function ProfileUpdateForm() {
   const setCurrentStep = useProfileStore((state) => state.setCurrentStep);
   const getFormData = useProfileStore((state) => state.getFormData);
   const initializeForm = useProfileStore((state) => state.initializeForm);
-  console.log("current-data", getFormData());
-  const formData = getFormData();
-  const handleNext = () => {
+  const formData=useProfileStore(state=>state.formData);
+  const initialized=useRef(false), saved=useRef("");
+  const saveChain=useRef(Promise.resolve());
+  const [saveStatus,setSaveStatus]=useState("");
+  const [errors,setErrors]=useState<string[]>([]);
+  const saveDraft=async(snapshot=useProfileStore.getState().getFormData(),step=useProfileStore.getState().currentStep)=>{
+    setSaveStatus("সংরক্ষণ হচ্ছে...");
+    const [data,error]=await PatchRequestAxios("/user/update-user",{...snapshot,draftStep:step});
+    if(!data){setSaveStatus("সংরক্ষণ হয়নি — সংযোগ হলে আবার চেষ্টা করুন");throw new Error(error?.message||"Draft save failed");}
+    saved.current=JSON.stringify(snapshot);setSaveStatus("ডেটাবেসে সংরক্ষিত");
+  };
+  useEffect(()=>{
+    if(!initialized.current||saved.current===JSON.stringify(formData))return;
+    const snapshot=formData;
+    const timer=setTimeout(()=>{saveChain.current=saveChain.current.catch(()=>{}).then(()=>saveDraft(snapshot,currentStep));void saveChain.current.catch(()=>{});},1000);
+    return ()=>clearTimeout(timer);
+  },[formData,currentStep]);
+  useEffect(()=>{const retry=()=>{void saveDraft().catch(()=>{});};window.addEventListener("online",retry);return ()=>window.removeEventListener("online",retry);},[]);
+  const handleNext = async () => {
+    const missing=missingFields(formData,currentStep);setErrors(missing);
+    if(missing.length){toast.error("অনুগ্রহ করে এই ধাপের আবশ্যিক তথ্য পূরণ করুন");return;}
+    try{await saveChain.current.catch(()=>{});await saveDraft(undefined,currentStep+1);}catch{return;}
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -62,8 +84,11 @@ export default function ProfileUpdateForm() {
     },
   });
   useEffect(() => {
-    if (data) {
+    if (data && !initialized.current) {
+      initialized.current=true;
       initializeForm(data);
+      saved.current=JSON.stringify(useProfileStore.getState().getFormData());
+      setCurrentStep(Math.max(0,Math.min(9,(data as {draftStep?:number}).draftStep||0)));
     }
   }, [data]);
 
@@ -91,9 +116,10 @@ export default function ProfileUpdateForm() {
       return;
     }
 
-    console.log("Submitting:", formData);
-
-    mutate(formData);
+    const missing=missingFields(formData);setErrors(missing);
+    if(missing.length){toast.error("বাকি আবশ্যিক তথ্য পূরণ করুন");return;}
+    try{await saveChain.current.catch(()=>{});await saveDraft();}catch{return;}
+    mutate({...formData,submit:true,draftStep:currentStep});
   };
 
   const renderStep = () => {
@@ -140,6 +166,9 @@ export default function ProfileUpdateForm() {
           </Button>
         </div>
 
+        <p role="status" aria-live="polite" className="text-sm text-gray-600 mb-3">{saveStatus}</p>
+        {errors.length>0&&<div role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">আবশ্যিক তথ্য বাকি: {errors.join(", ")}</div>}
+        <AiBiodataAssistant />
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">
           {/* Mobile: Simple Progress Bar */}
@@ -169,6 +198,7 @@ export default function ProfileUpdateForm() {
                 <div className="flex flex-col items-center flex-1">
                   <div
                     onClick={() => {
+                      if(index>currentStep&&missingFields(formData,currentStep).length){setErrors(missingFields(formData,currentStep));toast.error("বর্তমান ধাপের আবশ্যিক তথ্য পূরণ করুন");return;}
                       setCurrentStep(index);
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}

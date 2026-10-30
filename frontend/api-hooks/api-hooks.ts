@@ -19,12 +19,14 @@ const baseUrl = process.env.BASE_URL
 
 function parseAxiosError(error: AxiosError): { message: string, statusCode: number } {
   const res = error?.response?.data as any ;
-  const statusCode = error?.response?.data?.statusCode ?? 500;
+  const statusCode = res?.statusCode ?? error.response?.status ?? 500;
 
   let message = 'Something went wrong';
 
   if (res?.message) {
-    if (Array.isArray(res.message?.message)) {
+    if (Array.isArray(res.message)) {
+      message = res.message[0];
+    } else if (Array.isArray(res.message?.message)) {
       message = res.message.message[0];
     } else if (typeof res.message === 'string') {
       message = res.message;
@@ -36,7 +38,7 @@ function parseAxiosError(error: AxiosError): { message: string, statusCode: numb
   return { message, statusCode };
 }
 
-export const PostRequestAxios = async <T>(url: string, payload: any) : Promise<[T | null, { message: string; statusCode: number } | null]> => {
+export const PostRequestAxios = async <T>(url: string, payload: any, redirectUnauthorized = true) : Promise<[T | null, { message: string; statusCode: number } | null]> => {
     const {access_token} = await getToken()
     try{
         const {data} = await axios.post<T>(`${baseUrl}${url}`, payload,{
@@ -50,7 +52,7 @@ export const PostRequestAxios = async <T>(url: string, payload: any) : Promise<[
 
     }catch(error ){
         if (axios.isAxiosError(error)) {
-            if (error.status === 401) {
+            if (redirectUnauthorized && error.status === 401) {
                 throw redirect('/login')
                 
                 }
@@ -66,7 +68,7 @@ export const PostRequestAxios = async <T>(url: string, payload: any) : Promise<[
         return [null, null];
     }
 }
-export const PatchRequestAxios = async <T>(url: string, payload: T) : Promise<[T | null, { message: string; statusCode: number } | null]> => {
+export const PatchRequestAxios = async <T>(url: string, payload: unknown) : Promise<[T | null, { message: string; statusCode: number } | null]> => {
     const {access_token} = await getToken()
     try{
         const {data} = await axios.patch(`${baseUrl}${url}`, payload,{
@@ -113,7 +115,7 @@ export const GetRequestNormal = async <T>(url: string,revalidate=0 ,revalidateTa
     const {access_token} = await getToken()
     
     try{
-        const response = await fetch(`${baseUrl}${url}`,{next:{revalidate:revalidate,tags:[revalidateTags]},headers:{
+        const response = await fetch(`${baseUrl}${url}`,{cache:"no-store",headers:{
                
                 access_token:access_token ? access_token : '',
                 
@@ -122,7 +124,7 @@ export const GetRequestNormal = async <T>(url: string,revalidate=0 ,revalidateTa
         }})
        if (response.ok) {
       const data = await response.json()
-       console.log("data",data)
+
       return data
     } else {
         console.log("response",response.status)

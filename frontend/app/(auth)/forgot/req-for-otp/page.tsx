@@ -19,17 +19,21 @@ const ForgotPassword = () => {
     method: "POST",
     url: "/user/forgot-password-send-otp",
     mutationKey: ["forgot-password-otp"],
-    successMessage: "ওটিপি আপনার ফোনে পাঠানো হয়েছে",
+    successMessage: "অ্যাকাউন্টটি থাকলে নিবন্ধিত ফোন বা ইমেইলে OTP পাঠানো হবে",
     onSuccess: (data) => {
       // Navigate to verify OTP page with phone number
-      router.push(`/forgot/verify-otp?phone=${phoneNumber}`);
+      sessionStorage.setItem("niqaha_reset_subject", normalizeContact(phoneNumber));
+      sessionStorage.setItem("niqaha_reset_sent_at",String(Date.now()));
+      sessionStorage.setItem("niqaha_reset_challenge",data.challengeId);
+      router.push("/forgot/verify-otp");
     },
   });
 
+  const normalizeContact = (value: string) => value.includes("@") ? value.trim().toLowerCase() : value.replace(/[০-৯]/g,n=>String("০১২৩৪৫৬৭৮৯".indexOf(n))).replace(/[\s()-]/g,"");
   // Validate phone number
   const validatePhone = (phone: string) => {
     // Bangladesh phone number validation (11 digits starting with 01)
-    const phoneRegex = /^01[3-9]\d{8}$/;
+    const phoneRegex = /^(?:01[3-9]\d{8}|\+[1-9]\d{6,14}|[^\s@]+@[^\s@]+\.[^\s@]+)$/;
     return phoneRegex.test(phone);
   };
 
@@ -39,14 +43,14 @@ const ForgotPassword = () => {
 
     // Validation
     if (!phoneNumber) {
-      toast.error("ফোন নম্বর লিখুন", {
+      toast.error("ফোন নম্বর বা ইমেইল লিখুন", {
         style: { background: "red", color: "white" },
       });
       return;
     }
 
-    if (!validatePhone(phoneNumber)) {
-      toast.error("সঠিক ফোন নম্বর লিখুন (যেমন: 01712345678)", {
+    if (!validatePhone(normalizeContact(phoneNumber))) {
+      toast.error("সঠিক নিবন্ধিত ফোন নম্বর বা ইমেইল লিখুন", {
         duration: 5000,
         style: { background: "red", color: "white" },
       });
@@ -54,7 +58,8 @@ const ForgotPassword = () => {
     }
 
     // Send OTP
-    sendOtp({ phoneNumber });
+    if (isPending) return;
+    sendOtp({ phoneNumber: normalizeContact(phoneNumber) });
   };
 
   return (
@@ -69,7 +74,7 @@ const ForgotPassword = () => {
             পাসওয়ার্ড ভুলে গেছেন?
           </h1>
           <p className="text-gray-600 text-sm">
-            আপনার ফোন নম্বর দিন, আমরা আপনাকে একটি ওটিপি পাঠাব
+            আপনার নিবন্ধিত ফোন নম্বর বা ইমেইল দিন, আমরা একটি ওটিপি পাঠাব
           </p>
         </div>
 
@@ -78,7 +83,7 @@ const ForgotPassword = () => {
           <CardHeader className="bg-gradient-to-r from-pink-50 to-pink-100 border-b border-gray-200">
             <CardTitle className="text-xl text-pink-800 flex items-center gap-2">
               <Phone className="w-5 h-5" />
-              ফোন নম্বর যাচাই
+              ফোন বা ইমেইল যাচাই
             </CardTitle>
           </CardHeader>
 
@@ -90,23 +95,23 @@ const ForgotPassword = () => {
                   htmlFor="phoneNumber"
                   className="text-gray-700 font-medium"
                 >
-                  ফোন নম্বর <span className="text-red-500">*</span>
+                  ফোন নম্বর বা ইমেইল <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     id="phoneNumber"
-                    type="tel"
-                    placeholder="01712345678"
+                    type="text"
+                    placeholder="+8801712345678 / name@example.com"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     className="pl-10 h-12 text-lg border-gray-300 focus:border-pink-500 focus:ring-pink-500"
-                    maxLength={11}
+                    maxLength={254}
                     disabled={isPending}
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  আপনার নিবন্ধিত ফোন নম্বর লিখুন
+                  দেশের কোডসহ ফোন নম্বর বা নিবন্ধিত ইমেইল লিখুন
                 </p>
               </div>
 
@@ -145,7 +150,7 @@ const ForgotPassword = () => {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => router.push("/auth/login")}
+                onClick={() => router.push("/login")}
                 className="text-pink-600 hover:text-pink-700 hover:bg-pink-50"
               >
                 লগইন পেজে ফিরে যান

@@ -1,8 +1,11 @@
+import { IdentityService } from './identity.service';
+import { PlatformService } from './platform.service';
+import { samePhone, adminSort, adminFilter, editableProfile, completion, visibleFilter } from './profile-rules';
 import { HttpException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserDocument } from './entities/user.entity';
+import { User, UserDocument, UserType } from './entities/user.entity';
 import { Model, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -25,10 +28,10 @@ import { PdfService } from './pdf.service';
 @Injectable()
 export class UserService  implements OnModuleInit{
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService, private identity:IdentityService, private platform:PlatformService){}
    async onModuleInit() {
     await this.ensurePhoneNumberIndex();
-    const findOneAdmin = await this.userModel.findOne({role:'admin'}).lean().exec();
+    const findOneAdmin = await this.userModel.findOne({role:UserType.ADMIN}).lean().exec();
     if(!findOneAdmin){
       const rewPAssword =  this.configService.get<string>('ADMIN_PASSWORD') as string
       const passwordHash = await bcrypt.hash(rewPAssword, 10)
@@ -36,7 +39,7 @@ export class UserService  implements OnModuleInit{
       name:"admin",
        phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
        password: passwordHash,
-       role: 'admin',
+       role: UserType.ADMIN,
        isOtpVerified:true
      })
     }
@@ -74,93 +77,10 @@ export class UserService  implements OnModuleInit{
       },
     );
   }
-  async create(createUserDto: CreateUserDto) {
-    
-    if(!createUserDto.phoneNumber || !createUserDto.password){
-      throw new HttpException('All fields are required', 400);
-    }
+  async create(createUserDto: CreateUserDto) {return this.identity.register(createUserDto);}
 
-  const findIsUserThere = await this.userModel.findOne({phoneNumber:createUserDto.phoneNumber}).lean().exec();
-
-  if(findIsUserThere ){
-    if (findIsUserThere.isOtpVerified) {
-      throw new HttpException('User already exists', 400);
-    }
-      const now = new Date();
-    const otpExpiry = new Date(findIsUserThere.otpValidatedAt);
-     if (otpExpiry > now) {
-      return {
-        message: 'OTP has already been sent to your mobile number',
-        data: {
-          phoneNumber: findIsUserThere.phoneNumber,
-          otpExpiresAt: otpExpiry,
-        },
-      };
-    }
-       const newOtp = await this.otpService.generateUniqueOTP();
-    const newOtpExpiry = new Date(Date.now() + 26 * 60 * 1000);
-
-    await this.userModel.updateOne(
-      { phoneNumber: createUserDto.phoneNumber },
-      {
-        $set: {
-          otpNumber: newOtp,
-          otpValidatedAt: newOtpExpiry,
-        },
-      }
-    );
-    this.smsService.sendOtpSms(createUserDto.phoneNumber,newOtp)
-    return {
-      message: 'OTP has been sent to your mobile number',
-      data: {
-        phoneNumber: findIsUserThere.phoneNumber,
-        otpExpiresAt: newOtpExpiry,
-      },
-    };
-
-  }
-  const passwordHash = await bcrypt.hash(createUserDto.password, 10);
-
-  const {phoneNumber,name} = createUserDto
-  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
-  const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
-  const getOtp = await this.otpService.generateUniqueOTP()
-    const finalData ={
-      phoneNumber,
-      name,
-      password:passwordHash,
-      userId:userIdCount,
-      otpNumber:getOtp,
-      gender:createUserDto.gender,
-    
-      otpValidatedAt: new Date(Date.now() + 26 * 60 * 1000),
-    }
-    this.smsService.sendOtpSms(phoneNumber,getOtp)
-    const create = await this.userModel.create(finalData);
-    if(!create){
-      throw new HttpException('User not created', 400);
-    }
-
-
-    return {message:'User created successfully',data:create};
-  }
-
-
-  async verifyOtp(otp:string){
-    const findOneAndUpdated = await this.userModel.findOneAndUpdate({otpNumber:otp},{isOtpVerified:true,otpValidatedAt:null, otpNumber:null}).lean();
-    if(!findOneAndUpdated){
-      throw new HttpException('User not found', 400);
-    }
-          const secret = this.configService.get<string>('ACCESS_TOKEN');
-  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
-    const access_token = await this.jwtService.sign({email:findOneAndUpdated.email ?? "",id:findOneAndUpdated._id,role:findOneAndUpdated.role,mobileNumber:findOneAndUpdated.phoneNumber},{expiresIn:"10d",secret:secret});
-    return {message:'User verified successfully',data:findOneAndUpdated,access_token:access_token};
-    
-  }
-  
-
-
-
+  async resendOtp(id:string){return this.identity.resend(id);}
+  async verifyOtp(payload:any) {return this.identity.verify(payload);}
 
  @Cron(CronExpression.EVERY_10_MINUTES)
 async findUserAndUpdated() {
@@ -191,80 +111,71 @@ async findUserAndUpdated() {
 }
 
 
-  async updatedFullUserInformation (updated:UpdateUserDto,userId:string){
-    const {password,isOtpVerified,isSubscriber, role, otpNumber, numberOfConnections, id, otpValidatedAt, _v,updatedAt,createdAt,...payload} = updated
-    const idAndUpdate =  await this.userModel.findOneAndUpdate({_id:userId},{$set:payload},{new:true}).lean();
-    if(!idAndUpdate){
-      throw new HttpException('User not updated', 400);
+  async updatedFullUserInformation(updated:UpdateUserDto,userId:string) {
+    const current:any=await this.userModel.findById(userId).lean();
+    if(!current)throw new HttpException('Account unavailable',404);
+    const payload=editableProfile(updated);
+    // Account contact changes use separate verification; existing contact data stays intact.
+    if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
+    if(typeof (updated as any).isPublished==='boolean')payload.isPublished=(updated as any).isPublished;
+    payload.draftStep=Math.max(0,Math.min(9,Number((updated as any).draftStep)||0));
+    payload.draftSavedAt=new Date();
+    if((updated as any).submit===true) {
+      const state={...current,...payload};
+      if(completion(state).percentage<100)throw new HttpException({message:'Required information is missing',missing:completion(state).remaining},400);
+      payload.biodataStatus='submitted';
+      payload.isPublishFromAdmin=false;
+      payload.verificationStatus='pending';
     }
-   this.sendToUser(idAndUpdate)
-    return {
-      message:'User updated successfully',
-      data:idAndUpdate
-    }
-
-
-
+    const data=await this.userModel.findByIdAndUpdate(userId,{$set:payload},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
+    return {message:(updated as any).submit?'Biodata submitted for review':'Draft saved',data,completion:completion(data)};
   }
 
-  async loginUser(loginUserDto:LoginDto){
-     const {phoneNumber,password} = loginUserDto
-     if(!phoneNumber || !password){
-       throw new HttpException('All fields are required', 400);
-     }
-     const findOneUser = await this.userModel.findOne({phoneNumber}).select(" email id role phoneNumber name email password isOtpVerified userId numberOfConnections gender").lean();
-     if(!findOneUser){
-       throw new HttpException('User not found', 400);
-     }
-     this.logger.debug("is-user-verified->",findOneUser.isOtpVerified)
-     if(!findOneUser.isOtpVerified){
-       throw new HttpException('User is not verified', 408);
-     }
-      const isMatch = await bcrypt.compare(password,findOneUser.password);
-       if(!isMatch){
-      throw new HttpException('Invalid credentials', 400);
-    }
-      const secret = this.configService.get<string>('ACCESS_TOKEN');
-  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
-    const access_token = await this.jwtService.sign({email:findOneUser.email ?? "",id:findOneUser._id,role:findOneUser.role,mobileNumber:findOneUser.phoneNumber},{expiresIn:"10d",secret:secret});
-     return{
-      message:'User logged in successfully',
-      access_token,
-     
-      user:findOneUser
-    }
-  }
+  async loginUser(payload:LoginDto){return this.identity.login(payload);}
 
   async loginWithGoogle(tokenId:string){
-     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-       const ticket = await client.verifyIdToken({
-      idToken: tokenId,
-      audience: process.env.GOOGLE_CLIENT_ID
-    })
+     const clientId=this.configService.get<string>('GOOGLE_CLIENT_ID');
+     if(!clientId)throw new HttpException('Google sign-in is not configured',503);
+     const client = new OAuth2Client(clientId);
+     let ticket;
+     try{ticket=await client.verifyIdToken({idToken:tokenId,audience:clientId});}
+     catch{throw new HttpException('Google sign-in could not be verified. Please try again.',401);}
    const googlePayload = ticket.getPayload();
-   this.logger.debug('googlePayload',googlePayload)
+   if(!googlePayload?.email_verified||!googlePayload.email)throw new HttpException('Google email is not verified',401);
+   googlePayload.email=googlePayload.email.trim().toLowerCase();
    const {email,name,picture,} = googlePayload as {email:string,name:string,picture:string}
 
+   let isNewUser=false;
    let finUserByEmail = await this.userModel.findOne({email:email});
   const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
   const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
    if(!finUserByEmail){
-     finUserByEmail = await this.userModel.create({
+     const claim=await this.userModel.db.collection('identity_claims').findOneAndUpdate({_id:email as any},{$setOnInsert:{userId:new Types.ObjectId()}},{upsert:true,returnDocument:'after'});
+     isNewUser=true;
+     finUserByEmail = await this.userModel.findOneAndUpdate({_id:claim!.userId},{$setOnInsert:{
       email:email,
       name:name,
       isOtpVerified:true,
+      isEmailVerified:true,
       userId:userIdCount
 
-     })
+     }},{upsert:true,returnDocument:'after'})
    }
-       const secret = this.configService.get<string>('ACCESS_TOKEN');
-  this.logger.log('🔑 Regular Login SECRET:', secret); // Debug
-     const access_token = await this.jwtService.sign({email:finUserByEmail.email ?? "",id:finUserByEmail._id ?? "",role:finUserByEmail?.role ?? "",mobileNumber:finUserByEmail?.phoneNumber ?? ""},{expiresIn:"10d",secret:secret});
+   if(!finUserByEmail)throw new HttpException('Unable to sign in',400);
+   if(finUserByEmail.password&&finUserByEmail.isOtpVerified&&!finUserByEmail.isEmailVerified)throw new HttpException('Please sign in with your password and verify this email in your dashboard before using Google sign-in.',400);
+   if(!finUserByEmail.isOtpVerified) {
+     finUserByEmail=await this.userModel.findByIdAndUpdate(finUserByEmail._id,{$set:{isOtpVerified:true,isEmailVerified:true,name},$unset:{password:1}},{returnDocument:'after'});
+   }else if(!finUserByEmail.isEmailVerified) {
+     finUserByEmail=await this.userModel.findByIdAndUpdate(finUserByEmail._id,{$set:{isEmailVerified:true}},{returnDocument:'after'});
+   }
+   if(!finUserByEmail)throw new HttpException('Unable to sign in',400);
+   const access_token = await this.identity.token(finUserByEmail);
      return{
        message:'User logged in successfully',
       access_token:access_token,
      
-      user:finUserByEmail
+      isNewUser,
+      user:this.identity.safe(finUserByEmail)
      }
 
   }
@@ -312,6 +223,7 @@ async findUserAndUpdated() {
   }
 }); */
   const firstMatch: any = {
+    ...visibleFilter,
     $and: [
      /*  { isPublished: { $eq: true } },
       { isPublished: { $ne: null } }, */
@@ -446,19 +358,8 @@ if (heightMin !== undefined || heightMax !== undefined) {
     matchConditions['familyInfo.familyFinancial'] = { $in: economicStatus };
   }
 
- if (category && category.length > 0) {
-  const hasVerified = category.includes('verified');
-  const hasGeneral = category.includes('general');
-  this.logger.log(`hasVerified: ${hasVerified}, hasGeneral: ${hasGeneral}`);
-  if(hasVerified && hasGeneral){
-    matchConditions.isSubscriber = { $in: [true, false] };
-  }
-  else if (hasVerified && !hasGeneral) {
-    matchConditions.isSubscriber = true;
-  } else if (hasGeneral && !hasVerified) {
-    matchConditions.isSubscriber = false;
-  } 
-}
+ if(category?.includes('verified'))matchConditions.verificationStatus='approved';
+ if(category?.includes('general'))matchConditions.isSubscriber={$ne:true};
 
   // Add $match stage if conditions exist
   if (Object.keys(matchConditions).length > 0) {
@@ -496,8 +397,8 @@ pipeline.push({
   pipeline.push({
     $project: {
       _id: 1,
-      name: 1,
-      email: 1,
+      isSubscriber:1,
+      verificationStatus:1,
       age: 1,
       gender: 1,
       maritalStatus: 1,
@@ -507,7 +408,6 @@ pipeline.push({
     
       'address.district': 1,
       'address.upazila': 1,
-      'address.presentAddress': 1,
       'educationInfo.educationMethod': 1,
       'educationInfo.highestEducation': 1,
       'personalInformation.height': 1,
@@ -527,7 +427,7 @@ pipeline.push({
   console.log('Users returned:', users.length);
 
   return {
-    docs: users,
+    docs: users.map(u=>({...u,isVerified:u.verificationStatus==='approved'})),
     totalDocs: total,
     limit,
     page,
@@ -540,15 +440,14 @@ pipeline.push({
   };
 }
 
- async addToShortList(payload: CreateShortlistDto, userId: string) {
-  const findAndUpdate = await this.shortlistModel.findOneAndUpdate(
-    { userId: userId },
-    { $addToSet: { shortlistedUserId: payload.shortlistedUserId } }, 
-    { new: true, upsert: true }
-  );
-   
-  return findAndUpdate;
-}
+ async addToShortList(payload:CreateShortlistDto,userId:string) {
+  if(!payload.shortlistedUserId)throw new HttpException("Profile ID is required",400);
+  await this.platform.profile(payload.shortlistedUserId,userId);
+  const r=await this.shortlistModel.updateOne({userId},{$addToSet:{shortlistedUserId:payload.shortlistedUserId}},{upsert:true});
+  const created=r.modifiedCount>0||r.upsertedCount>0;
+  if(created)await this.userModel.updateOne({_id:payload.shortlistedUserId},{$inc:{profileInterests:1}});
+  return {success:true,created};
+ }
  async removeFromShortList(payload: CreateShortlistDto, userId: string) {
   const findAndUpdate = await this.shortlistModel.findOneAndUpdate(
     { userId: userId },
@@ -585,12 +484,13 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
     // Replace root with user details
     { $replaceRoot: { newRoot: '$userDetails' } },
     
+    { $match: visibleFilter },
     // Project only the fields you need
     {
       $project: {
         _id: 1,
-        name: 1,
-        email: 1,
+        isSubscriber:1,
+        verificationStatus:1,
         age: 1,
         gender: 1,
         maritalStatus: 1,
@@ -599,7 +499,6 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
         createdAt: 1,
         'address.district': 1,
         'address.upazila': 1,
-        'address.presentAddress': 1,
         'educationInfo.educationMethod': 1,
         'educationInfo.highestEducation': 1,
         'personalInformation.height': 1,
@@ -628,60 +527,35 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
 
 
 
-async findOne(id: FindOneDto) {
-  const searchId = id.id;
-  const isValidObjectId = Types.ObjectId.isValid(searchId) && 
-                          String(new Types.ObjectId(searchId)) === searchId;
-  
-  let findOne;
-  
-  // Try to find by _id first if it's a valid ObjectId
-  if (isValidObjectId) {
-    findOne = await this.userModel
-      .findById(searchId)
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -whatsapp ')
-      .lean();
-  }
-  
-  // If not found and not a valid ObjectId, try userId
-  if (!findOne) {
-    findOne = await this.userModel
-      .findOne({ userId: searchId })
-      .select('-password -email -otpNumber -otpValidatedAt -phoneNumber -whatsapp ')
-      .lean();
-  }
-  
-  if (!findOne) {
-    throw new HttpException('User not found', 400);
-  }
-  
-  return findOne;
-}
+async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.profile(id.id,actor,role);}
+
   async finMyProfile(id: string) {
     const findOne = await this.userModel.findById(id).select("  -password -otpNumber -otpValidatedAt ").lean();
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
-    return findOne;
+    return {...findOne,completion:completion(findOne)};
   }
 
- async update( updateUserDto: UpdateUserDto) {
-    const {id,password, _v,updatedAt,createdAt,...rest} = updateUserDto
-    const findOne = await this.userModel.findByIdAndUpdate(id,{$set:rest},{new:true}).lean();
+ async update( updateUserDto: UpdateUserDto,actor:string) {
+    if(updateUserDto.numberOfConnections!==undefined&&(await this.userModel.findById(updateUserDto.id).select("numberOfConnections").lean())?.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,updateUserDto.id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
+    await this.platform.audit(actor,"profile.admin.update",updateUserDto.id);
+    const {id,password, _v,updatedAt,createdAt,...raw} = updateUserDto
+    const rest:any=editableProfile(raw);
+    for(const k of ['isPublishFromAdmin','isPublished','verificationStatus','statusReason'])if(raw[k]!==undefined)rest[k]=raw[k];
+    if(rest.isPublishFromAdmin===true)rest.verificationStatus='approved';
+    if(rest.isPublishFromAdmin===false)rest.verificationStatus='rejected';
+    const findOne = await this.identity.adminUpdateProfile(actor,id,rest,raw);
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
     return findOne;
   }
 
-   async removeUser(id: string) {
-     const findOne = await this.userModel.findByIdAndDelete(id).lean();
-    if(!findOne) {
-      throw new HttpException('User not found', 400);
-    }
-    return findOne;
-  }
-   async remove(id: FindOneDto) {
+   async removeUser(id:string){return this.platform.createCase(id,'deletion',{});}
+
+   async remove(id: FindOneDto,actor:string) {
+     await this.platform.audit(actor,"account.admin.delete",id.id);
      const findOne = await this.userModel.findByIdAndDelete(id.id).lean();
     if(!findOne) {
       throw new HttpException('User not found', 400);
@@ -705,7 +579,7 @@ async findOne(id: FindOneDto) {
     if(!updatePassword) {
       throw new HttpException('User not found', 400);
     }
-    return updatePassword;
+    return {message:'Password updated successfully'};
   }
 
 
@@ -715,31 +589,16 @@ async findOne(id: FindOneDto) {
   const skip = (page - 1) * limit;
   this.logger.debug("searchQuery->",isPublished)
 
-  // Build filter
-  const filter: any = {};
-
-  // Text search using MongoDB text index
-  if (searchQuery && searchQuery.trim()) {
-    filter.$text = { $search: searchQuery };
-  }
-
-  // Gender filter
-  if (gender && gender !== 'all') {
-    filter.gender = gender;
-  }
-  
-  if (isPublished !== undefined && isPublished !== null && isPublished !== 'all') {
-  filter.isPublishFromAdmin =  isPublished === 'true';
-}
+  const filter:any=adminFilter(query);
 
   // Execute query with pagination
   const [data, totalItems] = await Promise.all([
     this.userModel
       .find(filter)
-      .select('name email phoneNumber whatsapp maritalStatus isSubscriber isOtpVerified numberOfConnections isPublished isPublishFromAdmin userId')
+.select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds')
       .skip(skip)
       .limit(limit)
-      .sort({ createdAt: -1 }) // Latest users first
+      .sort(adminSort(query.sort))
       .lean()
       .exec(),
     this.userModel.countDocuments(filter).exec(),
@@ -758,7 +617,8 @@ async findOne(id: FindOneDto) {
   };
 }
 
-async toggleSubscription(id:string) {
+async toggleSubscription(id:string,actor:string) {
+  await this.platform.audit(actor,"membership.admin.toggle",id);
   const findOne = await this.userModel.findById(id).select("isSubscriber").lean();
   if(!findOne) {
     throw new HttpException('User not found', 400);
@@ -779,182 +639,22 @@ async userDeleteAdmin(id:string) {
 }
 
 
-async createPayment(pkgId: string,id:string){
-  this.logger.debug("pkgId->",pkgId)
-   const finOneUser = await this.userModel.findById(id).lean();
-   const findOnePackage = await this.pricingService.findOne(pkgId);
-   if(!finOneUser || !findOnePackage){
-     throw new HttpException('User not found', 400);
-   }
-   this.logger.debug("findOnePackage->",findOnePackage)
-   const finalPrice = findOnePackage?.discountPrice ? findOnePackage.discountPrice : findOnePackage.originalPrice ?? 100 ;
-   const userIdWithConnections = `${finOneUser._id.toString()}-${findOnePackage.numberOfConnections}`
-   const createPayment = await this.bkash.createPayment(finalPrice,userIdWithConnections.toString());
-   return createPayment
+async createPayment(pkgId:string,id:string){return this.platform.createPayment(id,pkgId);}
+async executePayment(paymentId:string){return this.platform.executePayment(paymentId);}
+
+
+async createRequestNumber(payload:RequestNumberDto,userId:string){return this.platform.unlock(userId,payload.requestUserId);}
+
+async getMyRequests(userId:string,query:PaginationDto){
+ const balance=await this.platform.connections(userId);
+ const page=Math.max(1,query.page||1),limit=Math.min(100,Math.max(1,query.limit||10));
+ const history=balance.history.slice((page-1)*limit,page*limit);
+ const data=await Promise.all(history.map(async x=>{try{return {...x,requestUserId:await this.platform.profile(x.profileId,userId)};}catch{return {...x,requestUserId:null};}}));
+ return {data,page,limit,totalItems:balance.history.length,totalPages:Math.ceil(balance.history.length/limit)};
 }
 
-async executePayment(paymentId:string){
-  try{
-const executePayment = await this.bkash.executePayment(paymentId);
-      this.logger.log('Execute response:', executePayment);
-           const BKASH_COMPLETE = this.configService.get('BKASH_COMPLETE');
-           if (executePayment.transactionStatus === BKASH_COMPLETE) {
-                  const parts = executePayment.payerReference.split('-');
-            const findOne = await this.userModel.findByIdAndUpdate(parts[0],{$inc:{numberOfConnections:Number(parts[1])}}).lean();
-            if(!findOne) {
-              return {
-                failure: true,
-                success: false
-              };
-            }
-            this.logger.debug("success-----of---this----era")
-            this.findUserAndSendToTelegram(parts[0])
-            return {
-              success: true,
-              failure: false
-            }
-
-           }
-           this.logger.debug("fail-----of---this----era")
-           return {
-            failure: true,
-            success: false}
-  }catch(error){
-      this.logger.debug("fail-----of---this----era",error)
-    return {
-      failure: true,
-      success: false}
-  }
-  
-  
-
-
-}
-
-async createRequestNumber(payload:RequestNumberDto){
-  const finUser = await this.userModel.findById(payload.userId).select("email id role phoneNumber name gender email password isOtpVerified userId numberOfConnections").lean();
-  if(!finUser){
-    throw new HttpException('User not found', 400);
-  }
-  if(!finUser.phoneNumber){
-    throw new HttpException('Your phone number is missing', 400);
-  }
-  if(finUser?.numberOfConnections <=0){
-    throw new HttpException('Not enough connections', 400);
-  }
-  const isAlreadyInRequest = await this.requestNumberModel.findOne({userId:payload.userId,requestUserId:payload.requestUserId}).lean();
-  if(isAlreadyInRequest){
-    throw new HttpException('Phone Number already requested', 400);
-  }
-  const requestUser = await this.userModel.findById(payload.requestUserId).select("email id role gender phoneNumber name email password isOtpVerified userId numberOfConnections").lean();
-  if(!requestUser?.phoneNumber){
-    throw new HttpException('User not found', 400);
-  }
-  const [updatedUser,createdUser] = await Promise.all([
-    await this.userModel.findByIdAndUpdate(payload.userId,{$inc:{numberOfConnections:-1}},{new:true}).select("email id role phoneNumber name email password isOtpVerified userId numberOfConnections gender").lean(),
-    await this.requestNumberModel.create({userId:payload.userId,requestUserId:payload.requestUserId})
-  ])
-  const UserReqNumber = {
-    from:{
-      name:finUser.name,
-      email:finUser.email,
-      phoneNumber:finUser.phoneNumber,
-      userId:finUser.userId,
-      gender:finUser.gender
-    },
-    toUser:{
-      name:requestUser.name,
-      email:requestUser.email,
-      phoneNumber:requestUser.phoneNumber,
-      userId:requestUser.userId,
-      gender:requestUser.gender
-    }
-  }
-  this.NumberRequest(UserReqNumber)
-return {
-  userData:updatedUser,
-  message:"Request number created successfully"
-}
-
-}
-
-async getMyRequests (userId:string, query:PaginationDto){
-
-  const {page = 1, limit = 10} = query
-  const skip = (page - 1) * limit;
-  const findShortlist = await this.requestNumberModel.find({userId}).populate({
-    path:'requestUserId',
-    select:"email phoneNumber name   isOtpVerified userId "
-  }).skip(skip).limit(limit).lean();
-  const totalItems = await this.requestNumberModel.countDocuments({userId});
-  const totalPages = Math.ceil(totalItems / limit);
-  return {
-    data:findShortlist,
-    page,
-    limit,
-    totalItems,
-    totalPages,
-    hasNextPage: page < totalPages,
-    hasPreviousPage: page > 1,
-  }
-
-}
-
-async RequestForOtpRestPassword(payload:ReqForDto){
-  const findOneUser = await this.userModel.findOne({phoneNumber:payload.phoneNumber}).lean();
-  if(!findOneUser || !findOneUser.phoneNumber){
-    throw new HttpException('User not found', 400);
-  }
-        const newOtp = await this.otpService.generateUniqueOTP();
-    const newOtpExpiry = new Date(Date.now() + 26 * 60 * 1000);
-
-    await this.userModel.updateOne(
-      { phoneNumber: findOneUser.phoneNumber },
-      {
-        $set: {
-          otpNumber: newOtp,
-          otpValidatedAt: newOtpExpiry,
-        },
-      }
-    );
-    this.smsService.sendOtpSms(findOneUser.phoneNumber,newOtp)
-
-    return {
-      message:"OTP sent successfully",
-     
-    }
-
-  
-}
-async ResetPasswordWithOtp (payload:NewPasswordResetWithOtp){
-  const findUser = await this.userModel.findOne({phoneNumber:payload.phoneNumber,otpNumber:payload.otp}).lean();
-  if(!findUser){
-    throw new HttpException('User not found', 400);
-  }
-
-  const hashedPassword = await bcrypt.hash(payload.newPassword, 10);
-  await this.userModel.updateOne(
-    { phoneNumber: findUser.phoneNumber },
-    {
-      $set: {
-        password: hashedPassword,
-        otpNumber: null,
-        otpValidatedAt: null,
-      },
-    }
-  );
-  return {
-    message:"Password reset successfully",
-  }
-  
-}
-
-
-
-
-
-
-
+async RequestForOtpRestPassword(payload:ReqForDto){return this.identity.resetRequest(payload);}
+async ResetPasswordWithOtp(payload:NewPasswordResetWithOtp){return this.identity.reset(payload);}
 
 
 //bot 

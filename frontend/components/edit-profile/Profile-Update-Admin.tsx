@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { BasicInfoStep } from "../custom/updateProfile/BasicInfoStep";
 import { AddressStep } from "../custom/updateProfile/AddressStep";
 import { EducationStep } from "../custom/updateProfile/EducationStep";
@@ -77,7 +79,13 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
-  console.log("current-data", getFormData());
+  const contacts = useProfileStore(state => state.formData);
+  const updateField = useProfileStore(state => state.updateField);
+  const { mutate: saveContacts, isPending: isSavingContacts } = useCommonMutationApi({
+    method: "PATCH", url: "/user/update-user-admin", mutationKey: ["admin-user-contacts", id],
+    successMessage: "ফোন ও ইমেইল সংরক্ষিত হয়েছে",
+    onSuccess: () => { refetch(); },
+  });
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -161,10 +169,11 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
       return;
     }
 
-    console.log("Submitting:", formData);
     const submitData = {
       id,
       ...formData,
+      email: formData.email?.trim() || null,
+      phoneNumber: formData.phoneNumber?.trim() || null,
     };
 
     mutate(submitData);
@@ -174,7 +183,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const handleToggleVisibility = () => {
     toggleVisibility({
       id,
-      isPublishFromAdmin: !data?.isPublishFromAdmin ?? true,
+      isPublishFromAdmin: !data?.isPublishFromAdmin,
     });
     setShowHideAlert(false);
   };
@@ -266,7 +275,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <BasicInfoStep />;
+        return <BasicInfoStep admin />;
       case 1:
         return <AddressStep />;
       case 2:
@@ -286,13 +295,30 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
       case 9:
         return <PledgeStep />;
       default:
-        return <BasicInfoStep />;
+        return <BasicInfoStep admin />;
     }
   };
 
   return (
     <div className="min-h-screen w-full bg-gray-50 py-4 sm:py-6 lg:py-8">
       <div className="w-full container mx-auto px-3 sm:px-4 lg:px-6">
+        <Card className="mb-6 border-pink-200">
+          <CardHeader><CardTitle className="text-lg text-pink-700">অ্যাকাউন্টের ফোন ও ইমেইল</CardTitle></CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={e => {
+              e.preventDefault();
+              if (!contacts.email?.trim() && !contacts.phoneNumber?.trim()) { toast.error("অন্তত একটি ফোন নম্বর বা ইমেইল রাখুন"); return; }
+              saveContacts({ id, email: contacts.email?.trim() || null, phoneNumber: contacts.phoneNumber?.trim() || null });
+            }}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2"><Label htmlFor="admin-contact-phone">মোবাইল নম্বর</Label><Input id="admin-contact-phone" type="tel" autoComplete="off" value={contacts.phoneNumber || ""} disabled={isLoading || isSavingContacts} onChange={e => updateField("phoneNumber",e.target.value)} placeholder="+8801712345678" /></div>
+                <div className="space-y-2"><Label htmlFor="admin-contact-email">ইমেইল</Label><Input id="admin-contact-email" type="email" autoComplete="off" value={contacts.email || ""} disabled={isLoading || isSavingContacts} onChange={e => updateField("email",e.target.value)} placeholder="name@example.com" /></div>
+              </div>
+              <p className="text-xs text-gray-500">পরিবর্তিত ফোন/ইমেইল পুনরায় যাচাই করতে হবে। ব্যবহারকারীর পুরোনো সেশন ও OTP বাতিল হবে। অসম্পূর্ণ বায়োডাটার ক্ষেত্রেও এখান থেকে সংরক্ষণ করা যাবে।</p>
+              <Button type="submit" disabled={isLoading || !data || isSavingContacts} className="bg-pink-600 hover:bg-pink-700">{isSavingContacts ? "সংরক্ষণ হচ্ছে..." : "ফোন ও ইমেইল সংরক্ষণ করুন"}</Button>
+            </form>
+          </CardContent>
+        </Card>
         {/* Action Buttons - Hide/Unhide and Delete */}
         <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
           <Button

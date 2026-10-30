@@ -12,13 +12,12 @@ interface UseApiMutationConfig<TData = any, TVariables = any> {
   successMessage?: string
   onSuccess?: (data: TData) => void
   onError?: (error: Error) => void,
- 
+
 }
 
 export function useCommonMutationApi<TData = any, TVariables = any>(
   config: UseApiMutationConfig<TData, TVariables>
 ) {
-  console.log("url",config?.url,"method",config?.method,"mutationKey")
   const { url, method, mutationKey, successMessage, onSuccess, onError } = config
 
   // Select the right function based on method
@@ -50,9 +49,9 @@ export function useCommonMutationApi<TData = any, TVariables = any>(
     mutationFn: async (variables: TVariables) => {
       const mutationFn = getMutationFn()
       const res = await mutationFn(variables as any)
-      
-      
-      
+
+
+
       return res
     },
     onSuccess: (data) => {
@@ -66,7 +65,7 @@ export function useCommonMutationApi<TData = any, TVariables = any>(
       onError?.( {
         message: data?.error?.message || "Unknown error"
       } as Error)
-      
+
     },
     onError: (error: Error) => {
       toast.error(error.message)

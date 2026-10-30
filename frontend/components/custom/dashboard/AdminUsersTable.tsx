@@ -64,7 +64,9 @@ import { useDebounce } from "use-debounce";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import CopyContactButton from "./CopyContactButton";
+import AdminUserFilters from "./AdminUserFilters";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { User as BiodataUser } from "@/@types/user";
 import {
@@ -139,7 +141,8 @@ export default function AdminUsersTable() {
   const [recipientSearch, setRecipientSearch] = useState("");
   const [recipientPage, setRecipientPage] = useState(1);
   const router = useRouter();
-  const query = new URLSearchParams();
+  const advancedParams=useSearchParams();
+  const query = new URLSearchParams(advancedParams.toString());
   query.set("page", tableFilters.page.toString());
   query.set("query", text);
   query.set("gender", tableFilters.gender);
@@ -150,7 +153,7 @@ export default function AdminUsersTable() {
 
   // Fetch users
   const { data, isLoading, error } = useQueryWrapper<PaginatedUsersResponse>(
-    ["admin-users", tableFilters.page, text, tableFilters.gender, tableFilters.publish],
+    ["admin-users", tableFilters.page, text, tableFilters.gender, tableFilters.publish,advancedParams.toString()],
     `/user/get-all-user-for-admin?${query.toString()}`,
   );
 
@@ -255,7 +258,10 @@ export default function AdminUsersTable() {
       toast.error("অনুগ্রহ করে সঠিক সংখ্যা লিখুন");
       return;
     }
+    const adjustmentReason=window.prompt("Reason for changing the connection balance");
+    if(!adjustmentReason||!window.confirm("Confirm this balance adjustment?"))return;
     updateConnectionsMutation.mutate({
+      adjustmentReason,requestId:crypto.randomUUID(),
       id: userId,
       numberOfConnections: numValue,
     });
@@ -353,7 +359,7 @@ export default function AdminUsersTable() {
     toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
   };
 
-  const handleCopyProfileFromAction = async (user: User) => {
+  const handleCopyProfileFromAction = async (user: User, includeContacts=false) => {
     if (typeof window === "undefined") return;
 
     setCopyingUserId(user._id);
@@ -372,7 +378,7 @@ export default function AdminUsersTable() {
         profile,
         window.location.origin,
         {
-          includeContactNumber: false,
+          includeContactNumber: includeContacts,
         },
       );
 
@@ -434,6 +440,7 @@ export default function AdminUsersTable() {
         </p>
       </div>
 
+      <AdminUserFilters />
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
@@ -643,6 +650,14 @@ export default function AdminUsersTable() {
                       <p className="text-sm text-muted-foreground">
                         {group.description}
                       </p>
+                      <a
+                        href={group.inviteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block break-all text-xs text-green-700 underline underline-offset-2 hover:text-green-800"
+                      >
+                        {group.inviteUrl}
+                      </a>
                     </div>
 
                     <Button
@@ -832,10 +847,10 @@ export default function AdminUsersTable() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => void handleCopyProfileFromAction(user)}
+                        onClick={() => void handleCopyProfileFromAction(user,false)}
                         disabled={copyingUserId === user._id}
                         className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                        title="Copy details"
+                        title="Copy short biodata without contact numbers"
                         aria-label={`Copy ${user.name} details`}
                       >
                         {copyingUserId === user._id ? (
@@ -844,6 +859,7 @@ export default function AdminUsersTable() {
                           <Copy className="h-4 w-4" />
                         )}
                       </Button>
+                      <CopyContactButton id={user._id} />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1010,7 +1026,7 @@ export default function AdminUsersTable() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => void handleCopyProfileFromAction(user)}
+                    onClick={() => void handleCopyProfileFromAction(user,false)}
                     disabled={copyingUserId === user._id}
                     className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                     title="Copy details"
@@ -1022,6 +1038,7 @@ export default function AdminUsersTable() {
                       <Copy className="h-4 w-4" />
                     )}
                   </Button>
+                  <CopyContactButton id={user._id} />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1057,9 +1074,9 @@ export default function AdminUsersTable() {
           {/* Page Info */}
           <div className="text-sm text-center text-muted-foreground font-heading">
             মোট {data?.totalItems?.toLocaleString("bn-BD")} টির মধ্যে{" "}
-            {(((data?.page ?? 1) - 1) * 10 + 1).toLocaleString("bn-BD")} -{" "}
+            {(data?.totalItems ? ((data?.page ?? 1) - 1) * (data?.limit ?? 10) + 1 : 0).toLocaleString("bn-BD")} -{" "}
             {Math.min(
-              (data?.page ?? 1) * 10,
+              (data?.page ?? 1) * (data?.limit ?? 10),
               data?.totalItems ?? 0,
             ).toLocaleString("bn-BD")}{" "}
             দেখানো হচ্ছে (পেজ {data?.page?.toLocaleString("bn-BD")}/

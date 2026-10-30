@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import PolicyLinks from "@/components/custom/common/PolicyLinks";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
@@ -159,6 +160,7 @@ const PricingSection = () => {
                     </div>
                   </div>
 
+                  <p className="text-xs text-gray-600 mb-3">একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।</p><PolicyLinks />
                   {/* CTA Button */}
                   <Button
                     onClick={() => mutate({ id: pricing._id })}

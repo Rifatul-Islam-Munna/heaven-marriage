@@ -98,7 +98,7 @@ const getInitialFormData = (): Partial<User> => ({
     islamicBookName: '',
     islamicScholarsName: '',
     extraInfoHobby: '',
-    height: undefined,
+    height: 0,
     skinTone: '',
     islamicStudy: '',
     physicalStructure:""

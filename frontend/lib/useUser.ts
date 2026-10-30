@@ -19,8 +19,6 @@ export const useUser = (): UseUserReturn => {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
-   console.log("Navbar - User:", user);
-  console.log("Navbar - Loading:", loading);
   const pathName = usePathname()
   const fetchUser = async () => {
     try {

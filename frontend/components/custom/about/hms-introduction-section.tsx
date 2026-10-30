@@ -30,7 +30,7 @@ export default function HMSIntroductionSectionV2() {
               <div className="relative aspect-[16/9]">
                 <Image
                   src={webData?.about?.images?.right || ""}
-                  alt="HMS Introduction"
+                  alt="Niqaha.com Introduction"
                   width={1000}
                   height={1000}
                   className="object-cover"

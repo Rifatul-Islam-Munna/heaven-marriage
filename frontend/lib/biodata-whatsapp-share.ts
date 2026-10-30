@@ -151,7 +151,7 @@ export const buildBiodataWhatsappText = (
   origin: string,
   options: BuildBiodataWhatsappTextOptions = {},
 ) => {
-  const { includeContactNumber = true } = options;
+  const { includeContactNumber = false } = options;
   const contactWhatsapp = includeContactNumber
     ? cleanText(user?.whatsapp) || cleanText(user?.phoneNumber)
     : "";
@@ -176,7 +176,7 @@ export const buildBiodataWhatsappText = (
     "",
     `${isFemale ? "🌿🍂" : "🌿🍁"} *${isFemale ? "পাত্রীর" : "পাত্রের"} বায়োডাটা নাম্বারঃ* ${biodataNumber}`,
     "",
-    formatLabelValueLine("নামঃ", user.name),
+    formatLabelValueLine("নামঃ", user.identityUnlocked===false?undefined:user.name),
     formatLabelValueLine("বয়সঃ", formatAge(user.age)),
     formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
     formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
@@ -227,6 +227,8 @@ export const buildBiodataWhatsappText = (
       user.expectedLifePartner?.expectedQuality,
     ),
     formatLabelValueLine("আপনার হোয়াটসঅ্যাপ নাম্বারঃ", contactWhatsapp),
+    includeContactNumber ? formatLabelValueLine("মোবাইল নম্বর:",user.phoneNumber) : "",
+    includeContactNumber ? formatLabelValueLine("অভিভাবকের নম্বর:",user.guardianPhone) : "",
     "",
     `*${isFemale ? "পাত্রীর" : "পাত্রের"} বিস্তারিত বায়োডাটা লিংকঃ*`,
     profileUrl,

@@ -1,4 +1,5 @@
 "use client";
+import PlatformOverview from "@/components/custom/profile/PlatformOverview";
 import { useUser } from "@/lib/useUser";
 import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,9 +92,9 @@ const User = () => {
     method: "DELETE",
     url: "/user/delete-my-account",
     mutationKey: ["delete-user"],
-    successMessage: "ব্যবহারকারী মুছে ফেলা হয়েছে",
+    successMessage: "মুছে ফেলার অনুরোধ জমা হয়েছে। অ্যাডমিন পর্যালোচনা করবেন।",
     onSuccess: () => {
-      handellogout();
+      refetch();
     },
   });
 
@@ -120,6 +121,7 @@ const User = () => {
 
   // Calculate profile completion percentage
   const profileCompletion = useMemo(() => {
+    if(user?.completion)return user.completion.percentage;
     if (!user) return 0;
 
     let totalFields = 0;
@@ -359,6 +361,7 @@ const User = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+<PlatformOverview />
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

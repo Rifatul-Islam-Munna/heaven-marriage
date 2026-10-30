@@ -1,7 +1,8 @@
 // components/biodata-advanced-filter.tsx
 "use client";
+import { searchEvent } from "@/lib/google-tag-manager";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   useQueryStates,
   parseAsString,
@@ -142,13 +143,17 @@ function FilterContent({
   const [newAge] = useDebounce(age, 600);
   const [newHeight] = useDebounce(height, 600);
 
+  const lastAge=useRef(newAge),lastHeight=useRef(newHeight);
   useEffect(() => {
-    setFilters({ ...filters, ageMin: newAge.min, ageMax: newAge.max });
+    if(lastAge.current.min===newAge.min&&lastAge.current.max===newAge.max)return;
+    lastAge.current=newAge;
+    setFilters({ ageMin: newAge.min, ageMax: newAge.max });
   }, [newAge]);
 
   useEffect(() => {
+    if(lastHeight.current.min===newHeight.min&&lastHeight.current.max===newHeight.max)return;
+    lastHeight.current=newHeight;
     setFilters({
-      ...filters,
       heightMin: newHeight.min,
       heightMax: newHeight.max,
     });
@@ -328,7 +333,7 @@ function FilterContent({
                               // Close dialog - you'll need to manage this state
                               document
                                 .querySelector('[data-state="open"]')
-                                ?.querySelector('button[aria-label="Close"]')
+                                ?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
                                 ?.click();
                             }}
                             className="text-sm"
@@ -457,7 +462,7 @@ function FilterContent({
                               });
                               document
                                 .querySelector('[data-state="open"]')
-                                ?.querySelector('button[aria-label="Close"]')
+                                ?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
                                 ?.click();
                             }}
                             className="text-sm"
@@ -924,7 +929,7 @@ export default function BiodataAdvancedFilter() {
   const [upazilaOpen, setUpazilaOpen] = useState(false);
 
   // URL State Management with nuqs
-  const [filters, setFilters] = useQueryStates({
+  const [filters, setRawFilters] = useQueryStates({
     gender: parseAsString.withDefault("all"),
     maritalStatus: parseAsArrayOf(parseAsString).withDefault([]),
     ageMin: parseAsInteger.withDefault(10),
@@ -945,6 +950,7 @@ export default function BiodataAdvancedFilter() {
     polygamy: parseAsArrayOf(parseAsString).withDefault([]),
   });
 
+  const setFilters:typeof setRawFilters=(values,options)=>{searchEvent();return setRawFilters(values,options);};
   // Collapsible sections state
   const [openSections, setOpenSections] = useState({
     primary: true,
@@ -955,16 +961,16 @@ export default function BiodataAdvancedFilter() {
     others: false,
   });
 
-  const toggleSection = (section: keyof typeof openSections) => {
-    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  const toggleSection = (section: string) => {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
   };
 
   const handleCheckboxChange = (
-    field: keyof typeof filters,
+    field: string,
     value: string,
     checked: boolean,
   ) => {
-    const currentValues = filters[field] as string[];
+    const currentValues = filters[field as keyof typeof filters] as string[];
     if (checked) {
       setFilters({ [field]: [...currentValues, value] });
     } else {
@@ -1003,7 +1009,7 @@ export default function BiodataAdvancedFilter() {
     ? upazilas.filter((upazila) => upazila.district_id === selectedDistrict.id)
     : [];
 
-  const hasActiveFilters =
+  const hasActiveFilters = Boolean(
     filters.gender !== "all" ||
     filters.maritalStatus.length > 0 ||
     filters.ageMin !== 10 ||
@@ -1018,7 +1024,7 @@ export default function BiodataAdvancedFilter() {
     filters.fiqh.length > 0 ||
     filters.profession.length > 0 ||
     filters.economicStatus.length > 0 ||
-    filters.category.length > 0;
+    filters.category.length > 0);
 
   return (
     <>

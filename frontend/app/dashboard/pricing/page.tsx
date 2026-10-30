@@ -41,6 +41,8 @@ interface Pricing {
   originalPrice: number;
   discountPrice?: number;
   numberOfConnections: number;
+  disabled?:boolean;
+  validityDays?:number;
 }
 
 interface PricingFormData {
@@ -50,6 +52,8 @@ interface PricingFormData {
   originalPrice: string;
   discountPrice: string;
   numberOfConnections: string;
+  disabled?:boolean;
+  validityDays?:string;
 }
 
 // Convert English numbers to Bangla
@@ -77,7 +81,7 @@ const PricingDashboard = () => {
   // Fetch all pricings
   const { data: pricings = [], isLoading } = useQueryWrapper<Pricing[]>(
     ["pricings"],
-    "/pricing",
+    "/pricing/admin/all",
     {
       staleTime: 5000,
     },
@@ -147,6 +151,8 @@ const PricingDashboard = () => {
         ? Number(formData.discountPrice)
         : undefined,
       numberOfConnections: Number(formData.numberOfConnections),
+      disabled:!!formData.disabled,
+      validityDays:formData.validityDays?Number(formData.validityDays):undefined,
     };
 
     if (isEditing) {
@@ -174,6 +180,8 @@ const PricingDashboard = () => {
         ? pricing.discountPrice.toString()
         : "",
       numberOfConnections: pricing.numberOfConnections.toString(),
+      disabled:!!pricing.disabled,
+      validityDays:pricing.validityDays?.toString()||"",
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -394,6 +402,7 @@ const PricingDashboard = () => {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <label className="flex gap-2 text-sm"><input type="checkbox" checked={!!formData.disabled} onChange={e=>setFormData({...formData,disabled:e.target.checked})}/>Disable new purchases</label><div className="space-y-2"><Label htmlFor="validityDays">Validity in days (optional)</Label><Input id="validityDays" type="number" min={1} max={3650} value={formData.validityDays||""} onChange={e=>setFormData({...formData,validityDays:e.target.value})}/></div>
             <div className="space-y-2">
               <Label
                 htmlFor="title"
