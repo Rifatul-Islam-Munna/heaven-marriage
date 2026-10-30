@@ -47,6 +47,7 @@ export default function Footer() {
   const pathName = usePathname();
   return (
     <footer
+      data-visual-global="true"
       className={cn(
         `w-full border-t bg-gradient-to-br from-pink-50 to-purple-50`,
         {

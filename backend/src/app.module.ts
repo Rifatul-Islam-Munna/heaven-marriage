@@ -11,6 +11,7 @@ import { GuidelinesModule } from './guidelines/guidelines.module';
 import { ContactModule } from './contact/contact.module';
 import { ImageModule } from './image/image.module';
 import { WebDataModule } from './web-data/web-data.module';
+import { VisualContentModule } from './visual-content/visual-content.module';
 import { PricingModule } from './pricing/pricing.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
@@ -58,6 +59,7 @@ import { Request } from 'express';
     ContactModule,
     ImageModule,
     WebDataModule,
+    VisualContentModule,
     PricingModule,
     CustomQuestionModule,
   ],

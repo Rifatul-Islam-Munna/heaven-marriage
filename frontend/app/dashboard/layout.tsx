@@ -38,6 +38,10 @@ const data = {
           url: "/dashboard/contact",
         },
         {
+          title: "ভিজ্যুয়াল পেজ এডিটর",
+          url: "/dashboard/visual-editor",
+        },
+        {
           title: "ছবি",
           url: "/dashboard/images",
         },

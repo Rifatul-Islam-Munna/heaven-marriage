@@ -139,3 +139,12 @@ html,
 body {
   overflow-x: hidden;
 }
+
+/* Visual copy editing: preserve the site's typography and allow Arabic shaping. */
+.visual-arabic-copy { font-family: 'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, serif; unicode-bidi: plaintext; }
+.visual-current-selection { outline: 2px dashed #e11d48 !important; outline-offset: 4px; }
+
+/* The inspector marks text without changing the site's normal styling. */
+html.visual-editing-mode body :not([data-visual-editor-ui]) { caret-color: auto; }
+.visual-hover-selection:not(.visual-current-selection) { outline: 1px dashed #f43f5e !important; outline-offset: 3px; cursor: text !important; }
+.visual-current-selection { outline: 2px solid #e11d48 !important; outline-offset: 4px; }

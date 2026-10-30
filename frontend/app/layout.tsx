@@ -43,6 +43,7 @@ import type { Metadata } from "next";
 import TrackingConsent from "@/lib/TrackingConsent";
 import { publicMetadata } from "@/lib/seo";
 import { PageViewTracker } from "@/lib/PageViewTracker";
+import VisualContentRuntime from "@/components/custom/dashboard/VisualContentRuntime";
 import { Suspense } from "react";
 export const metadata: Metadata = { ...publicMetadata("Niqaha.com | ইসলামিক ম্যাট্রিমনি", "বাংলাদেশ ও প্রবাসী বাংলাদেশিদের জন্য ইসলামিক ম্যাট্রিমনি। বায়োডাটা জমা দিন, পাত্র-পাত্রীর বায়োডাটা খুঁজুন এবং নিরাপদে সংযোগ নিন।", "/"), metadataBase: new URL("https://niqaha.com"), icons: { icon: "/favicon.ico", apple: "/logo.png" } };
 
@@ -69,6 +70,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <Suspense><VisualContentRuntime /></Suspense>
           </NuqsAdapter>
         </QueryClint>
         <Toaster />
