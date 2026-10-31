@@ -1,309 +1,804 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
-import {BarChart3,CheckCircle2,Code2,ExternalLink,FileSearch,Globe,Image as ImageIcon,LockKeyhole,RefreshCcw,Save,Search,Send,Settings2,ShieldCheck} from 'lucide-react';
-import {visualPageCatalog} from '@/lib/visual-page-catalog';
-import {SITE_ORIGIN,isPrivateSeoPath,validSeoPath,type SeoAdminDoc,type SeoListItem,type SeoSettings} from '@/lib/seo-settings-types';
 
-type Tab='basics'|'social'|'indexing'|'schema'|'site';
-type Group='robots'|'openGraph'|'twitter'|'sitemap'|'verification';
-const cls='w-full rounded-xl border border-[#e8dbe0] bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100';
-function Field({name,children,hint}:{name:string;children:React.ReactNode;hint?:string}){
-  return <label className="block space-y-1.5"><span className="block text-xs font-bold text-[#56414c]">{name}</span>
-    {children}{hint&&<span className="block text-[11px] leading-5 text-[#97838d]">{hint}</span>}</label>;
-}
-function TextField({name,value,onChange,hint,placeholder='',multiline=false}:{name:string;value:string;onChange:(v:string)=>void;hint?:string;placeholder?:string;multiline?:boolean}){
-  return <Field name={name} hint={hint}>{multiline?
-    <textarea dir="auto" rows={3} className={cls+' resize-y'} value={value} placeholder={placeholder} onChange={e=>onChange(e.target.value)}/>:
-    <input dir="auto" className={cls} value={value} placeholder={placeholder} onChange={e=>onChange(e.target.value)}/>}</Field>;
-}
-function Toggle({label,checked,onChange,disabled=false,help}:{label:string;checked:boolean;onChange:(v:boolean)=>void;disabled?:boolean;help?:string}){
-  return <label className="flex items-center justify-between gap-4 rounded-xl border border-[#eee4e7] p-3.5">
-    <span><span className="block text-sm font-semibold">{label}</span>{help&&<span className="mt-1 block text-xs text-[#96818d]">{help}</span>}</span>
-    <input aria-label={label} type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange(e.target.checked)} className="size-4 shrink-0 accent-rose-600"/>
-  </label>;
-}
-function parseLanguages(source:string){
-  const result:Record<string,string>={};
-  for(const line of source.split('\n').map(v=>v.trim()).filter(Boolean)){
-    const m=line.match(/^([a-z]{2,3}(?:-[a-zA-Z]{2,4})?|x-default):\s*(.+)$/);
-    if(m)result[m[1]]=m[2].trim();
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Check, CheckCircle2, ChevronsUpDown, Code2, ExternalLink, FileSearch, Globe, Image as ImageIcon, Info,
+  Loader2, LockKeyhole, RotateCcw, Save, Search, Send, Settings2, TriangleAlert,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { visualPageCatalog } from '@/lib/visual-page-catalog';
+import {
+  SITE_ORIGIN, isPrivateSeoPath, validSeoPath, type SeoAdminDoc, type SeoListItem, type SeoSettings,
+} from '@/lib/seo-settings-types';
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DashboardHeader, DashboardPage, DashButton, KpiCard, KpiRow, Panel, PlainHeader, Segmented, SortHeader,
+  StatusPill, Toggle, fieldClass, formatWhen, labelClass, type SortState,
+} from './dashboard-kit';
+
+type Tab = 'search' | 'social' | 'indexing' | 'schema' | 'site';
+type Group = 'robots' | 'openGraph' | 'twitter' | 'sitemap' | 'verification';
+type RowStatus = 'pending' | 'live' | 'original';
+type SortKey = 'page' | 'status' | 'updated';
+type TableFilter = 'all' | 'pending' | 'live' | 'original' | 'private';
+type CheckState = 'good' | 'warn' | 'bad' | 'info';
+type HealthCheck = { label: string; state: CheckState; detail: string };
+type Row = { path: string; label: string; status: RowStatus; isPrivate: boolean; updatedAt: string | null };
+
+const SITE = '@site';
+const catalogLabels = new Map(visualPageCatalog.map(page => [page.path, page.label]));
+const scopeLabel = (scope: string) => scope === SITE ? 'Site-wide settings' : catalogLabels.get(scope) || 'Specific address';
+const STATUS_ORDER: Record<RowStatus, number> = { pending: 0, live: 1, original: 2 };
+const darkLink = 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-white/20 bg-white/10 px-3 py-2 text-[13px] font-medium text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+
+function parseLanguages(source: string) {
+  const result: Record<string, string> = {};
+  for (const line of source.split('\n').map(value => value.trim()).filter(Boolean)) {
+    const match = line.match(/^([a-z]{2,3}(?:-[a-zA-Z]{2,4})?|x-default):\s*(.+)$/);
+    if (match) result[match[1]] = match[2].trim();
   }
   return result;
 }
-const languageText=(v?:Record<string,string>)=>Object.entries(v||{}).map(([k,x])=>k+': '+x).join('\n');
-const tabs:[Tab,string,typeof Search][]=[
-  ['basics','Search basics',FileSearch],['social','Social cards',ImageIcon],
-  ['indexing','Index & sitemap',Globe],['schema','Schema / Hreflang',Code2],['site','Global settings',Settings2],
-];
+const languageText = (value?: Record<string, string>) => Object.entries(value || {}).map(([key, url]) => key + ': ' + url).join('\n');
+function jsonState(text?: string): 'empty' | 'valid' | 'invalid' {
+  if (!text?.trim()) return 'empty';
+  try { JSON.parse(text); return 'valid'; } catch { return 'invalid'; }
+}
+const statusOf = (item?: SeoListItem): RowStatus => !item ? 'original' : item.hasUnpublishedChanges ? 'pending' : item.published ? 'live' : 'original';
+function updatedOf(item?: SeoListItem) {
+  const raw = (item as unknown as Record<string, unknown> | undefined)?.updatedAt;
+  return typeof raw === 'string' ? raw : null;
+}
+const looksLikeTag = (value?: string) => !!value && /[<>]|content=/i.test(value);
 
-export default function SeoManager(){
-  const [scope,setScope]=useState('/');
-  const [query,setQuery]=useState('');
-  const [custom,setCustom]=useState('');
-  const [tab,setTab]=useState<Tab>('basics');
-  const [doc,setDoc]=useState<SeoAdminDoc|null>(null);
-  const [form,setForm]=useState<SeoSettings>({});
-  const [saved,setSaved]=useState<SeoListItem[]>([]);
-  const [langInput,setLangInput]=useState('');
-  const [busy,setBusy]=useState(false);
-  const [message,setMessage]=useState('');
-  const [error,setError]=useState('');
-  const isPrivate=isPrivateSeoPath(scope);
-  const available=useMemo(()=>visualPageCatalog.filter(x=>x.path.toLowerCase().includes(query.toLowerCase())||
-    x.label.toLowerCase().includes(query.toLowerCase())),[query]);
-  const pageStatus=saved.find(x=>x.scope===scope);
-  const tabsShown=tabs.filter(x=>scope==='@site'?x[0]==='site'||x[0]==='schema':x[0]!=='site');
-  const languageDirty=scope!=='@site'&&langInput!==languageText(doc?.draft.languages);
-  const dirty=JSON.stringify(form)!==JSON.stringify(doc?.draft||{})||languageDirty;
-  const siteTitle=form.title||visualPageCatalog.find(x=>x.path===scope)?.label+' | Niqaha.com'||'Niqaha.com';
-  const siteDescription=form.description||'The existing page description remains the fallback.';
-  const url=scope==='@site'?SITE_ORIGIN:form.canonical||SITE_ORIGIN+(scope==='/'?'':scope);
-
-  const reloadList=useCallback(async()=>{
-    try{const response=await fetch('/api/seo-settings?list=1',{cache:'no-store'});
-      if(response.ok)setSaved(await response.json() as SeoListItem[]);}catch{}
-  },[]);
-  useEffect(()=>{void reloadList();},[reloadList]);
-  useEffect(()=>{
-    const chosen=new URLSearchParams(window.location.search).get('path');
-    if(chosen&&validSeoPath(chosen))setScope(chosen);
-  },[]);
-  useEffect(()=>{
-    const controller=new AbortController();
-    setDoc(null);setForm({});setLangInput('');setError('');setMessage('');
-    void (async()=>{
-      try{
-        const response=await fetch('/api/seo-settings?admin=1&path='+encodeURIComponent(scope),
-          {cache:'no-store',signal:controller.signal});
-        if(!response.ok)throw Error((await response.json()).message||'Unable to load SEO content');
-        const next=await response.json() as SeoAdminDoc;
-        if(controller.signal.aborted)return;
-        setDoc(next);setForm(next.draft);setLangInput(languageText(next.draft.languages));
-      }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Loading failed');}
-    })();
-    return ()=>controller.abort();
-  },[scope]);
-  const change=(key:keyof SeoSettings,value:unknown)=>
-    setForm(prev=>({...prev,[key]:value}));
-  const nested=(group:Group,key:string,value:string|number|boolean|undefined)=>
-    setForm(prev=>({...prev,[group]:{...(prev[group]||{}),[key]:value}}));
-  const pick=(path:string)=>{
-    setScope(path);setTab(path==='@site'?'site':'basics');
-    setError('');setMessage('');
-  };
-  const chooseCustom=()=>{
-    let path=custom.trim();
-    if(/^https?:\/\//.test(path)){
-      try{
-        const u=new URL(path);
-        if(u.origin!==SITE_ORIGIN&&u.origin!==window.location.origin)throw Error();
-        path=u.pathname;
-      }catch{setError('Use a Niqaha.com page URL, not an external website.');return;}
-    }
-    path=path==='/'?path:path.replace(/\/$/,'');
-    if(!validSeoPath(path)||path==='@site'){setError('Enter a valid path such as /policies/privacy.');return;}
-    pick(path);
-  };
-  async function save(){
-    if(!doc||busy)return;
-    setBusy(true);setError('');setMessage('');
-    try{
-      if(form.structuredData?.trim())JSON.parse(form.structuredData);
-      const langs=parseLanguages(langInput);
-      if(scope!=='@site'&&langInput.split('\n').filter(x=>x.trim()).length!==Object.keys(langs).length)
-        throw Error('Hreflang requires one language: URL on each line.');
-      const settings={...form,...(scope==='@site'?{}:{languages:langs})};
-      const response=await fetch('/api/seo-settings',{
-        method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({scope,revision:doc.revision,settings}),
-      });
-      const payload=await response.json();
-      if(!response.ok)throw Error(payload.message||'Unable to save SEO');
-      setDoc(payload);setForm(payload.draft);setLangInput(languageText(payload.draft.languages));
-      setMessage('Draft saved to MongoDB. Publish to make your SEO changes live.');
-      await reloadList();
-    }catch(e){setError(e instanceof Error?e.message:'Save failed');}
-    finally{setBusy(false);}
-  }
-  async function publish(){
-    if(!doc||busy)return;
-    if(dirty){setError('Save your changes first, then publish.');return;}
-    if(!window.confirm('Publish SEO settings for '+scope+'?'))return;
-    setBusy(true);setError('');setMessage('');
-    try{
-      const response=await fetch('/api/seo-settings',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({scope,revision:doc.revision}),
-      });
-      const result=await response.json();
-      if(!response.ok)throw Error(result.message||'Publish failed');
-      setDoc(result);setMessage('Published! Search metadata and sitemap caches invalidated.');
-      await reloadList();
-    }catch(e){setError(e instanceof Error?e.message:'Publish failed');}
-    finally{setBusy(false);}
-  }
-  return <div className="min-h-screen bg-[#fbf8f8] px-4 py-7 text-[#2e232b] md:px-7 md:py-9">
-    <div className="mx-auto max-w-[1450px] space-y-6">
-      <header className="relative overflow-hidden rounded-3xl bg-[#2c1e29] px-7 py-8 text-white md:px-9">
-        <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-80 rounded-full bg-rose-400/20 blur-3xl"/>
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-rose-200"><BarChart3 size={16}/> Niqaha · Search visibility studio</p>
-            <h1 className="mt-3 font-serif text-4xl font-semibold md:text-5xl">Every page. Every detail.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/70">Edit search snippets, canonical links, social previews, robots, sitemaps and structured data in one place. Your website design stays untouched.</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={()=>void save()} disabled={!doc||busy||!dirty} className="flex items-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-xs font-bold hover:bg-white/10 disabled:opacity-35"><Save size={16}/> Save draft</button>
-            <button onClick={()=>void publish()} disabled={!doc||busy||dirty||!doc.hasUnpublishedChanges} className="flex items-center gap-2 rounded-xl bg-[#f6a1b6] px-5 py-3 text-xs font-bold text-[#301d28] hover:bg-[#ffd0dc] disabled:opacity-40"><Send size={16}/> Publish</button>
-          </div>
-        </div>
-        <div className="relative mt-6 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-white/10 px-3 py-1.5">{visualPageCatalog.length} routes</span>
-          <span className="rounded-full bg-white/10 px-3 py-1.5">{saved.filter(x=>x.published).length} published settings</span>
-          <span className="rounded-full bg-white/10 px-3 py-1.5">20-minute server cache</span>
-          <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5"><ShieldCheck size={13}/> Admin protected</span>
-        </div>
-      </header>
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(255px,320px)_minmax(0,1fr)]">
-        <aside className="overflow-hidden rounded-2xl border border-[#eee1e5] bg-white shadow-sm">
-          <div className="border-b border-[#eee1e5] p-4">
-            <p className="text-base font-bold">Your pages <span className="text-xs font-normal text-[#a58c97]">({available.length})</span></p>
-            <label className="relative mt-3 block"><Search size={15} className="absolute left-3 top-3.5 text-rose-400"/><input aria-label="Search routes" value={query} onChange={e=>setQuery(e.target.value)} className={cls+' pl-9'} placeholder="Search page titles or URLs"/></label>
-          </div>
-          <div className="max-h-[550px] space-y-1 overflow-y-auto p-2">
-            <button onClick={()=>pick('@site')} className={'flex w-full items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-bold '+(scope==='@site'?'border-rose-300 bg-rose-50':'border-transparent hover:bg-[#fbf7f8]')}><Settings2 size={16} className="text-rose-600"/> Global SEO & verification</button>
-            {available.map(item=>{
-              const savedItem=saved.find(x=>x.scope===item.path);
-              return <button key={item.path} onClick={()=>pick(item.path)} className={'w-full rounded-xl border px-3 py-3 text-left '+(item.path===scope?'border-rose-300 bg-rose-50':'border-transparent hover:bg-[#fbf7f8]')}>
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  {isPrivateSeoPath(item.path)?<LockKeyhole size={13} className="text-[#9f8893]"/>:<FileSearch size={13} className="text-rose-500"/>}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                </p>
-                <p className="mt-1 truncate pl-5 font-mono text-[11px] text-[#98818b]">{item.path}</p>
-                {savedItem&&<p className="mt-1.5 pl-5 text-[11px] text-rose-700">{savedItem.hasUnpublishedChanges?'● Unpublished draft':savedItem.published?'✓ Published':'Draft saved'}</p>}
-              </button>;
-            })}
-          </div>
-          <div className="space-y-2 border-t border-[#eee1e5] p-4">
-            <p className="text-xs font-semibold">Individual URL or dynamic route</p>
-            <div className="flex gap-2">
-              <input aria-label="Custom page path" className={cls+' min-w-0 flex-1'} value={custom} onChange={e=>setCustom(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')chooseCustom();}} placeholder="/policies/privacy"/>
-              <button onClick={chooseCustom} className="rounded-xl border border-rose-200 px-4 text-xs font-bold text-rose-700">Go</button>
-            </div>
-            <p className="text-[11px] leading-5 text-[#998891]">For dynamic pages choose a template like /policies/[kind], or enter one exact URL.</p>
-          </div>
-        </aside>
-        <div className="min-w-0 space-y-5">
-          <section className="space-y-5 rounded-2xl border border-[#eee1e5] bg-white p-5 shadow-sm md:p-7">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-[11px] font-bold uppercase tracking-[.15em] text-rose-600">Selected SEO configuration</p><h2 className="mt-2 break-all font-mono text-xl font-bold">{scope==='@site'?'Whole site':scope}</h2><p className="mt-1 text-xs text-[#98848c]">Revision {doc?.revision??0} · {pageStatus?.published?'Published before':'Using original metadata'}</p></div>
-              {scope!=='@site'&&<a href={scope.includes('[')?'/':scope} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><ExternalLink size={14}/> View page</a>}
-            </div>
-            {isPrivate&&<p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900"><LockKeyhole className="mt-0.5 shrink-0" size={16}/> Protected account page. Its title can be edited, but it always remains noindex and excluded from the sitemap.</p>}
-            {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-            {message&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
-            <div className="flex flex-wrap gap-2 border-b border-[#eee1e5] pb-4">
-              {tabsShown.map(([key,title,Icon])=><button key={key} onClick={()=>setTab(key)} className={'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold '+(tab===key?'bg-[#382731] text-white':'bg-[#faf5f7] text-[#765966] hover:bg-rose-50')}><Icon size={14}/>{title}</button>)}
-            </div>
-            {scope!=='@site'&&tab==='basics'&&<div className="grid gap-5">
-              <h3 className="font-serif text-2xl font-semibold">Search essentials</h3>
-              <TextField name="Meta title" value={form.title||''} onChange={v=>change('title',v)} hint="Write a unique, descriptive title. Search engines may shorten it."/>
-              <p className="-mt-4 text-xs text-[#887581]">{(form.title||'').length} characters</p>
-              <TextField name="Meta description" multiline value={form.description||''} onChange={v=>change('description',v)} hint="A clear summary of this exact page, not a keyword list."/>
-              <p className="-mt-4 text-xs text-[#887581]">{(form.description||'').length} characters</p>
-              <TextField name="Keywords (optional)" value={(form.keywords||[]).join(', ')} onChange={v=>change('keywords',v.split(',').map(s=>s.trim()).filter(Boolean))} hint="Comma-separated. Google generally ignores this meta tag."/>
-              <TextField name="Canonical URL" value={form.canonical||''} onChange={v=>change('canonical',v)} placeholder={SITE_ORIGIN+scope} hint="Keep blank to use the existing canonical. Only niqaha.com is allowed."/>
-              <TextField name="Content author (optional)" value={form.author||''} onChange={v=>change('author',v)}/>
-            </div>}
-            {scope!=='@site'&&tab==='social'&&<div className="grid gap-5">
-              <h3 className="font-serif text-2xl font-semibold">Social sharing previews</h3>
-              <p className="text-xs text-[#98818d]">Recommended preview image: roughly 1200 × 630 px. Use a publicly available image URL.</p>
-              <h4 className="text-sm font-bold text-rose-700">Open Graph · Facebook, Messenger, LinkedIn</h4>
-              <TextField name="OG title" value={form.openGraph?.title||''} onChange={v=>nested('openGraph','title',v)}/>
-              <TextField name="OG description" multiline value={form.openGraph?.description||''} onChange={v=>nested('openGraph','description',v)}/>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField name="OG image URL" value={form.openGraph?.image||''} onChange={v=>nested('openGraph','image',v)} placeholder="/opengraph-image"/>
-                <TextField name="OG image description" value={form.openGraph?.imageAlt||''} onChange={v=>nested('openGraph','imageAlt',v)}/>
-                <Field name="OG page type"><select className={cls} value={form.openGraph?.type||'website'} onChange={e=>nested('openGraph','type',e.target.value)}><option value="website">Website</option><option value="article">Article</option></select></Field>
-                <TextField name="OG language locale" value={form.openGraph?.locale||''} onChange={v=>nested('openGraph','locale',v)} placeholder="bn_BD"/>
-              </div>
-              <h4 className="border-t border-[#eee1e5] pt-5 text-sm font-bold text-rose-700">X / Twitter card</h4>
-              <Field name="Card style"><select className={cls} value={form.twitter?.card||'summary_large_image'} onChange={e=>nested('twitter','card',e.target.value)}><option value="summary_large_image">Large preview</option><option value="summary">Compact preview</option></select></Field>
-              <TextField name="X title" value={form.twitter?.title||''} onChange={v=>nested('twitter','title',v)}/>
-              <TextField name="X description" multiline value={form.twitter?.description||''} onChange={v=>nested('twitter','description',v)}/>
-              <TextField name="X image URL" value={form.twitter?.image||''} onChange={v=>nested('twitter','image',v)}/>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField name="X site account" value={form.twitter?.site||''} onChange={v=>nested('twitter','site',v)} placeholder="@niqaha"/>
-                <TextField name="X creator" value={form.twitter?.creator||''} onChange={v=>nested('twitter','creator',v)}/>
-              </div>
-            </div>}
-            {scope!=='@site'&&tab==='indexing'&&<div className="grid gap-4">
-              <h3 className="font-serif text-2xl font-semibold">Indexing and crawling</h3>
-              <Toggle label="Allow search indexing" checked={!isPrivate&&form.robots?.index!==false} onChange={v=>nested('robots','index',v)} disabled={isPrivate} help="Controls the noindex directive."/>
-              <Toggle label="Follow page links" checked={!isPrivate&&form.robots?.follow!==false} onChange={v=>nested('robots','follow',v)} disabled={isPrivate}/>
-              <Toggle label="No text snippet" checked={form.robots?.nosnippet===true} onChange={v=>nested('robots','nosnippet',v)}/>
-              <Toggle label="No image index" checked={form.robots?.noimageindex===true} onChange={v=>nested('robots','noimageindex',v)}/>
-              <Toggle label="Noarchive (legacy)" checked={form.robots?.noarchive===true} onChange={v=>nested('robots','noarchive',v)}/>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field name="Maximum snippet length"><input className={cls} type="number" min={-1} max={10000} placeholder="Default" value={form.robots?.maxSnippet??''} onChange={e=>nested('robots','maxSnippet',e.target.value===''?undefined:Number(e.target.value))}/></Field>
-                <Field name="Max image preview"><select className={cls} value={form.robots?.maxImagePreview||'large'} onChange={e=>nested('robots','maxImagePreview',e.target.value)}><option value="large">Large</option><option value="standard">Standard</option><option value="none">None</option></select></Field>
-              </div>
-              <h4 className="border-t border-[#eee1e5] pt-5 text-sm font-bold text-rose-700">XML sitemap</h4>
-              <Toggle label="Include in sitemap" checked={!isPrivate&&form.sitemap?.include!==false} disabled={isPrivate} onChange={v=>nested('sitemap','include',v)} help="Only existing public pages are eligible; noindex overrides this."/>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field name="Change frequency"><select className={cls} value={form.sitemap?.changeFrequency||'monthly'} onChange={e=>nested('sitemap','changeFrequency',e.target.value)}>{['always','hourly','daily','weekly','monthly','yearly','never'].map(v=><option key={v} value={v}>{v}</option>)}</select></Field>
-                <Field name="Priority (0–1)"><input className={cls} type="number" step={0.1} min={0} max={1} placeholder="Default" value={form.sitemap?.priority??''} onChange={e=>nested('sitemap','priority',e.target.value===''?undefined:Number(e.target.value))}/></Field>
-              </div>
-            </div>}
-            {tab==='schema'&&<div className="grid gap-4">
-              <h3 className="font-serif text-2xl font-semibold">JSON-LD structured data</h3>
-              <p className="text-xs leading-6 text-[#947f89]">Add valid schema.org JSON-LD that accurately describes this page. Rich results are not guaranteed, and executable scripts are not accepted.</p>
-              <textarea className={cls+' min-h-64 font-mono text-xs leading-6'} spellCheck={false} aria-label="Structured data JSON-LD"
-                value={form.structuredData||''} onChange={e=>change('structuredData',e.target.value)}
-                placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "WebPage",\n  "name": "Niqaha"\n}'}/>
-              {form.structuredData?.trim()&&<p className="text-xs">{(()=>{try{JSON.parse(form.structuredData);return '✓ Valid JSON';}catch{return 'Please fix invalid JSON before saving.';}})()}</p>}
-              {scope!=='@site'&&<TextField name="Hreflang alternate URLs" multiline value={langInput} onChange={setLangInput} placeholder={'bn: /\nen: /en'} hint="One existing translated equivalent per line, formatted: language: URL. Do not invent translated pages."/>}
-            </div>}
-            {scope==='@site'&&tab==='site'&&<div className="grid gap-4">
-              <h3 className="font-serif text-2xl font-semibold">Site-wide SEO identity</h3>
-              <p className="text-xs leading-6 text-[#94808a]">Global settings support every page, alongside the original per-page metadata.</p>
-              <TextField name="Brand/site name" value={form.siteName||''} onChange={v=>change('siteName',v)} placeholder="Niqaha.com"/>
-              <TextField name="Default social share image URL" value={form.openGraph?.image||''} onChange={v=>nested('openGraph','image',v)} placeholder="/opengraph-image"/>
-              <h4 className="border-t border-[#eee1e5] pt-4 text-sm font-bold">Search Console verification</h4>
-              <TextField name="Google verification token" value={form.verification?.google||''} onChange={v=>nested('verification','google',v)} hint="Token only. Do not paste the full meta tag."/>
-              <TextField name="Bing verification token" value={form.verification?.bing||''} onChange={v=>nested('verification','bing',v)}/>
-            </div>}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eee1e5] pt-5">
-              <button onClick={()=>{setForm({});setLangInput('');setMessage('Coded defaults selected. Save and publish to restore them.');}} className="flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700"><RefreshCcw size={14}/> Restore original defaults</button>
-              <div className="flex gap-2">
-                <button onClick={()=>void save()} disabled={!doc||busy||!dirty} className="flex items-center gap-1 rounded-lg bg-[#392832] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40"><Save size={15}/> Save</button>
-                <button onClick={()=>void publish()} disabled={!doc||busy||dirty||!doc.hasUnpublishedChanges} className="flex items-center gap-1 rounded-lg bg-rose-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40"><Send size={15}/> Publish</button>
-              </div>
-            </div>
-          </section>
-          {scope!=='@site'&&<div className="grid gap-5 xl:grid-cols-2">
-            <section className="min-w-0 rounded-2xl border border-[#eee1e5] bg-white p-5 shadow-sm">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#886e7a]"><Search size={15}/> Search preview</h3>
-              <p className="mt-5 break-all text-xs text-emerald-700">{url}</p>
-              <p className="mt-1 line-clamp-2 text-lg font-medium text-[#2156b0]">{siteTitle}</p>
-              <p className="mt-1 line-clamp-3 text-sm text-[#6a6570]">{siteDescription}</p>
-              <p className="mt-3 text-[11px] text-[#93838d]">Illustrative; Google can change the actual snippet.</p>
-            </section>
-            <section className="min-w-0 rounded-2xl border border-[#eee1e5] bg-white p-5 shadow-sm">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#886e7a]"><ImageIcon size={15}/> Share preview</h3>
-              <div className="mt-4 overflow-hidden rounded-xl border bg-[#faf6f7]">
-                <div className="flex h-24 items-center justify-center bg-[#f0e0e6] text-rose-600">
-                  {form.openGraph?.image?<p className="px-3 text-center text-xs">{form.openGraph.image}</p>:<ImageIcon size={28}/>}
-                </div>
-                <div className="p-3"><p className="text-[10px] font-semibold text-[#95848c]">NIQAHA.COM</p><p className="mt-1 truncate text-sm font-bold">{form.openGraph?.title||siteTitle}</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-[#92848e]">{form.openGraph?.description||siteDescription}</p></div>
-              </div>
-            </section>
-          </div>}
-          <p className="flex items-start gap-2 text-xs leading-6 text-[#8c7a86]"><CheckCircle2 size={17} className="mt-1 shrink-0 text-rose-600"/>
-            Settings are stored in MongoDB as drafts and published values. No new SEO data is applied to visitors until you publish. Existing metadata and page design remain the fallback.</p>
-        </div>
-      </div>
-    </div>
+function Field({ id, label, hint, children }: { id: string; label: string; hint?: ReactNode; children: ReactNode }) {
+  return <div className="min-w-0">
+    <label htmlFor={id} className={labelClass}>{label}</label>
+    {children}
+    {hint && <div className="mt-1 text-[11px] leading-4 text-[#6c757d]">{hint}</div>}
   </div>;
+}
+function SubHeading({ children }: { children: ReactNode }) {
+  return <h3 className="border-b border-[#f0f0f0] pb-1.5 text-[13px] font-semibold text-[#212529]">{children}</h3>;
+}
+function LengthHint({ length, min, max, empty }: { length: number; min: number; max: number; empty: string }) {
+  const state = !length ? 'empty' : length < min ? 'short' : length > max ? 'long' : 'good';
+  return <div className="mt-1.5">
+    <div className="h-1 overflow-hidden rounded-full bg-[#e9ecef]">
+      <div className={cn('h-full rounded-full transition-[width]', state === 'good' ? 'bg-emerald-500' : state === 'empty' ? 'bg-transparent' : 'bg-amber-500')}
+        style={{ width: Math.min(100, (length / max) * 100) + '%' }} />
+    </div>
+    <p className="mt-1 flex justify-between gap-2 text-[11px]">
+      <span className={state === 'good' ? 'text-emerald-700' : state === 'empty' ? 'text-[#6c757d]' : 'text-amber-700'}>
+        {state === 'empty' ? empty : state === 'short' ? `A bit short. Aim for ${min}–${max} characters.`
+          : state === 'long' ? `May get cut off. Aim for ${min}–${max} characters.` : 'Good length'}
+      </span>
+      <span className="tabular-nums text-[#adb5bd]">{length}</span>
+    </p>
+  </div>;
+}
+function PreviewImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState('');
+  if (!src || failed === src) return <div className={cn('flex items-center justify-center bg-[#f0f2f5] text-[#adb5bd]', className)}>
+    <ImageIcon size={26} aria-hidden /><span className="sr-only">No image</span>
+  </div>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} onError={() => setFailed(src)} className={cn('object-cover', className)} />;
+}
+
+function ScopePicker({ scope, records, onOpen }: {
+  scope: string; records: Map<string, SeoListItem>; onOpen: (next: string) => boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [address, setAddress] = useState('');
+  const [error, setError] = useState('');
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => { if (!boxRef.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  const pages = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return visualPageCatalog.filter(page => !q || page.label.toLowerCase().includes(q) || page.path.toLowerCase().includes(q));
+  }, [query]);
+  const choose = (path: string) => { if (onOpen(path)) { setOpen(false); setQuery(''); } };
+  const submit = () => {
+    let path = address.trim();
+    if (/^https?:\/\//i.test(path)) {
+      try {
+        const url = new URL(path);
+        if (url.origin !== SITE_ORIGIN && url.origin !== window.location.origin) throw Error();
+        path = url.pathname;
+      } catch { setError('Use a Niqaha.com address, not another website.'); return; }
+    }
+    if (path && !path.startsWith('/')) path = '/' + path;
+    path = path === '/' ? path : path.replace(/\/$/, '');
+    if (!validSeoPath(path) || path === SITE) { setError('Enter a valid address such as /policies/privacy.'); return; }
+    if (onOpen(path)) { setOpen(false); setAddress(''); setError(''); }
+  };
+  const dot = (item?: SeoListItem) => {
+    const status = statusOf(item);
+    return <span role="img" aria-label={status === 'pending' ? 'Draft waiting' : status === 'live' ? 'Custom SEO live' : 'Original metadata'}
+      className={cn('inline-block size-2 shrink-0 rounded-full', status === 'pending' ? 'bg-amber-500' : status === 'live' ? 'bg-emerald-500' : 'bg-[#ced4da]')} />;
+  };
+  return <div ref={boxRef} className="relative min-w-0 flex-1 sm:flex-none">
+    <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(value => !value)}
+      className="flex w-full min-w-0 items-center gap-2 rounded-md border border-[#dee2e6] bg-white px-3 py-1.5 text-left hover:bg-[#f8f9fa] focus-visible:outline-2 focus-visible:outline-rose-600 sm:w-[320px]">
+      {scope === SITE ? <Settings2 size={15} className="shrink-0 text-rose-600" /> : isPrivateSeoPath(scope)
+        ? <LockKeyhole size={15} className="shrink-0 text-[#6c757d]" /> : <Globe size={15} className="shrink-0 text-[#6c757d]" />}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{scopeLabel(scope)}</span>
+        <span className="block truncate font-mono text-[11px] text-[#6c757d]">{scope === SITE ? 'Applies to every page' : scope}</span>
+      </span>
+      <ChevronsUpDown size={15} className="shrink-0 text-[#6c757d]" />
+    </button>
+    {open && <div role="dialog" aria-label="Choose a page"
+      className="absolute left-0 top-full z-30 mt-1 w-[min(420px,calc(100vw-2rem))] rounded-lg border border-[#dee2e6] bg-white shadow-xl">
+      <div className="space-y-2 border-b border-[#f0f0f0] p-2">
+        <button type="button" onClick={() => choose(SITE)} className={cn('flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left',
+          scope === SITE ? 'bg-rose-50' : 'hover:bg-[#f8f9fa]')}>
+          <Settings2 size={15} className="shrink-0 text-rose-600" />
+          <span className="min-w-0 flex-1"><span className="block text-[13px] font-medium">Site-wide settings</span>
+            <span className="block text-[11px] text-[#6c757d]">Site name, default image, Search Console</span></span>
+          {dot(records.get(SITE))}
+        </button>
+        <label className="relative block">
+          <span className="sr-only">Search pages</span>
+          <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#adb5bd]" />
+          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search pages"
+            className={cn(fieldClass, 'py-1.5 pl-8 text-[13px]')} />
+        </label>
+      </div>
+      <ul aria-label="Pages" className="max-h-64 overflow-y-auto p-1">
+        {pages.map(page => {
+          const active = page.path === scope;
+          return <li key={page.path}>
+            <button type="button" aria-current={active ? 'page' : undefined} onClick={() => choose(page.path)}
+              className={cn('flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left', active ? 'bg-rose-50' : 'hover:bg-[#f8f9fa]')}>
+              {dot(records.get(page.path))}
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 truncate text-[13px] font-medium">
+                  {page.label}{isPrivateSeoPath(page.path) && <LockKeyhole size={11} className="shrink-0 text-[#adb5bd]" aria-label="Private page" />}
+                </span>
+                <span className="block truncate font-mono text-[11px] text-[#6c757d]">{page.path}</span>
+              </span>
+              {active && <Check size={14} className="shrink-0 text-rose-600" />}
+            </button>
+          </li>;
+        })}
+        {!pages.length && <li className="px-3 py-6 text-center text-[13px] text-[#6c757d]">No page matches “{query}”.</li>}
+      </ul>
+      <div className="border-t border-[#f0f0f0] p-3">
+        <label htmlFor="seo-address" className="mb-1.5 block text-[12px] font-semibold text-[#495057]">Open a specific address</label>
+        <div className="flex gap-2">
+          <input id="seo-address" value={address} onChange={event => { setAddress(event.target.value); setError(''); }}
+            onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); submit(); } }}
+            placeholder="/policies/privacy" aria-describedby="seo-address-help" aria-invalid={!!error}
+            className={cn(fieldClass, 'py-1.5 font-mono text-[12px]')} />
+          <DashButton tone="dark" onClick={submit}>Open</DashButton>
+        </div>
+        <p id="seo-address-help" className={cn('mt-1.5 text-[11px]', error ? 'text-amber-700' : 'text-[#6c757d]')}>
+          {error || 'Templates like /policies/[kind] set shared settings; an exact address overrides only that page.'}
+        </p>
+      </div>
+    </div>}
+  </div>;
+}
+
+export default function SeoManager() {
+  const [scope, setScope] = useState('/');
+  const [tab, setTab] = useState<Tab>('search');
+  const [doc, setDoc] = useState<SeoAdminDoc | null>(null);
+  const [form, setForm] = useState<SeoSettings>({});
+  const [saved, setSaved] = useState<SeoListItem[]>([]);
+  const [langInput, setLangInput] = useState('');
+  const [keywordText, setKeywordText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [network, setNetwork] = useState<'facebook' | 'x'>('facebook');
+  const [confirmPublish, setConfirmPublish] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: 'status', dir: 'asc' });
+  const [tableQuery, setTableQuery] = useState('');
+  const [tableFilter, setTableFilter] = useState<TableFilter>('all');
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  const isSite = scope === SITE;
+  const isPrivate = !isSite && isPrivateSeoPath(scope);
+  const languageDirty = !isSite && langInput !== languageText(doc?.draft.languages);
+  const dirty = !!doc && (JSON.stringify(form) !== JSON.stringify(doc.draft || {}) || languageDirty);
+
+  const reloadList = useCallback(async () => {
+    try {
+      const response = await fetch('/api/seo-settings?list=1', { cache: 'no-store' });
+      if (response.ok) setSaved(await response.json() as SeoListItem[]);
+    } catch { /* The page list still works while the SEO service is offline. */ }
+  }, []);
+  useEffect(() => { void reloadList(); }, [reloadList]);
+  useEffect(() => {
+    const chosen = new URLSearchParams(window.location.search).get('path');
+    if (chosen && validSeoPath(chosen)) { setScope(chosen); setTab(chosen === SITE ? 'site' : 'search'); }
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setDoc(null); setForm({}); setLangInput(''); setKeywordText(''); setLoadError('');
+    void (async () => {
+      try {
+        const response = await fetch('/api/seo-settings?admin=1&path=' + encodeURIComponent(scope), { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw Error((await response.json().catch(() => ({}))).message || 'Unable to load SEO settings');
+        const next = await response.json() as SeoAdminDoc;
+        if (controller.signal.aborted) return;
+        setDoc(next);
+        setForm(next.draft);
+        setLangInput(languageText(next.draft.languages));
+        setKeywordText((next.draft.keywords || []).join(', '));
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'Loading failed');
+      }
+    })();
+    return () => controller.abort();
+  }, [scope]);
+  useEffect(() => {
+    if (!confirmReset) return;
+    const timer = window.setTimeout(() => setConfirmReset(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [confirmReset]);
+
+  const change = (key: keyof SeoSettings, value: unknown) => setForm(prev => ({ ...prev, [key]: value }));
+  const nested = (group: Group, key: string, value: string | number | boolean | undefined) =>
+    setForm(prev => ({ ...prev, [group]: { ...(prev[group] || {}), [key]: value } }));
+  const openScope = (next: string) => {
+    if (next === scope) return true;
+    if (dirty && !window.confirm('You have unsaved SEO changes. Leave them?')) return false;
+    setScope(next);
+    setTab(next === SITE ? 'site' : 'search');
+    return true;
+  };
+
+  async function save() {
+    if (!doc || busy || !dirty) return;
+    setBusy(true);
+    try {
+      if (jsonState(form.structuredData) === 'invalid') throw Error('Structured data isn’t valid JSON. Fix it in the Structured data tab.');
+      const langs = parseLanguages(langInput);
+      if (!isSite && langInput.split('\n').filter(line => line.trim()).length !== Object.keys(langs).length)
+        throw Error('Hreflang needs one “language: URL” pair on each line.');
+      const settings = { ...form, ...(isSite ? {} : { languages: langs }) };
+      const response = await fetch('/api/seo-settings', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, revision: doc.revision, settings }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw Error(Array.isArray(payload.message) ? payload.message.join(', ') : payload.message || 'Unable to save SEO');
+      setDoc(payload);
+      setForm(payload.draft);
+      setLangInput(languageText(payload.draft.languages));
+      setKeywordText((payload.draft.keywords || []).join(', '));
+      toast.success('Draft saved. Publish to make it live.');
+      await reloadList();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Save failed');
+    } finally { setBusy(false); }
+  }
+  async function publish() {
+    setConfirmPublish(false);
+    if (!doc || busy || dirty) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/seo-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, revision: doc.revision }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.message || 'Publish failed');
+      setDoc(result);
+      toast.success('Published. Search metadata and the sitemap were refreshed.');
+      await reloadList();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Publish failed');
+    } finally { setBusy(false); }
+  }
+  const saveRef = useRef(save);
+  useEffect(() => { saveRef.current = save; });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void saveRef.current(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  // Preview values fall back the same way the live site does.
+  const defaultTitle = catalogLabels.has(scope) ? `${catalogLabels.get(scope)} | Niqaha.com` : 'Niqaha.com';
+  const shownTitle = form.title?.trim() || defaultTitle;
+  const shownDescription = form.description?.trim() || '';
+  const pageUrl = isSite ? SITE_ORIGIN : form.canonical?.trim() || SITE_ORIGIN + (scope === '/' ? '' : scope);
+  let crumb = pageUrl;
+  try { const url = new URL(pageUrl, SITE_ORIGIN); crumb = [url.host, ...url.pathname.split('/').filter(Boolean)].join(' › '); } catch { /* show raw */ }
+  const ogImage = form.openGraph?.image?.trim() || '/opengraph-image';
+  const ogTitle = form.openGraph?.title?.trim() || shownTitle;
+  const ogDescription = form.openGraph?.description?.trim() || shownDescription;
+  const xImage = form.twitter?.image?.trim() || ogImage;
+  const xTitle = form.twitter?.title?.trim() || ogTitle;
+  const xDescription = form.twitter?.description?.trim() || ogDescription;
+  const indexBlocked = isPrivate || form.robots?.index === false;
+  const canonical = form.canonical?.trim() || '';
+  const canonicalBad = !!canonical && !canonical.startsWith('/') && !canonical.startsWith(SITE_ORIGIN);
+  const schemaState = jsonState(form.structuredData);
+  const hreflangLines = langInput.split('\n').filter(line => line.trim()).length;
+  const hreflangBad = !isSite && hreflangLines !== Object.keys(parseLanguages(langInput)).length;
+
+  const checks = useMemo<HealthCheck[]>(() => {
+    if (isSite) return [
+      { label: 'Site name', state: form.siteName?.trim() ? 'good' : 'warn', detail: form.siteName?.trim() ? form.siteName.trim() : 'Not set. The built-in name is used.' },
+      { label: 'Default share image', state: form.openGraph?.image?.trim() ? 'good' : 'info', detail: form.openGraph?.image?.trim() ? 'Custom image set' : 'Using the built-in image' },
+      { label: 'Google Search Console', state: looksLikeTag(form.verification?.google) ? 'bad' : form.verification?.google?.trim() ? 'good' : 'info',
+        detail: looksLikeTag(form.verification?.google) ? 'Paste only the token, not the whole tag' : form.verification?.google?.trim() ? 'Verification token added' : 'Not connected' },
+      { label: 'Bing Webmaster Tools', state: looksLikeTag(form.verification?.bing) ? 'bad' : form.verification?.bing?.trim() ? 'good' : 'info',
+        detail: looksLikeTag(form.verification?.bing) ? 'Paste only the token, not the whole tag' : form.verification?.bing?.trim() ? 'Verification token added' : 'Not connected' },
+      { label: 'Structured data', state: schemaState === 'invalid' ? 'bad' : schemaState === 'valid' ? 'good' : 'info',
+        detail: schemaState === 'invalid' ? 'Invalid JSON' : schemaState === 'valid' ? 'Valid JSON-LD' : 'None added (optional)' },
+    ];
+    const titleLength = form.title?.trim().length || 0, descriptionLength = form.description?.trim().length || 0;
+    return [
+      { label: 'Title', state: !titleLength ? 'info' : titleLength < 30 || titleLength > 60 ? 'warn' : 'good',
+        detail: !titleLength ? 'Using the page’s built-in title' : titleLength < 30 ? 'Short, aim for 30–60 characters' : titleLength > 60 ? 'Long, may get cut off' : `${titleLength} characters` },
+      { label: 'Description', state: !descriptionLength ? 'warn' : descriptionLength < 70 || descriptionLength > 160 ? 'warn' : 'good',
+        detail: !descriptionLength ? 'Not written, Google picks text itself' : descriptionLength < 70 ? 'Short, aim for 70–160 characters' : descriptionLength > 160 ? 'Long, may get cut off' : `${descriptionLength} characters` },
+      { label: 'Google indexing', state: isPrivate ? 'info' : form.robots?.index === false ? 'bad' : 'good',
+        detail: isPrivate ? 'Private page, always hidden from search' : form.robots?.index === false ? 'Hidden from Google (noindex)' : 'Google can show this page' },
+      { label: 'Sitemap', state: isPrivate ? 'info' : indexBlocked || form.sitemap?.include === false ? 'warn' : 'good',
+        detail: isPrivate ? 'Private pages are never listed' : indexBlocked || form.sitemap?.include === false ? 'Not listed in sitemap.xml' : 'Listed in sitemap.xml' },
+      { label: 'Canonical address', state: canonicalBad ? 'bad' : 'good', detail: canonicalBad ? 'Must be a niqaha.com address' : canonical ? canonical : 'Uses this page’s own address' },
+      { label: 'Share image', state: form.openGraph?.image?.trim() ? 'good' : 'info', detail: form.openGraph?.image?.trim() ? 'Custom image set' : 'Using the default site image' },
+      { label: 'Structured data', state: schemaState === 'invalid' ? 'bad' : schemaState === 'valid' ? 'good' : 'info',
+        detail: schemaState === 'invalid' ? 'Invalid JSON' : schemaState === 'valid' ? 'Valid JSON-LD' : 'None added (optional)' },
+      ...(hreflangBad ? [{ label: 'Hreflang', state: 'bad' as const, detail: 'Each line needs “language: URL”' }] : []),
+    ];
+  }, [isSite, isPrivate, form, schemaState, indexBlocked, canonical, canonicalBad, hreflangBad]);
+  const goodChecks = checks.filter(check => check.state === 'good').length;
+  const badChecks = checks.filter(check => check.state === 'bad').length;
+
+  const records = useMemo(() => new Map(saved.map(item => [item.scope, item])), [saved]);
+  const rows = useMemo<Row[]>(() => {
+    const list: Row[] = [{ path: SITE, label: 'Site-wide settings', status: statusOf(records.get(SITE)), isPrivate: false, updatedAt: updatedOf(records.get(SITE)) }];
+    for (const page of visualPageCatalog) {
+      const item = records.get(page.path);
+      list.push({ path: page.path, label: page.label, status: statusOf(item), isPrivate: isPrivateSeoPath(page.path), updatedAt: updatedOf(item) });
+    }
+    for (const item of saved) {
+      if (item.scope === SITE || catalogLabels.has(item.scope)) continue;
+      list.push({ path: item.scope, label: 'Specific address', status: statusOf(item), isPrivate: isPrivateSeoPath(item.scope), updatedAt: updatedOf(item) });
+    }
+    return list;
+  }, [records, saved]);
+  const visibleRows = useMemo(() => {
+    const q = tableQuery.trim().toLowerCase();
+    const direction = sort.dir === 'asc' ? 1 : -1;
+    return rows.filter(row => (tableFilter === 'all' || (tableFilter === 'private' ? row.isPrivate : row.status === tableFilter)) &&
+      (!q || row.label.toLowerCase().includes(q) || row.path.toLowerCase().includes(q)))
+      .sort((a, b) => {
+        let diff = 0;
+        if (sort.key === 'page') diff = a.label.localeCompare(b.label);
+        else if (sort.key === 'status') diff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+        else diff = (a.updatedAt ? Date.parse(a.updatedAt) : 0) - (b.updatedAt ? Date.parse(b.updatedAt) : 0);
+        return diff * direction || a.label.localeCompare(b.label);
+      });
+  }, [rows, tableQuery, tableFilter, sort]);
+
+  const privateCount = visualPageCatalog.filter(page => isPrivateSeoPath(page.path)).length;
+  const liveCount = saved.filter(item => item.published).length;
+  const pendingCount = saved.filter(item => item.hasUnpublishedChanges).length;
+  const tabs: { value: Tab; label: string; icon: ReactNode }[] = isSite
+    ? [{ value: 'site', label: 'Site identity', icon: <Settings2 size={13} /> }, { value: 'schema', label: 'Structured data', icon: <Code2 size={13} /> }]
+    : [{ value: 'search', label: 'Search', icon: <FileSearch size={13} /> }, { value: 'social', label: 'Social sharing', icon: <ImageIcon size={13} /> },
+      { value: 'indexing', label: 'Indexing', icon: <Globe size={13} /> }, { value: 'schema', label: 'Structured data', icon: <Code2 size={13} /> }];
+  const activeTab = tabs.some(item => item.value === tab) ? tab : tabs[0].value;
+  const canPublish = !!doc && !busy && !dirty && !!doc.hasUnpublishedChanges;
+  const pageRecord = records.get(scope);
+  const statusPill = dirty ? <StatusPill tone="warning">Unsaved changes</StatusPill>
+    : doc?.hasUnpublishedChanges ? <StatusPill tone="warning">Draft waiting to publish</StatusPill>
+      : pageRecord?.published ? <StatusPill tone="positive"><Check size={11} /> Live</StatusPill>
+        : <StatusPill tone="neutral">Original metadata</StatusPill>;
+  const smallButton = 'px-2.5 py-1 text-[12px]';
+  const checkIcon = (state: CheckState) => state === 'good' ? <CheckCircle2 size={15} className="text-emerald-600" />
+    : state === 'info' ? <Info size={15} className="text-[#adb5bd]" />
+      : <TriangleAlert size={15} className={state === 'bad' ? 'text-red-600' : 'text-amber-500'} />;
+
+  return <DashboardPage>
+    <DashboardHeader
+      title="SEO"
+      description="Control how each page appears in Google and when it’s shared on social media. Changes stay in a draft until you publish, and the built-in metadata is always the fallback."
+      meta={doc ? statusPill : null}
+      actions={<>
+        {!isSite && !scope.includes('[') && <a href={scope} target="_blank" rel="noopener noreferrer" className={darkLink}><ExternalLink size={14} /> View page</a>}
+        <DashButton tone="ghost-dark" title="Save draft (Ctrl+S)" disabled={!doc || busy || !dirty} onClick={() => void save()}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save draft
+        </DashButton>
+        <DashButton tone="primary" disabled={!canPublish} title={dirty ? 'Save your changes first' : undefined} onClick={() => setConfirmPublish(true)}>
+          <Send size={14} /> Publish
+        </DashButton>
+      </>}
+    />
+
+    <KpiRow>
+      <KpiCard label="Pages" value={visualPageCatalog.length} icon={<FileSearch size={16} />} hint={`${visualPageCatalog.length - privateCount} public, ${privateCount} private`} />
+      <KpiCard label="Custom SEO live" value={liveCount} tone="positive" hint="Using your published settings" />
+      <KpiCard label="Waiting to publish" value={pendingCount} tone={pendingCount ? 'warning' : 'positive'}
+        hint={pendingCount ? 'Drafts search engines can’t see yet' : 'Everything is live'} />
+      <KpiCard label="Private pages" value={privateCount} icon={<LockKeyhole size={16} />} hint="Always hidden from search" />
+    </KpiRow>
+
+    {loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800">
+      <span>{loadError}</span>
+      <DashButton onClick={() => { const current = scope; setScope(SITE === current ? '/' : SITE); window.setTimeout(() => setScope(current), 0); }}>Try again</DashButton>
+    </div>}
+
+    <div ref={workspaceRef} className="grid scroll-mt-4 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section aria-label="SEO settings" className="min-w-0 rounded-lg bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#f0f0f0] px-3 py-2.5">
+          <ScopePicker scope={scope} records={records} onOpen={openScope} />
+          <div className="ml-auto max-w-full">
+            <Segmented label="Settings section" size="sm" value={activeTab} onChange={setTab}
+              options={tabs.map(item => ({ value: item.value, label: item.label, icon: item.icon }))} />
+          </div>
+        </div>
+
+        {!doc ? <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-[#6c757d]">
+          {loadError ? 'Settings couldn’t be loaded.' : <><Loader2 size={16} className="animate-spin" /> Loading settings…</>}
+        </div> : <div className="space-y-5 p-4">
+          {isPrivate && <p className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
+            <LockKeyhole size={14} className="mt-0.5 shrink-0" /> This is a private account page. You can change its title, but it always stays hidden from search and out of the sitemap.
+          </p>}
+
+          {activeTab === 'search' && <>
+            <Field id="seo-title" label="Title in search results">
+              <input id="seo-title" dir="auto" value={form.title || ''} onChange={event => change('title', event.target.value)}
+                placeholder={defaultTitle} className={fieldClass} />
+              <LengthHint length={form.title?.trim().length || 0} min={30} max={60} empty="Empty: the page’s built-in title is used." />
+            </Field>
+            <Field id="seo-description" label="Description in search results">
+              <textarea id="seo-description" dir="auto" rows={3} value={form.description || ''} onChange={event => change('description', event.target.value)}
+                placeholder="A clear, honest summary of what this page offers." className={cn(fieldClass, 'resize-y leading-6')} />
+              <LengthHint length={form.description?.trim().length || 0} min={70} max={160} empty="Empty: Google chooses text from the page." />
+            </Field>
+            <Field id="seo-canonical" label="Canonical address"
+              hint={canonicalBad ? <span className="text-red-600">Use a niqaha.com address, or leave it empty.</span> : 'Leave empty to use this page’s own address. Set it only when another page is the preferred version.'}>
+              <input id="seo-canonical" value={form.canonical || ''} onChange={event => change('canonical', event.target.value)}
+                placeholder={SITE_ORIGIN + (scope === '/' ? '' : scope)} aria-invalid={canonicalBad}
+                className={cn(fieldClass, 'font-mono text-[13px]', canonicalBad && 'border-red-400')} />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="seo-keywords" label="Keywords (optional)" hint="Separate with commas. Google mostly ignores this tag.">
+                <input id="seo-keywords" dir="auto" value={keywordText}
+                  onChange={event => { setKeywordText(event.target.value); change('keywords', event.target.value.split(',').map(word => word.trim()).filter(Boolean)); }}
+                  placeholder="marriage, biodata" className={fieldClass} />
+              </Field>
+              <Field id="seo-author" label="Author (optional)">
+                <input id="seo-author" dir="auto" value={form.author || ''} onChange={event => change('author', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+          </>}
+
+          {activeTab === 'social' && <>
+            <p className="text-[12px] text-[#6c757d]">Empty fields fall back to the search title and description. Share images work best at about 1200 × 630 px and must be publicly reachable.</p>
+            <SubHeading>Facebook, Messenger and LinkedIn</SubHeading>
+            <Field id="og-title" label="Share title">
+              <input id="og-title" dir="auto" value={form.openGraph?.title || ''} onChange={event => nested('openGraph', 'title', event.target.value)} placeholder={shownTitle} className={fieldClass} />
+            </Field>
+            <Field id="og-description" label="Share description">
+              <textarea id="og-description" dir="auto" rows={2} value={form.openGraph?.description || ''} onChange={event => nested('openGraph', 'description', event.target.value)}
+                placeholder={shownDescription || 'Falls back to the search description'} className={cn(fieldClass, 'resize-y')} />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="og-image" label="Share image URL">
+                <input id="og-image" value={form.openGraph?.image || ''} onChange={event => nested('openGraph', 'image', event.target.value)} placeholder="/opengraph-image" className={cn(fieldClass, 'font-mono text-[13px]')} />
+              </Field>
+              <Field id="og-alt" label="Image description">
+                <input id="og-alt" dir="auto" value={form.openGraph?.imageAlt || ''} onChange={event => nested('openGraph', 'imageAlt', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field id="og-type" label="Page type">
+                <select id="og-type" value={form.openGraph?.type || 'website'} onChange={event => nested('openGraph', 'type', event.target.value)} className={fieldClass}>
+                  <option value="website">Website</option><option value="article">Article</option>
+                </select>
+              </Field>
+              <Field id="og-locale" label="Language and region">
+                <input id="og-locale" value={form.openGraph?.locale || ''} onChange={event => nested('openGraph', 'locale', event.target.value)} placeholder="bn_BD" className={fieldClass} />
+              </Field>
+            </div>
+            <SubHeading>X (Twitter)</SubHeading>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="x-card" label="Card style">
+                <select id="x-card" value={form.twitter?.card || 'summary_large_image'} onChange={event => nested('twitter', 'card', event.target.value)} className={fieldClass}>
+                  <option value="summary_large_image">Large image</option><option value="summary">Small image</option>
+                </select>
+              </Field>
+              <Field id="x-image" label="Image URL">
+                <input id="x-image" value={form.twitter?.image || ''} onChange={event => nested('twitter', 'image', event.target.value)} placeholder="Uses the share image" className={cn(fieldClass, 'font-mono text-[13px]')} />
+              </Field>
+            </div>
+            <Field id="x-title" label="Title">
+              <input id="x-title" dir="auto" value={form.twitter?.title || ''} onChange={event => nested('twitter', 'title', event.target.value)} placeholder={ogTitle} className={fieldClass} />
+            </Field>
+            <Field id="x-description" label="Description">
+              <textarea id="x-description" dir="auto" rows={2} value={form.twitter?.description || ''} onChange={event => nested('twitter', 'description', event.target.value)}
+                placeholder={ogDescription || 'Falls back to the share description'} className={cn(fieldClass, 'resize-y')} />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="x-site" label="Site account">
+                <input id="x-site" value={form.twitter?.site || ''} onChange={event => nested('twitter', 'site', event.target.value)} placeholder="@niqaha" className={fieldClass} />
+              </Field>
+              <Field id="x-creator" label="Creator account">
+                <input id="x-creator" value={form.twitter?.creator || ''} onChange={event => nested('twitter', 'creator', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+          </>}
+
+          {activeTab === 'indexing' && <>
+            <SubHeading>Search engines</SubHeading>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Toggle id="robots-index" label="Show in Google" description={isPrivate ? 'Private pages are always hidden' : 'Turning this off adds noindex'}
+                checked={!isPrivate && form.robots?.index !== false} disabled={isPrivate} onChange={value => nested('robots', 'index', value)} />
+              <Toggle id="robots-follow" label="Follow links on this page" description="Lets search engines discover linked pages"
+                checked={!isPrivate && form.robots?.follow !== false} disabled={isPrivate} onChange={value => nested('robots', 'follow', value)} />
+              <Toggle id="robots-snippet" label="Hide the text snippet" description="Results show the title only"
+                checked={form.robots?.nosnippet === true} onChange={value => nested('robots', 'nosnippet', value)} />
+              <Toggle id="robots-images" label="Keep images out of image search" description="Adds noimageindex"
+                checked={form.robots?.noimageindex === true} onChange={value => nested('robots', 'noimageindex', value)} />
+              <Toggle id="robots-archive" label="No cached copy" description="Adds noarchive (rarely needed)"
+                checked={form.robots?.noarchive === true} onChange={value => nested('robots', 'noarchive', value)} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="robots-snippet-length" label="Longest text snippet" hint="Characters. Leave empty for no limit, or -1 for any length.">
+                <input id="robots-snippet-length" type="number" min={-1} max={10000} value={form.robots?.maxSnippet ?? ''} placeholder="No limit"
+                  onChange={event => nested('robots', 'maxSnippet', event.target.value === '' ? undefined : Number(event.target.value))} className={fieldClass} />
+              </Field>
+              <Field id="robots-image-preview" label="Image preview size">
+                <select id="robots-image-preview" value={form.robots?.maxImagePreview || 'large'} onChange={event => nested('robots', 'maxImagePreview', event.target.value)} className={fieldClass}>
+                  <option value="large">Large</option><option value="standard">Standard</option><option value="none">None</option>
+                </select>
+              </Field>
+            </div>
+            <SubHeading>Sitemap</SubHeading>
+            <Toggle id="sitemap-include" label="List in sitemap.xml" description="Only public pages that Google may show are listed"
+              checked={!isPrivate && form.sitemap?.include !== false} disabled={isPrivate} onChange={value => nested('sitemap', 'include', value)} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="sitemap-frequency" label="How often it changes">
+                <select id="sitemap-frequency" value={form.sitemap?.changeFrequency || 'monthly'} onChange={event => nested('sitemap', 'changeFrequency', event.target.value)} className={fieldClass}>
+                  {['always', 'hourly', 'daily', 'weekly', 'monthly', 'yearly', 'never'].map(value =>
+                    <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}
+                </select>
+              </Field>
+              <Field id="sitemap-priority" label="Priority (0 to 1)" hint="Leave empty for the default.">
+                <input id="sitemap-priority" type="number" step={0.1} min={0} max={1} value={form.sitemap?.priority ?? ''} placeholder="Default"
+                  onChange={event => nested('sitemap', 'priority', event.target.value === '' ? undefined : Number(event.target.value))} className={fieldClass} />
+              </Field>
+            </div>
+          </>}
+
+          {activeTab === 'site' && <>
+            <Field id="site-name" label="Site name">
+              <input id="site-name" dir="auto" value={form.siteName || ''} onChange={event => change('siteName', event.target.value)} placeholder="Niqaha.com" className={fieldClass} />
+            </Field>
+            <Field id="site-image" label="Default share image URL" hint="Used whenever a page has no share image of its own.">
+              <input id="site-image" value={form.openGraph?.image || ''} onChange={event => nested('openGraph', 'image', event.target.value)} placeholder="/opengraph-image" className={cn(fieldClass, 'font-mono text-[13px]')} />
+            </Field>
+            <SubHeading>Search Console verification</SubHeading>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="verify-google" label="Google token"
+                hint={looksLikeTag(form.verification?.google) ? <span className="text-red-600">Paste only the token value, not the whole meta tag.</span> : 'Only the token, without the meta tag.'}>
+                <input id="verify-google" value={form.verification?.google || ''} onChange={event => nested('verification', 'google', event.target.value)}
+                  aria-invalid={looksLikeTag(form.verification?.google)} className={cn(fieldClass, 'font-mono text-[13px]')} />
+              </Field>
+              <Field id="verify-bing" label="Bing token"
+                hint={looksLikeTag(form.verification?.bing) ? <span className="text-red-600">Paste only the token value, not the whole meta tag.</span> : undefined}>
+                <input id="verify-bing" value={form.verification?.bing || ''} onChange={event => nested('verification', 'bing', event.target.value)}
+                  aria-invalid={looksLikeTag(form.verification?.bing)} className={cn(fieldClass, 'font-mono text-[13px]')} />
+              </Field>
+            </div>
+          </>}
+
+          {activeTab === 'schema' && <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[12px] text-[#6c757d]">schema.org JSON-LD that truthfully describes what’s on {isSite ? 'the site' : 'this page'}. Scripts aren’t accepted, and rich results are never guaranteed.</p>
+              <div className="flex gap-1.5">
+                {schemaState === 'empty' && <DashButton className={smallButton} onClick={() => change('structuredData', JSON.stringify({
+                  '@context': 'https://schema.org', '@type': isSite ? 'Organization' : 'WebPage',
+                  name: isSite ? form.siteName?.trim() || 'Niqaha.com' : shownTitle, url: pageUrl,
+                }, null, 2))}>Insert a starter</DashButton>}
+                {schemaState === 'valid' && <DashButton className={smallButton} onClick={() => change('structuredData', JSON.stringify(JSON.parse(form.structuredData || '{}'), null, 2))}>Tidy formatting</DashButton>}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="seo-schema" className="sr-only">Structured data JSON-LD</label>
+              <textarea id="seo-schema" spellCheck={false} value={form.structuredData || ''} onChange={event => change('structuredData', event.target.value)}
+                placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "WebPage",\n  "name": "Niqaha"\n}'}
+                className={cn(fieldClass, 'min-h-64 resize-y font-mono text-[12px] leading-5', schemaState === 'invalid' && 'border-red-400')} />
+              <p className={cn('mt-1 text-[11px]', schemaState === 'invalid' ? 'text-red-600' : schemaState === 'valid' ? 'text-emerald-700' : 'text-[#6c757d]')}>
+                {schemaState === 'invalid' ? 'This isn’t valid JSON yet. Saving stays blocked until it is.' : schemaState === 'valid' ? 'Valid JSON' : 'Optional.'}
+              </p>
+            </div>
+            {!isSite && <Field id="seo-hreflang" label="Translated versions (hreflang)"
+              hint={hreflangBad ? <span className="text-red-600">Write one “language: URL” pair per line, for example bn: /</span> : 'One real translated page per line, as “language: URL”. Don’t list pages that don’t exist.'}>
+              <textarea id="seo-hreflang" rows={3} value={langInput} onChange={event => setLangInput(event.target.value)} placeholder={'bn: /\nen: /en'}
+                aria-invalid={hreflangBad} className={cn(fieldClass, 'resize-y font-mono text-[12px]', hreflangBad && 'border-red-400')} />
+            </Field>}
+          </>}
+        </div>}
+
+        {doc && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f0f0f0] px-4 py-3">
+          <button type="button" onClick={() => {
+            if (!confirmReset) { setConfirmReset(true); return; }
+            setConfirmReset(false);
+            setForm({}); setLangInput(''); setKeywordText('');
+            toast('Original metadata selected. Save and publish to apply it.');
+          }} className={cn('inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+            confirmReset ? 'bg-red-600 text-white hover:bg-red-700' : 'text-[#6c757d] hover:bg-[#f1f3f5] hover:text-[#212529]')}>
+            <RotateCcw size={13} /> {confirmReset ? 'Click again to clear every custom field' : 'Use original metadata'}
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#adb5bd]">Revision {doc.revision ?? 0}</span>
+            <DashButton tone="dark" disabled={busy || !dirty} onClick={() => void save()}><Save size={14} /> Save draft</DashButton>
+            <DashButton tone="primary" disabled={!canPublish} onClick={() => setConfirmPublish(true)}><Send size={14} /> Publish</DashButton>
+          </div>
+        </div>}
+      </section>
+
+      <aside aria-label="Previews and checks" className="min-w-0 space-y-4 xl:sticky xl:top-4">
+        {!isSite && <Panel title="Google preview" description="Google may rewrite titles and snippets.">
+          <div className="relative rounded-md border border-[#e9ecef] bg-white p-3">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#f1f3f4] text-[12px] font-bold text-rose-600" aria-hidden>N</span>
+              <div className="min-w-0 leading-tight">
+                <p className="text-[13px] text-[#202124]">Niqaha.com</p>
+                <p className="truncate text-[12px] text-[#4d5156]">{crumb}</p>
+              </div>
+            </div>
+            <p dir="auto" className="mt-2 line-clamp-2 text-[18px] leading-snug text-[#1a0dab]">{shownTitle}</p>
+            <p dir="auto" className="mt-1 line-clamp-2 text-[13px] leading-5 text-[#4d5156]">
+              {form.robots?.nosnippet ? <span className="italic text-[#9aa0a6]">No snippet: only the title shows.</span>
+                : shownDescription || <span className="italic text-[#9aa0a6]">Google picks text from the page.</span>}
+            </p>
+            {indexBlocked && <div className="absolute inset-0 flex items-center justify-center rounded-md bg-white/85 p-4 text-center">
+              <p className="flex items-center gap-2 text-[12px] font-medium text-[#495057]"><LockKeyhole size={14} /> Hidden from Google, so this result won’t appear.</p>
+            </div>}
+          </div>
+        </Panel>}
+
+        <Panel title={isSite ? 'Default share card' : 'Share preview'}
+          actions={<Segmented size="sm" label="Network" value={network} onChange={setNetwork}
+            options={[{ value: 'facebook', label: 'Facebook' }, { value: 'x', label: 'X' }]} />}>
+          {network === 'facebook' ? <div className="overflow-hidden rounded-md border border-[#dadde1]">
+            <PreviewImage src={ogImage} alt={form.openGraph?.imageAlt || ''} className="aspect-[1.91/1] w-full" />
+            <div className="border-t border-[#dadde1] bg-[#f0f2f5] px-3 py-2">
+              <p className="text-[11px] uppercase text-[#606770]">niqaha.com</p>
+              <p dir="auto" className="line-clamp-1 text-[14px] font-semibold text-[#1d2129]">{ogTitle}</p>
+              {ogDescription && <p dir="auto" className="line-clamp-1 text-[12px] text-[#606770]">{ogDescription}</p>}
+            </div>
+          </div> : form.twitter?.card === 'summary' ? <div className="flex overflow-hidden rounded-2xl border border-[#cfd9de]">
+            <PreviewImage src={xImage} alt="" className="size-[100px] shrink-0" />
+            <div className="min-w-0 border-l border-[#cfd9de] px-3 py-2">
+              <p className="text-[12px] text-[#536471]">niqaha.com</p>
+              <p dir="auto" className="line-clamp-1 text-[14px] text-[#0f1419]">{xTitle}</p>
+              {xDescription && <p dir="auto" className="line-clamp-2 text-[12px] text-[#536471]">{xDescription}</p>}
+            </div>
+          </div> : <div>
+            <div className="relative overflow-hidden rounded-2xl border border-[#cfd9de]">
+              <PreviewImage src={xImage} alt="" className="aspect-[1.91/1] w-full" />
+              <span dir="auto" className="absolute bottom-2 left-2 max-w-[85%] truncate rounded bg-black/70 px-1.5 py-0.5 text-[12px] text-white">{xTitle}</span>
+            </div>
+            <p className="mt-1 text-[12px] text-[#536471]">From niqaha.com</p>
+          </div>}
+          {!form.openGraph?.image?.trim() && <p className="mt-2 text-[11px] text-[#6c757d]">Showing the default site image.</p>}
+        </Panel>
+
+        <Panel title="Checklist" description={`${goodChecks} of ${checks.length} look good${badChecks ? ` · ${badChecks} need fixing` : ''}`}>
+          <ul className="space-y-2.5">
+            {checks.map(check => <li key={check.label} className="flex items-start gap-2.5">
+              <span className="mt-0.5 shrink-0">{checkIcon(check.state)}</span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium">{check.label}</span>
+                <span className="block break-words text-[12px] text-[#6c757d]">{check.detail}</span>
+              </span>
+            </li>)}
+          </ul>
+        </Panel>
+      </aside>
+    </div>
+
+    <Panel title="All pages" description="Every page with its SEO status. Private pages always stay out of search." bodyClassName="p-0"
+      actions={<>
+        <label className="relative">
+          <span className="sr-only">Search pages</span>
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#adb5bd]" />
+          <input value={tableQuery} onChange={event => setTableQuery(event.target.value)} placeholder="Search pages" className={cn(fieldClass, 'w-48 py-1.5 pl-8 text-[13px]')} />
+        </label>
+        <Segmented label="Filter by status" size="sm" value={tableFilter} onChange={setTableFilter} options={[
+          { value: 'all', label: 'All' }, { value: 'pending', label: 'Waiting' }, { value: 'live', label: 'Live' },
+          { value: 'original', label: 'Original' }, { value: 'private', label: 'Private' },
+        ]} />
+      </>}>
+      <div className="max-h-[560px] overflow-auto">
+        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <thead className="sticky top-0 z-10 bg-white">
+            <tr>
+              <SortHeader label="Page" sortKey="page" sort={sort} onSort={setSort} />
+              <PlainHeader label="Search visibility" />
+              <SortHeader label="Status" sortKey="status" sort={sort} onSort={setSort} />
+              <SortHeader label="Updated" sortKey="updated" sort={sort} onSort={setSort} />
+              <PlainHeader label="Actions" className="text-right" />
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map(row => {
+              const current = row.path === scope;
+              return <tr key={row.path} className={cn('border-b border-[#f0f0f0] last:border-0 hover:bg-[#f8f9fa]', current && 'bg-rose-50/60')}>
+                <td className="px-3 py-2.5">
+                  <p className="flex items-center gap-1.5 truncate font-medium">
+                    {row.path === SITE && <Settings2 size={13} className="shrink-0 text-rose-600" />}{row.label}
+                    {current && <span className="text-[11px] font-normal text-rose-700">Open now</span>}
+                  </p>
+                  <p className="truncate font-mono text-[11px] text-[#6c757d]">{row.path === SITE ? 'Applies to every page' : row.path}</p>
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.path === SITE ? <span className="text-[#6c757d]">—</span>
+                    : row.isPrivate ? <StatusPill tone="neutral"><LockKeyhole size={11} /> Always hidden</StatusPill>
+                      : row.path.includes('[') ? <StatusPill tone="info">Template</StatusPill>
+                        : <StatusPill tone="positive"><Globe size={11} /> Public</StatusPill>}
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.status === 'pending' ? <StatusPill tone="warning">Draft waiting</StatusPill>
+                    : row.status === 'live' ? <StatusPill tone="positive"><Check size={11} /> Live</StatusPill>
+                      : <StatusPill tone="neutral">Original</StatusPill>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-[#6c757d]">{formatWhen(row.updatedAt)}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <DashButton className={smallButton} disabled={current} onClick={() => {
+                    if (openScope(row.path)) window.requestAnimationFrame(() => workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+                  }}>{row.status === 'pending' ? 'Review & publish' : 'Edit'}</DashButton>
+                </td>
+              </tr>;
+            })}
+            {!visibleRows.length && <tr><td colSpan={5} className="px-3 py-10 text-center text-[13px] text-[#6c757d]">
+              No pages match.{' '}
+              <button type="button" className="font-medium text-rose-700 underline" onClick={() => { setTableQuery(''); setTableFilter('all'); }}>Clear filters</button>
+            </td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t border-[#f0f0f0] px-4 py-2 text-[12px] text-[#6c757d]">Showing {visibleRows.length} of {rows.length}</p>
+    </Panel>
+
+    <AlertDialog open={confirmPublish} onOpenChange={setConfirmPublish}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{isSite ? 'Publish site-wide SEO?' : 'Publish SEO for this page?'}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {isSite ? 'The new settings apply to every page. Search metadata and the sitemap refresh right away.'
+              : 'Search engines and social networks get the new title, description and settings. The sitemap refreshes too.'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <p className="break-all rounded-md border border-[#e9ecef] bg-[#f8f9fa] px-3 py-2 font-mono text-xs text-[#495057]">{isSite ? 'Whole site' : scope}</p>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction disabled={busy} className="bg-rose-600 hover:bg-rose-700" onClick={() => void publish()}>Publish</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </DashboardPage>;
 }

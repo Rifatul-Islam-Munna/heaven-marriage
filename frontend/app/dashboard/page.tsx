@@ -1,26 +1,16 @@
+import { Suspense } from "react";
 import AdminUsersTable from "@/components/custom/dashboard/AdminUsersTable";
-import Link from "next/link";
-import React, { Suspense } from "react";
-import {dashboardLanding} from '@/lib/dashboard-session';
+import { dashboardLanding } from "@/lib/dashboard-session";
 
-const page = async () => {
-  const session=await dashboardLanding();
+export default async function DashboardHomePage() {
+  const session = await dashboardLanding();
+  const quickLinks = [
+    ...(session.permissions.includes("upgrades") ? [{ href: "/dashboard/upgrades", label: "Services & payments" }] : []),
+    ...(session.permissions.includes("settings") ? [{ href: "/dashboard/settings#messenger-settings", label: "Messenger settings" }] : []),
+  ];
   return (
     <Suspense>
-      <div className="p-4 flex flex-wrap gap-4">
-        {session.permissions.includes("settings")&&<Link
-          href="/dashboard/settings#messenger-settings"
-          className="text-pink-600 underline"
-        >
-          Landing Page Messenger URL
-        </Link>}
-        {session.permissions.includes("upgrades")&&<Link href="/dashboard/upgrades" className="text-pink-600 underline">
-          Service requests, connection history, reminders & settings
-        </Link>}
-      </div>
-      <AdminUsersTable />
+      <AdminUsersTable quickLinks={quickLinks} />
     </Suspense>
   );
-};
-
-export default page;
+}

@@ -4,7 +4,7 @@ import { PlatformService } from './platform.service';
 import { samePhone, adminSort, adminFilter, editableProfile, completion, visibleFilter } from './profile-rules';
 import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AdminSetPasswordDto, AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument, UserType } from './entities/user.entity';
 import { Model, Types } from 'mongoose';
@@ -572,6 +572,14 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
   }
 
    async removeUser(id:string){return this.platform.createCase(id,'deletion',{});}
+
+  /** Admin-only: set a new login password for any account (no old password needed). */
+  async adminSetPassword(dto:AdminSetPasswordDto,actor:string,actorRole:string=UserType.ADMIN){
+    await this.assertManageableTarget(dto.id,actorRole);
+    const result=await this.identity.adminSetPassword(actor,dto.id,dto.newPassword);
+    await this.platform.audit(actor,"account.admin.password",dto.id);
+    return result;
+  }
 
    async remove(id: FindOneDto,actor:string,actorRole:string=UserType.ADMIN) {
      await this.assertManageableTarget(id.id,actorRole);

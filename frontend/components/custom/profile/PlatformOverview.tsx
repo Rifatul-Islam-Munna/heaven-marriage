@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
+import { formatPremiumFee, resolvePremiumSettings, type PremiumSettings } from "@/lib/premium-settings";
 import VerifyContact from "./VerifyContact";
 import { useState } from "react";
 type Summary = {
@@ -46,11 +47,6 @@ type Case = {
   fee?: number;
   transactionReference?: string;
 };
-type Match = {
-  profile: { _id: string; userId: string; gender: string };
-  score: number | null;
-  reasons: string[];
-};
 export default function PlatformOverview() {
   const { data, refetch } = useQueryWrapper<Summary>(
     ["platform-summary"],
@@ -60,14 +56,12 @@ export default function PlatformOverview() {
     ["my-service-requests"],
     "/platform/requests",
   );
-  const { data: admirers } = useQueryWrapper<{ _id: string; userId: string }[]>(
-    ["my-admirers"],
-    "/platform/admirers",
+  const { data: publicSettings, isLoading: publicSettingsLoading } = useQueryWrapper<{ premium?: PremiumSettings }>(
+    ["public-settings"],
+    "/public/settings",
   );
-  const { data: matches } = useQueryWrapper<{
-    profiles: Match[];
-    message: string;
-  }>(["my-matches"], "/platform/matches");
+  const premium = resolvePremiumSettings(publicSettings?.premium);
+  const premiumCases = cases?.filter((item) => item.kind === "premium") ?? [];
   const [reference, setReference] = useState(""),
     [method, setMethod] = useState("bkash");
   const apply = useCommonMutationApi({
@@ -193,38 +187,35 @@ export default function PlatformOverview() {
           ))}
         </CardContent>
       </Card>
-      <Card className="shadow-none border-pink-100">
+      {!publicSettingsLoading && (premium.enabled || premiumCases.length > 0) && <Card className="shadow-none border-pink-100">
         <CardHeader>
-          <CardTitle>Premium Marriage Assistance</CardTitle>
+          <CardTitle>{premium.title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p>
-            রেজিস্ট্রেশন ফি ৳১,০০০। বায়োডাটা জমা দেওয়ার পর টিম আবেদন যাচাই করে
-            যোগাযোগ করবে। পেমেন্ট নিশ্চিত হলে সেবা সক্রিয় হবে।
-          </p>
+          {premium.enabled && <>
+          <p>রেজিস্ট্রেশন ফি {formatPremiumFee(premium.fee)}। {premium.summary}</p>
           <Link className="text-pink-600 underline" href="/premium">
-            সেবার বিস্তারিত ও শর্ত দেখুন
+            {premium.detailsLabel}
           </Link>
           {data.accountType !== "premium" && (
             <Button
               disabled={apply.isPending || data.completion.percentage < 100}
               onClick={() => apply.mutate({})}
             >
-              Premium Upgrade Request
+              {premium.requestLabel}
             </Button>
           )}
-          {cases?.map((c) => (
+          </>}
+          {premiumCases.map((c) => (
             <div key={c.id} className="rounded border p-3 text-sm">
               <p>
                 {c.kind} · {c.status}
               </p>
-              {c.kind === "premium" && c.status === "payment_pending" && (
+              {c.status === "payment_pending" && (
                 <div className="space-y-2 mt-2">
                   <p>
-                    ৳১,০০০ পেমেন্টের আগে বিস্তারিত জানতে কল:{" "}
-                    <a href="tel:+8801748919251" className="underline">
-                      01748919251
-                    </a>
+                    {formatPremiumFee(c.fee ?? premium.fee)} পেমেন্টের আগে বিস্তারিত জানুন।
+                    {premium.contactPhone && <> কল: <a href={'tel:' + premium.contactPhone} className="underline">{premium.contactPhone}</a></>}
                   </p>
                   <select
                     aria-label="Payment method"
@@ -260,48 +251,7 @@ export default function PlatformOverview() {
             </div>
           ))}
         </CardContent>
-      </Card>
-      <Card className="shadow-none border-pink-100">
-        <CardHeader>
-          <CardTitle>যাঁরা আপনাকে পছন্দের তালিকায় রেখেছেন</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-3 flex-wrap">
-          {admirers?.map((a) => (
-            <a
-              key={a._id}
-              href={"/biodata/" + a.userId}
-              className="text-pink-600 underline"
-            >
-              বায়োডাটা #{a.userId}
-            </a>
-          ))}
-        </CardContent>
-      </Card>
-      <Card className="shadow-none border-pink-100">
-        <CardHeader>
-          <CardTitle>আপনার জন্য প্রস্তাবিত বায়োডাটা</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">{matches?.message}</p>
-          {matches?.profiles.map((m) => (
-            <div
-              key={m.profile._id}
-              className="rounded border border-pink-100 p-3"
-            >
-              <Link
-                href={`/biodata/${m.profile.userId}`}
-                className="text-pink-600 underline"
-              >
-                বায়োডাটা #{m.profile.userId}
-              </Link>
-              {m.score !== null && (
-                <span className="ml-3">{m.score}% পছন্দের মিল</span>
-              )}
-              <p className="text-sm">{m.reasons.join(" · ")}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

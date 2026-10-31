@@ -13,6 +13,7 @@ import { BkashService } from './bkash.service';
 import { MessagingService } from './messaging.service';
 import { completion, publicProfile, visibleFilter } from './profile-rules';
 import { QuestionConfigService } from '../profile-questions/question-config.service';
+import { resolvePremiumSettings } from './premium-settings';
 
 @Injectable()
 export class PlatformService implements OnModuleInit {
@@ -386,6 +387,11 @@ export class PlatformService implements OnModuleInit {
         },
       });
     if (existing && kind !== 'report') return existing;
+    const premium = kind === 'premium'
+      ? resolvePremiumSettings((await this.db.collection('platform_settings').findOne({ key: 'public' }))?.premium)
+      : null;
+    if (premium && !premium.enabled)
+      throw new BadRequestException('Premium applications are currently unavailable');
     const c = {
       id: randomUUID(),
       userId: actor,
@@ -393,7 +399,7 @@ export class PlatformService implements OnModuleInit {
       targetId: p.targetId || null,
       message: String(p.message || '').slice(0, 2000),
       status: 'pending',
-      fee: kind === 'premium' ? 1000 : null,
+      fee: premium?.fee ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

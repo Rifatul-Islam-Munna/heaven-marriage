@@ -1,4 +1,5 @@
-import {Body,Controller,Get,Param,Patch,Query,Req,UseGuards} from '@nestjs/common';
+import {Body,Controller,Get,Param,Patch,Post,Query,Req,UseGuards} from '@nestjs/common';
+import {Throttle,ThrottlerGuard} from '@nestjs/throttler';
 import {AuthGuard,type ExpressRequest} from '../lib/auth.guard';
 import {RolesGuard} from '../lib/roles.guard';
 import {Roles} from '../lib/roles.decorator';
@@ -25,6 +26,14 @@ export class StaffAccessController{
   @UseGuards(AuthGuard,RolesGuard)
   @Roles(UserType.ADMIN)
   search(@Query('q')query:string){return this.staff.search(query);}
+  /** Create a ready-to-use team member (or member) account. */
+  @Post('admin/create')
+  @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
+  @Throttle({default:{limit:30,ttl:3600000}})
+  @Roles(UserType.ADMIN)
+  create(@Req()req:ExpressRequest,@Body()payload:unknown){
+    return this.staff.create(req.user.id,payload);
+  }
   @Patch('admin/:id')
   @UseGuards(AuthGuard,RolesGuard)
   @Roles(UserType.ADMIN)

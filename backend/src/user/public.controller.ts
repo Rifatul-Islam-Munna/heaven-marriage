@@ -3,6 +3,7 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { PlatformService } from './platform.service';
 import { resolvePolicySettings, suppliedPolicies } from './policy-defaults';
+import { resolvePremiumSettings } from './premium-settings';
 @Controller('public')
 export class PublicController {
   constructor(
@@ -24,6 +25,7 @@ export class PublicController {
     return {
       messengerUrl: s.messengerUrl || '',
       discoveryEnabled: s.discoveryEnabled !== false,
+      premium: resolvePremiumSettings(s.premium),
       policies: Object.fromEntries(
         ['terms', 'privacy', 'refund'].map((k) => [k, !!s[k + 'Published']]),
       ),

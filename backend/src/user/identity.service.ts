@@ -321,6 +321,40 @@ export class IdentityService {
     };
   }
 
+  /**
+   * Only a current administrator may set another account's password.
+   * Bumping authVersion signs the member out of every existing session.
+   */
+  async adminSetPassword(actor: string, userId: string, newPassword: string) {
+    const admin = await this.users.findById(actor).select('role').lean();
+    if (admin?.role !== 'admin')
+      throw new UnauthorizedException('Administrator access required');
+    if (
+      typeof newPassword !== 'string' ||
+      newPassword.length < 8 ||
+      newPassword.length > 50
+    )
+      throw new BadRequestException('Use a password of 8 to 50 characters');
+    const user: any = await this.users
+      .findById(userId)
+      .select('isOtpVerified')
+      .lean();
+    if (!user) throw new BadRequestException('User not found');
+    const result = await this.users.updateOne(
+      { _id: user._id },
+      {
+        $set: { password: await bcrypt.hash(newPassword, 12) },
+        $inc: { authVersion: 1 },
+      },
+    );
+    if (!result.matchedCount) throw new BadRequestException('User not found');
+    await this.db.collection('identity_challenges').deleteMany({ userId });
+    return {
+      message: 'Password updated. The member was signed out of all devices.',
+      accountVerified: !!user.isOtpVerified,
+    };
+  }
+
   /** Only a current administrator may edit account login contacts. */
   async adminUpdateProfile(
     actor: string,

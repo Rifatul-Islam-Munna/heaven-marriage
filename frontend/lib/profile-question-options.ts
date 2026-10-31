@@ -11,7 +11,23 @@ const strings=(items:string[]):QuestionOption[]=>items.map(s=>({value:s,label:s}
 const format=(items:any[],value='value',label='label'):QuestionOption[]=>items.map(i=>({
  value:String(i[value]),label:String(i[label]),
 }));
+/**
+ * Option values are React keys and stored answers, so they must be unique.
+ * Some static lists repeat a name (e.g. upazilas "Kaukhali" and "Daulatpur"
+ * exist in two districts); they store the same value, so keep the first.
+ */
+function uniqueOptions(options:QuestionOption[]):QuestionOption[]{
+ const seen=new Set<string>();
+ return options.filter(option=>{
+  if(seen.has(option.value))return false;
+  seen.add(option.value);
+  return true;
+ });
+}
 export function profileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:Record<string,any>):QuestionOption[]{
+ return uniqueOptions(rawProfileQuestionOptions(q,gender,formData));
+}
+function rawProfileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:Record<string,any>):QuestionOption[]{
  if(q.options?.length)return q.options;
  const filtered=(items:any[])=>items.filter(i=>!i.gender||i.gender==='all'||
    i.gender==='both'||i.gender===gender);

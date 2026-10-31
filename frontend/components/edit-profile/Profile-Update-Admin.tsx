@@ -50,6 +50,7 @@ import { ExpectedPartnerStep } from "../custom/updateProfile/ExpectedPartnerStep
 import { CustomQuestionsStep } from "../custom/updateProfile/CustomQuestionsStep";
 import { PledgeStep } from "../custom/updateProfile/PledgeStep";
 import { User } from "@/@types/user";
+import AdminPasswordCard from "./AdminPasswordCard";
 import {
   BIODATA_WHATSAPP_GROUPS,
   BiodataWhatsappGroup,
@@ -301,6 +302,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             </form>
           </CardContent>
         </Card>
+        <AdminPasswordCard id={id} memberName={data?.name} disabled={isLoading || !data} />
         {/* Action Buttons - Hide/Unhide and Delete */}
         <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
           <Button

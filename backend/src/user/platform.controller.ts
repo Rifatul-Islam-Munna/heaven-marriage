@@ -1,6 +1,7 @@
 import {DashboardPermission} from '../staff-access/permissions';
 import { normalizeMessengerUrl } from './messenger-url';
 import { resolvePolicySettings, suppliedPolicies } from './policy-defaults';
+import { parsePremiumSettings, resolvePremiumSettings } from './premium-settings';
 import { IdentityService } from './identity.service';
 import {
   Body,
@@ -206,6 +207,7 @@ export class PlatformController {
   @UseGuards(RolesGuard)
   @DashboardPermission('settings','upgrades')
   async settings() {
+    const saved = await this.db.collection('platform_settings').findOne({ key: 'public' });
     return {
       discoveryEnabled: true,
       minMatchScore: 1,
@@ -216,11 +218,8 @@ export class PlatformController {
         education: 1,
         age: 1,
       },
-      ...resolvePolicySettings(
-        await this.db
-          .collection('platform_settings')
-          .findOne({ key: 'public' }),
-      ),
+      ...resolvePolicySettings(saved),
+      premium: resolvePremiumSettings(saved?.premium),
     };
   }
   @Patch('admin/settings')
@@ -299,6 +298,7 @@ export class PlatformController {
       )
         throw new BadRequestException('Minimum score must be 0–100');
     }
+    if (p.premium !== undefined) updates.premium = parsePremiumSettings(p.premium);
     await this.service.audit(r.user.id, 'settings.update', 'public');
     await this.db
       .collection('platform_settings')

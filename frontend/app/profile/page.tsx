@@ -1,42 +1,22 @@
 "use client";
-import PlatformOverview from "@/components/custom/profile/PlatformOverview";
-import { useUser } from "@/lib/useUser";
-import React, { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  User as UserIcon,
-  Mail,
-  Phone,
-  IdCard,
-  Edit,
-  Eye,
-  CheckCircle,
-  XCircle,
-  Shield,
-  AlertCircle,
-  Loader2,
-  EyeOff,
-  Trash2,
-} from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { UserType, User as USer } from "@/@types/user";
-import { useRouter } from "next/navigation";
-import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+
+import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle, BadgeCheck, Bookmark, Check, ChevronRight, Copy, Eye, EyeOff, IdCard, Loader2, Mail, Pencil, Phone,
+  Settings, ShieldCheck, Sparkles, Trash2, User as UserIcon, Users,
+} from "lucide-react";
+import { toast } from "sonner";
+import PlatformOverview from "@/components/custom/profile/PlatformOverview";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { UserType, User as ProfileUser } from "@/@types/user";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
-import { logOutUser } from "@/actions/auth";
 
 export interface UserInfo {
   _id: string;
@@ -49,687 +29,205 @@ export interface UserInfo {
   isOtpVerified: boolean;
 }
 
+const ROLE_LABEL: Record<string, string> = {
+  admin: "অ্যাডমিন", manager: "ম্যানেজার", seo: "SEO এডিটর", blog: "ব্লগ এডিটর", editor: "এডিটর",
+};
+
+function Pill({ tone, children }: { tone: "green" | "gray" | "red" | "pink"; children: React.ReactNode }) {
+  const tones = {
+    green: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+    gray: "bg-gray-100 text-gray-700 ring-gray-500/20",
+    red: "bg-red-50 text-red-700 ring-red-600/20",
+    pink: "bg-pink-50 text-pink-700 ring-pink-600/20",
+  } as const;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${tones[tone]}`}>{children}</span>;
+}
+
+function ProgressRing({ value }: { value: number }) {
+  const radius = 26, circumference = 2 * Math.PI * radius;
+  return <div className="relative size-16 shrink-0" role="img" aria-label={`${value}% সম্পূর্ণ`}>
+    <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
+      <circle cx="32" cy="32" r={radius} fill="none" strokeWidth="6" className="stroke-amber-100" />
+      <circle cx="32" cy="32" r={radius} fill="none" strokeWidth="6" strokeLinecap="round" className="stroke-amber-500 transition-all"
+        strokeDasharray={circumference} strokeDashoffset={circumference * (1 - value / 100)} />
+    </svg>
+    <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-700">{value}%</span>
+  </div>;
+}
+
+function InfoItem({ icon, label, value, action }: { icon: React.ReactNode; label: string; value: React.ReactNode; action?: React.ReactNode }) {
+  return <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">{icon}</span>
+    <div className="min-w-0 flex-1">
+      <p className="text-xs text-gray-500">{label}</p>
+      <div className="mt-0.5 break-words text-[15px] font-semibold text-gray-900">{value}</div>
+    </div>
+    {action}
+  </div>;
+}
+
+const quickLinks = [
+  { href: "/profile/ai-profile", label: "AI দিয়ে বায়োডাটা", hint: "প্রশ্নের উত্তর দিয়ে দ্রুত পূরণ করুন", icon: Sparkles },
+  { href: "/profile/short-list", label: "প্রিয় তালিকা", hint: "পছন্দের বায়োডাটাগুলো", icon: Bookmark },
+  { href: "/profile/numbers", label: "আমার সংযোগ", hint: "যাদের যোগাযোগ নম্বর পেয়েছেন", icon: Users },
+  { href: "/profile/settings", label: "প্রোফাইল সেটিংস", hint: "পাসওয়ার্ড, ফোন ও ইমেইল", icon: Settings },
+] as const;
+
 const User = () => {
   const router = useRouter();
-
-  // Alert dialog states
-  const [showHideAlert, setShowHideAlert] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-
-  const {
-    data: user,
-    isLoading,
-    refetch,
-  } = useQueryWrapper<USer>(
-    ["get-my-profile-for-success"],
-    "/user/get-my-profile",
-  );
-
-  const handleEdit = () => {
-    router.push("/profile/my-profile");
-  };
-
-  const handleVisitProfile = () => {
-    router.push(`/biodata/${user?.userId}`);
-  };
-
-  // Hide/Unhide mutation
-  const { mutate: toggleVisibility, isPending: isTogglingVisibility } =
-    useCommonMutationApi({
-      method: "PATCH",
-      url: "/user/update-user", // Adjust to your actual endpoint
-      mutationKey: ["toggle-my-visibility"],
-      successMessage: user?.isPublished
-        ? "প্রোফাইল লুকানো হয়েছে"
-        : "প্রোফাইল প্রকাশিত হয়েছে",
-      onSuccess: () => {
-        refetch();
-      },
-    });
-
-  // Delete mutation with logout
+  const { data: user, isLoading, refetch } = useQueryWrapper<ProfileUser>(["get-my-profile-for-success"], "/user/get-my-profile");
   const { mutate: deleteUser, isPending: isDeleting } = useCommonMutationApi({
     method: "DELETE",
     url: "/user/delete-my-account",
     mutationKey: ["delete-user"],
     successMessage: "মুছে ফেলার অনুরোধ জমা হয়েছে। অ্যাডমিন পর্যালোচনা করবেন।",
-    onSuccess: () => {
-      refetch();
-    },
+    onSuccess: () => { refetch(); },
   });
 
-  const handellogout = async () => {
-    const res = await logOutUser();
-    if (res) {
-      /*   await refetch();
-      router.refresh(); */
-      window.location.href = "/";
-    }
-  };
+  if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
+    <div className="flex flex-col items-center gap-3 text-gray-600"><Loader2 className="h-9 w-9 animate-spin text-pink-500" /> তথ্য লোড হচ্ছে...</div>
+  </div>;
 
-  // Handle hide/unhide confirmation
-  const handleToggleVisibility = () => {
-    toggleVisibility({ isPublished: !user?.isPublished });
-    setShowHideAlert(false);
-  };
-
-  // Handle delete confirmation
-  const handleDelete = () => {
-    deleteUser({});
-    setShowDeleteAlert(false);
-  };
-
-  // Calculate profile completion percentage
-  const profileCompletion = useMemo(() => {
-    if(user?.completion)return user.completion.percentage;
-    if (!user) return 0;
-
-    let totalFields = 0;
-    let filledFields = 0;
-
-    // Helper function to check if a field has value
-    const hasValue = (field: any): boolean => {
-      if (field === undefined || field === null || field === "") return false;
-      if (typeof field === "number" && field === 0) return false;
-      return true;
-    };
-
-    // Basic Information (8 fields)
-    const basicFields = [
-      user?.name,
-      user?.email,
-      user?.phoneNumber,
-      user?.gender,
-      user?.age,
-      user?.bloodGroup,
-      user?.weight,
-      user?.nationality,
-    ];
-    totalFields += basicFields.length;
-    filledFields += basicFields.filter(hasValue).length;
-
-    // Address (5 fields)
-    if (user?.address) {
-      const addressFields = [
-        user.address.presentAddress,
-        user.address.permanentAddress,
-        user.address.district,
-        user.address.upazila,
-        user.address.extraInfo,
-      ];
-      totalFields += addressFields.length;
-      filledFields += addressFields.filter(hasValue).length;
-    } else {
-      totalFields += 5;
-    }
-
-    // Education Information (9 fields)
-    if (user?.educationInfo) {
-      const eduFields = [
-        user.educationInfo.educationMethod,
-        user.educationInfo.highestEducation,
-        user.educationInfo.highestEducationBoard,
-        user.educationInfo.highestEducationGroup,
-        user.educationInfo.highestEducationPassingYear,
-        user.educationInfo.sSCPassingYear,
-        user.educationInfo.sSCPassingGroup,
-        user.educationInfo.hSCPassingYear,
-        user.educationInfo.hSCPassingGroup,
-      ];
-      totalFields += eduFields.length;
-      filledFields += eduFields.filter(hasValue).length;
-    } else {
-      totalFields += 9;
-    }
-
-    // Family Information (9 fields)
-    if (user?.familyInfo) {
-      const familyFields = [
-        user.familyInfo.fathersProfession,
-        user.familyInfo.mothersProfession,
-        user.familyInfo.brotherCount,
-        user.familyInfo.brotherInformation,
-        user.familyInfo.sisterCount,
-        user.familyInfo.sisterInformation,
-        user.familyInfo.familyFinancial,
-        user.familyInfo.familyAssetDetails,
-        user.familyInfo.familyReligiousCondition,
-      ];
-      totalFields += familyFields.length;
-      filledFields += familyFields.filter(hasValue).length;
-    } else {
-      totalFields += 9;
-    }
-
-    // Personal Information (17 fields)
-    if (user?.personalInformation) {
-      const personalFields = [
-        user.personalInformation.outsideClothes,
-        user.personalInformation.womenNiqbYear,
-        user.personalInformation.manBeard,
-        user.personalInformation.prayerFiverTimeFrom,
-        user.personalInformation.MissPrayerTime,
-        user.personalInformation.maharaNonMahram,
-        user.personalInformation.reciteQuran,
-        user.personalInformation.fiqhFollow,
-        user.personalInformation.digitalMedia,
-        user.personalInformation.mentalOrPhysicalIssue,
-        user.personalInformation.specialWorkOfDeen,
-        user.personalInformation.majarBeliveStatus,
-        user.personalInformation.islamicBookName,
-        user.personalInformation.islamicScholarsName,
-        user.personalInformation.extraInfoHobby,
-        user.personalInformation.height,
-        user.personalInformation.skinTone,
-      ];
-      totalFields += personalFields.length;
-      filledFields += personalFields.filter(hasValue).length;
-    } else {
-      totalFields += 17;
-    }
-
-    // Occupational (3 fields)
-    if (user?.occupational) {
-      const occupationalFields = [
-        user.occupational.profession,
-        user.occupational.workingDetails,
-        user.occupational.salary,
-      ];
-      totalFields += occupationalFields.length;
-      filledFields += occupationalFields.filter(hasValue).length;
-    } else {
-      totalFields += 3;
-    }
-
-    // Marriage Information - Women (3 fields)
-    if (user?.marriageInformationWomen) {
-      const marriageWomenFields = [
-        user.marriageInformationWomen.jobAfterMarriage,
-        user.marriageInformationWomen.studyAfterMarriage,
-        user.marriageInformationWomen.thoughtsOnMarriage,
-      ];
-      totalFields += marriageWomenFields.length;
-      filledFields += marriageWomenFields.filter(hasValue).length;
-    }
-
-    // Marriage Information - Men (6 fields)
-    if (user?.marriageInformationMan) {
-      const marriageMenFields = [
-        user.marriageInformationMan.wifeVailAfterMarriage,
-        user.marriageInformationMan.allowWifeStudyAfterMarriage,
-        user.marriageInformationMan.wifeJobAfterMarriage,
-        user.marriageInformationMan.livingPlaceAfterMarriage,
-        user.marriageInformationMan.expectedAnyGiftFromMarriage,
-        user.marriageInformationMan.thoughtsOnMarriage,
-      ];
-      totalFields += marriageMenFields.length;
-      filledFields += marriageMenFields.filter(hasValue).length;
-    }
-
-    // Expected Life Partner (10 fields)
-    if (user?.expectedLifePartner) {
-      const expectedPartnerFields = [
-        user.expectedLifePartner.age,
-        user.expectedLifePartner.complexion,
-        user.expectedLifePartner.height,
-        user.expectedLifePartner.education,
-        user.expectedLifePartner.district,
-        user.expectedLifePartner.upazila,
-        user.expectedLifePartner.maritalStatus,
-        user.expectedLifePartner.profession,
-        user.expectedLifePartner.financialCondition,
-        user.expectedLifePartner.expectedQuality,
-      ];
-      totalFields += expectedPartnerFields.length;
-      filledFields += expectedPartnerFields.filter(hasValue).length;
-    } else {
-      totalFields += 10;
-    }
-
-    // Pledge (3 fields - boolean fields)
-    if (user?.pledge) {
-      const pledgeFields = [
-        user.pledge.youGordianKnowsThis,
-        user.pledge.allTheInformationTrue,
-        user.pledge.anyMisInformationWeAreNotKnowing,
-      ];
-      totalFields += pledgeFields.length;
-      filledFields += pledgeFields.filter((field) => field === true).length;
-    } else {
-      totalFields += 3;
-    }
-
-    // Calculate actual percentage
-    const actualPercentage = (filledFields / totalFields) * 100;
-
-    // Adjust so 55% actual completion shows as 100%
-    const adjustedPercentage = Math.min(actualPercentage * (100 / 55), 100);
-
-    return Math.round(adjustedPercentage);
-  }, [user]);
-
-  // Helper function to check if a field has value (reusable)
-  const hasValue = (field: any): boolean => {
-    if (field === undefined || field === null || field === "") return false;
-    if (typeof field === "number" && field === 0) return false;
-    return true;
-  };
-
-  // Check for required critical fields (height, age, gender)
-  const hasCriticalFields = useMemo(() => {
-    if (!user) return false;
-
-    const hasAge = hasValue(user?.age);
-    const hasGender = hasValue(user?.gender);
-    const hasHeight = hasValue(user?.personalInformation?.height);
-
-    return hasAge && hasGender && hasHeight;
-  }, [user]);
-
-  // Profile is incomplete if missing critical fields OR less than 65% completion
-  // The backend computes completion from the current admin question schema.
-  const isProfileIncomplete = profileCompletion < 100;
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-center h-96">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
-            <p className="text-gray-600">তথ্য লোড হচ্ছে...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // No data state
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <Card className="border border-gray-200 bg-white">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">কোনো তথ্য পাওয়া যায়নি</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
-<PlatformOverview />
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
-                আপনার সম্পর্কে তথ্য
-              </h1>
-              <p className="text-sm text-gray-600">
-                আপনার ব্যক্তিগত তথ্য এবং প্রোফাইল বিবরণ
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={handleEdit}
-                className="bg-pink-500 hover:bg-pink-600 text-white"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                বায়োডাটা এডিট করুন
-              </Button>
-              <Button
-                onClick={handleVisitProfile}
-                variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-100"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                নিজের প্রফাইল দেখুন
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons - Hide/Unhide and Delete */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          <Button
-            onClick={() => setShowHideAlert(true)}
-            disabled={isTogglingVisibility}
-            variant="outline"
-            className={`hidden items-center gap-2 ${
-              user?.isPublished
-                ? "border-orange-500 text-orange-600 hover:bg-orange-50"
-                : "border-green-500 text-green-600 hover:bg-green-50"
-            }`}
-          >
-            {user?.isPublished ? (
-              <>
-                <EyeOff className="w-4 h-4" />
-                প্রোফাইল লুকান
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4" />
-                প্রোফাইল প্রকাশ করুন
-              </>
-            )}
-          </Button>
-
-          <Button
-            onClick={() => setShowDeleteAlert(true)}
-            disabled={isDeleting}
-            variant="outline"
-            className="flex items-center gap-2 border-red-500 text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" />
-            অ্যাকাউন্ট মুছে ফেলুন
-          </Button>
-        </div>
-
-        {/* Profile Completion Alert */}
-        {isProfileIncomplete && (
-          <Card className="border border-orange-200 bg-orange-50 mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-2">
-                    প্রোফাইল সম্পূর্ণ করুন
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    আপনার প্রোফাইল মাত্র {profileCompletion}% সম্পূর্ণ। সম্পূর্ণ
-                    প্রোফাইল আপনার উপযুক্ত ম্যাচ পাওয়ার সম্ভাবনা বৃদ্ধি করে।
-                  </p>
-                  <div className="mb-3">
-                    <Progress value={profileCompletion} className="h-2" />
-                  </div>
-                  <Button
-                    onClick={handleEdit}
-                    size="sm"
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
-                  >
-                    এখনই সম্পূর্ণ করুন
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Main Profile Card */}
-        <Card className="border border-gray-200 bg-white">
-          <CardHeader className="border-b border-gray-200 bg-gray-50/50">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="text-xl font-semibold text-gray-900 flex items-center gap-3">
-                {/* Gender-based Profile Image */}
-                <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-                  {user?.gender ? (
-                    <Image
-                      src={
-                        user.gender.toLowerCase() === "male"
-                          ? "/male.png"
-                          : "/female.png"
-                      }
-                      alt="Profile"
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-pink-100 flex items-center justify-center">
-                      <UserIcon className="w-6 h-6 text-pink-600" />
-                    </div>
-                  )}
-                </div>
-                প্রোফাইল তথ্য
-              </CardTitle>
-              <div className="flex gap-2">
-                {user?.isOtpVerified !== undefined && (
-                  <Badge
-                    variant={user?.isOtpVerified ? "default" : "destructive"}
-                    className={
-                      user?.isOtpVerified
-                        ? "bg-green-500 hover:bg-green-600"
-                        : "bg-red-500"
-                    }
-                  >
-                    {user?.isOtpVerified ? (
-                      <>
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        যাচাইকৃত
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-3 h-3 mr-1" />
-                        যাচাই করা হয়নি
-                      </>
-                    )}
-                  </Badge>
-                )}
-                {user?.isPublished !== undefined && (
-                  <Badge
-                    variant={user?.isPublished ? "default" : "secondary"}
-                    className={
-                      user?.isPublished
-                        ? "bg-blue-500 hover:bg-blue-600"
-                        : "bg-gray-500"
-                    }
-                  >
-                    {user?.isPublished ? (
-                      <>
-                        <Eye className="w-3 h-3 mr-1" />
-                        প্রকাশিত
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff className="w-3 h-3 mr-1" />
-                        লুকানো
-                      </>
-                    )}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            {/* Grid Layout for Profile Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Name */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <UserIcon className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      নাম
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900 break-words">
-                      {user?.name || "তথ্য নেই"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* User ID */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <IdCard className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      ব্যবহারকারী আইডি
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900 break-words">
-                      {user?.userId || "তথ্য নেই"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <Mail className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      ইমেইল
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900 break-all">
-                      {user?.email || "তথ্য নেই"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Phone Number */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      ফোন নম্বর
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {user?.phoneNumber || "তথ্য নেই"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Role */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <Shield className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      ভূমিকা
-                    </p>
-                    <Badge
-                      variant="secondary"
-                      className="text-base font-semibold"
-                    >
-                      {user?.role || "তথ্য নেই"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* Connections */}
-              <div className="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <IdCard className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                      কানেকশন
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900 break-all font-mono text-sm">
-                      {user?.numberOfConnections?.toLocaleString("bn-BD") ||
-                        "নেই"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Additional Info Card */}
-        <Card className="border border-gray-200 bg-white mt-6">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-5 h-5 text-pink-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">
-                  প্রোফাইল সম্পূর্ণ করুন
-                </h3>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  আপনার প্রোফাইল সম্পূর্ণ এবং সঠিক তথ্য প্রদান করুন যাতে আরও
-                  ভালো ম্যাচ পেতে পারেন। সম্পূর্ণ প্রোফাইল আপনার সাফল্যের
-                  সম্ভাবনা বৃদ্ধি করে।
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Hide/Unhide Confirmation Dialog */}
-      <AlertDialog open={showHideAlert} onOpenChange={setShowHideAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {user?.isPublished
-                ? "প্রোফাইল লুকাতে চান?"
-                : "প্রোফাইল প্রকাশ করতে চান?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {user?.isPublished
-                ? "আপনার প্রোফাইলটি লুকানো হলে অন্য ব্যবহারকারীরা এটি দেখতে পারবেন না। আপনি যেকোনো সময় আবার প্রকাশ করতে পারবেন।"
-                : "আপনার প্রোফাইলটি প্রকাশিত হলে অন্য ব্যবহারকারীরা এটি দেখতে পারবেন এবং আপনার সাথে যোগাযোগ করতে পারবেন।"}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>বাতিল</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleToggleVisibility}
-              className={
-                user?.isPublished
-                  ? "bg-orange-600 hover:bg-orange-700"
-                  : "bg-green-600 hover:bg-green-700"
-              }
-            >
-              নিশ্চিত করুন
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">
-              অ্যাকাউন্ট মুছে ফেলতে চান?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              সতর্কতা! এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না। এটি স্থায়ীভাবে
-              আপনার অ্যাকাউন্ট এবং সমস্ত ডেটা মুছে ফেলবে। আপনি কি নিশ্চিত যে
-              আপনি আপনার অ্যাকাউন্ট মুছে ফেলতে চান?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>বাতিল</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              হ্যাঁ, মুছে ফেলুন
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+  if (!user) return <div className="min-h-[60vh] bg-gray-50 px-4 py-10">
+    <div className="mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center">
+      <AlertCircle className="mx-auto h-10 w-10 text-gray-400" />
+      <p className="mt-3 text-gray-700">আপনার তথ্য পাওয়া যায়নি। পেজটি আবার লোড করুন।</p>
+      <button type="button" onClick={() => refetch()} className="mt-4 rounded-lg bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700">আবার চেষ্টা করুন</button>
     </div>
-  );
+  </div>;
+
+  const completion = Math.max(0, Math.min(100, Math.round(user.completion?.percentage ?? 0)));
+  const deletionRequested = (user as unknown as { deletionRequested?: boolean }).deletionRequested === true;
+  const staffRole = user.role && ROLE_LABEL[String(user.role)];
+  const avatar = user.gender ? (String(user.gender).toLowerCase() === "male" ? "/male.png" : "/female.png") : null;
+  const copyId = () => {
+    if (!user.userId) return;
+    void navigator.clipboard.writeText(String(user.userId)).then(() => toast.success("বায়োডাটা নম্বর কপি হয়েছে"), () => toast.error("কপি করা যায়নি"));
+  };
+
+  return <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
+        <div className="h-16 bg-pink-50 sm:h-20" aria-hidden />
+        <div className="-mt-10 flex flex-col gap-4 px-5 pb-5 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+          <div className="flex min-w-0 items-end gap-4">
+            <div className="size-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-pink-100 shadow-sm sm:size-24">
+              {avatar ? <Image src={avatar} alt="" width={96} height={96} className="size-full object-cover" />
+                : <span className="flex size-full items-center justify-center text-pink-600"><UserIcon className="h-9 w-9" /></span>}
+            </div>
+            <div className="min-w-0 pb-1">
+              <h1 className="truncate text-xl font-bold text-gray-900 sm:text-2xl">{user.name || "আপনার প্রোফাইল"}</h1>
+              {user.userId && <button type="button" onClick={copyId} className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-pink-700" title="কপি করুন">
+                বায়োডাটা নং <span className="font-mono font-semibold text-gray-700">#{user.userId}</span><Copy className="h-3.5 w-3.5" />
+              </button>}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={() => router.push("/profile/my-profile")}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-pink-700">
+              <Pencil className="h-4 w-4" /> বায়োডাটা এডিট করুন
+            </button>
+            {user.userId && <button type="button" onClick={() => router.push(`/biodata/${user.userId}`)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              <Eye className="h-4 w-4" /> অন্যরা যেমন দেখে
+            </button>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-5 py-3 sm:px-6">
+          {user.isOtpVerified ? <Pill tone="green"><BadgeCheck className="h-3.5 w-3.5" /> অ্যাকাউন্ট যাচাইকৃত</Pill>
+            : <Pill tone="red"><AlertCircle className="h-3.5 w-3.5" /> অ্যাকাউন্ট যাচাই করা হয়নি</Pill>}
+          {user.isPublished ? <Pill tone="green"><Eye className="h-3.5 w-3.5" /> বায়োডাটা প্রকাশিত</Pill>
+            : <Pill tone="gray"><EyeOff className="h-3.5 w-3.5" /> বায়োডাটা এখনো প্রকাশিত নয়</Pill>}
+          {staffRole && <Pill tone="pink"><ShieldCheck className="h-3.5 w-3.5" /> {staffRole}</Pill>}
+          {deletionRequested && <Pill tone="red"><Trash2 className="h-3.5 w-3.5" /> মুছে ফেলার অনুরোধ পর্যালোচনায়</Pill>}
+        </div>
+      </section>
+
+      {completion < 100 ? <section className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center">
+        <ProgressRing value={completion} />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold text-gray-900">বায়োডাটা সম্পূর্ণ করুন</h2>
+          <p className="mt-1 text-sm leading-6 text-gray-700">আপনার বায়োডাটা {completion}% সম্পূর্ণ। সব তথ্য দিলে প্রকাশের জন্য জমা দিতে পারবেন এবং উপযুক্ত প্রস্তাব পাওয়ার সম্ভাবনা বাড়বে।</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <button type="button" onClick={() => router.push("/profile/my-profile")}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600">
+            এখনই সম্পূর্ণ করুন <ChevronRight className="h-4 w-4" />
+          </button>
+          <Link href="/profile/ai-profile" className="text-center text-xs font-medium text-amber-800 underline">অথবা AI দিয়ে দ্রুত পূরণ করুন</Link>
+        </div>
+      </section> : <section className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check className="h-5 w-5" /></span>
+        <div>
+          <h2 className="font-semibold text-gray-900">আপনার বায়োডাটা সম্পূর্ণ</h2>
+          <p className="text-sm text-gray-700">তথ্য পরিবর্তন হলে যেকোনো সময় এডিট করতে পারবেন।</p>
+        </div>
+      </section>}
+
+      <PlatformOverview />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">অ্যাকাউন্টের তথ্য</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <InfoItem icon={<UserIcon className="h-5 w-5" />} label="নাম" value={user.name || <span className="text-gray-400">দেওয়া হয়নি</span>} />
+            <InfoItem icon={<IdCard className="h-5 w-5" />} label="বায়োডাটা নম্বর" value={user.userId ? <span className="font-mono">#{user.userId}</span> : <span className="text-gray-400">নেই</span>}
+              action={user.userId ? <button type="button" onClick={copyId} aria-label="বায়োডাটা নম্বর কপি করুন" className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><Copy className="h-4 w-4" /></button> : undefined} />
+            <InfoItem icon={<Mail className="h-5 w-5" />} label="ইমেইল" value={user.email || <span className="text-gray-400">যুক্ত করা হয়নি</span>} />
+            <InfoItem icon={<Phone className="h-5 w-5" />} label="ফোন নম্বর" value={user.phoneNumber || <span className="text-gray-400">যুক্ত করা হয়নি</span>} />
+            <InfoItem icon={<Users className="h-5 w-5" />} label="বাকি কানেকশন" value={(user.numberOfConnections ?? 0).toLocaleString("bn-BD")}
+              action={<Link href="/profile/numbers" className="self-center text-xs font-semibold text-pink-700 hover:underline">দেখুন</Link>} />
+            <InfoItem icon={<ShieldCheck className="h-5 w-5" />} label="অ্যাকাউন্টের ধরন" value={staffRole || "সদস্য"} />
+          </div>
+          <p className="mt-4 text-xs text-gray-500">ফোন, ইমেইল বা পাসওয়ার্ড বদলাতে <Link href="/profile/settings" className="font-medium text-pink-700 underline">প্রোফাইল সেটিংস</Link> এ যান।</p>
+        </section>
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold text-gray-900">দ্রুত যান</h2>
+          <ul className="space-y-1">
+            {quickLinks.map(item => {
+              const Icon = item.icon;
+              return <li key={item.href}>
+                <Link href={item.href} className="group flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-pink-50">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 group-hover:bg-white group-hover:text-pink-600"><Icon className="h-4.5 w-4.5" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-gray-900">{item.label}</span>
+                    <span className="block truncate text-xs text-gray-500">{item.hint}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-pink-600" />
+                </Link>
+              </li>;
+            })}
+          </ul>
+        </section>
+      </div>
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-red-100 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-gray-900">অ্যাকাউন্ট মুছে ফেলা</h2>
+          <p className="mt-1 text-sm text-gray-600">{deletionRequested ? "আপনার অনুরোধ জমা আছে। অ্যাডমিন পর্যালোচনা করে ব্যবস্থা নেবেন।" : "অনুরোধ পাঠালে অ্যাডমিন পর্যালোচনা করে আপনার অ্যাকাউন্ট ও বায়োডাটা মুছে দেবেন।"}</p>
+        </div>
+        <button type="button" onClick={() => setShowDeleteAlert(true)} disabled={isDeleting || deletionRequested}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
+          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {deletionRequested ? "অনুরোধ পাঠানো হয়েছে" : "মুছে ফেলার অনুরোধ"}
+        </button>
+      </section>
+    </div>
+
+    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-red-600">অ্যাকাউন্ট মুছে ফেলার অনুরোধ পাঠাবেন?</AlertDialogTitle>
+          <AlertDialogDescription>অ্যাডমিন অনুমোদন দিলে আপনার অ্যাকাউন্ট ও সমস্ত তথ্য স্থায়ীভাবে মুছে যাবে, যা আর ফেরানো যাবে না।</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>বাতিল</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { deleteUser({}); setShowDeleteAlert(false); }} className="bg-red-600 hover:bg-red-700">হ্যাঁ, অনুরোধ পাঠান</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </div>;
 };
 
 export default User;

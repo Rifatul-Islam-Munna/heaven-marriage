@@ -311,6 +311,19 @@ export class ResetPasswordDto{
 
 }
 
+/** Administrator sets a new login password for another account. */
+export class AdminSetPasswordDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsMongoId()
+  id: string;
+
+  @ApiProperty({ example: 'NewPass#2026' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(50)
+  newPassword: string;
+}
+
 export class AdminUserDto extends UserFilterDto {
  @IsOptional() @IsIn(['true','false','all']) phoneVerified?:string;
  @IsOptional() @IsIn(['true','false','all']) emailVerified?:string;

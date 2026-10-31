@@ -2,7 +2,7 @@ import {DashboardPermission} from '../staff-access/permissions';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, Logger, Res, BadRequestException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, NewPasswordResetWithOtp, OtpstringDto, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import { AdminSetPasswordDto, AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, NewPasswordResetWithOtp, OtpstringDto, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { OptionalAuthGuard, AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
 import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
 import { RolesGuard } from 'src/lib/roles.guard';
@@ -163,6 +163,13 @@ export class UserController {
   @DashboardPermission('users')
   UpdateUserAdmin( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
     return this.userService.update( updateUserDto,req.user.id,req.user.role);
+  }
+  @Patch('admin-set-password')
+  @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
+  @Throttle({default:{limit:30, ttl:3600000}})
+  @DashboardPermission('users')
+  AdminSetPassword( @Body() dto: AdminSetPasswordDto,@Req() req:ExpressRequest) {
+    return this.userService.adminSetPassword( dto,req.user.id,req.user.role);
   }
   @Patch('update-user-subscriber')
     @UseGuards(AuthGuard,RolesGuard)

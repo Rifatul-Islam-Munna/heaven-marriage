@@ -9,6 +9,9 @@ import {
   targetValue, visualTarget,
   type VisualTarget, type VisualEntries, type AdminVisualPage, type PublicVisualPage,
 } from '@/lib/visual-content';
+import {
+  isEmbeddedFrame, postToEditor, readBridgeMessage, type EditorToFrame,
+} from '@/lib/visual-editor-bridge';
 
 const getGroup = (target: VisualTarget): 'global' | 'page' =>
   target.scope === '@global' ? 'global' : 'page';
@@ -124,6 +127,7 @@ export default function VisualContentRuntime() {
     }
     selectedRef.current = null;
     setSelected(null);
+    postToEditor({ type: 'deselect' });
   }, []);
 
   useEffect(() => {
@@ -167,6 +171,7 @@ export default function VisualContentRuntime() {
         if (!alive) return;
         contents.current = { page, global };
         requestAnimationFrame(refresh);
+        if (adminData) postToEditor({ type: 'ready', path: path! });
       } catch {
         // Retain current JSX text when backend/content cache is unavailable.
       }
@@ -201,7 +206,12 @@ export default function VisualContentRuntime() {
       event.preventDefault();
       event.stopPropagation();
       const target = targetAtPoint(event, true);
-      if (!target) { setMessage('Choose a heading, paragraph, button label or editable attribute.'); return; }
+      if (!target) {
+        const hint = 'Choose a heading, paragraph, button label or editable attribute.';
+        setMessage(hint);
+        postToEditor({ type: 'hint', message: hint });
+        return;
+      }
       const previous = selectedRef.current;
       if (previous) {
         const saved = contents.current[getGroup(previous)][previous.key];
@@ -212,8 +222,13 @@ export default function VisualContentRuntime() {
       selectedRef.current = target;
       target.element.classList.add('visual-current-selection');
       setSelected(target);
-      setValue(contents.current[getGroup(target)][target.key] ?? originalValue(target));
+      const current = contents.current[getGroup(target)][target.key] ?? originalValue(target);
+      setValue(current);
       setMessage('');
+      postToEditor({ type: 'select', selection: {
+        scope: target.scope, key: target.key, kind: target.kind,
+        original: originalValue(target), value: current,
+      } });
     };
     const move = (event: MouseEvent) => {
       if (pendingPublishScope) {
@@ -258,14 +273,16 @@ export default function VisualContentRuntime() {
     }
   }
 
-  async function save(method: 'PATCH' | 'DELETE') {
+  async function save(method: 'PATCH' | 'DELETE', explicitValue?: string) {
     const target = selectedRef.current;
     if (!target) return;
+    const nextValue = explicitValue ?? value;
     setLoading(true); setMessage('');
+    postToEditor({ type: 'busy', busy: true });
     try {
       const response = await fetch('/api/visual-content', {
         method, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: target.scope, key: target.key, ...(method === 'PATCH' ? { value } : {}) }),
+        body: JSON.stringify({ scope: target.scope, key: target.key, ...(method === 'PATCH' ? { value: nextValue } : {}) }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -274,7 +291,7 @@ export default function VisualContentRuntime() {
       const group = getGroup(target);
       const next = { ...contents.current[group] };
       if (method === 'DELETE') delete next[target.key];
-      else next[target.key] = value;
+      else next[target.key] = nextValue;
       contents.current = { ...contents.current, [group]: next };
       setDocs(previous => previous ? { ...previous,
         [group]: { ...previous[group], draft: next },
@@ -284,17 +301,46 @@ export default function VisualContentRuntime() {
         changed.current.delete(target.node);
         setValue(targetValue(target));
       } else {
-        applyVisualValue(target, value);
+        setValue(nextValue);
+        applyVisualValue(target, nextValue);
         changed.current.add(target.node);
       }
-      setMessage(method === 'PATCH'
+      const done = method === 'PATCH'
         ? 'Draft saved to MongoDB. Publish when ready.'
-        : 'Override removed from draft. Publish to restore default for visitors.');
+        : 'Override removed from draft. Publish to restore default for visitors.';
+      setMessage(done);
       refresh();
+      postToEditor({ type: 'saved', scope: target.scope, key: target.key, removed: method === 'DELETE', message: done });
+      if (method === 'DELETE') postToEditor({ type: 'select', selection: {
+        scope: target.scope, key: target.key, kind: target.kind,
+        original: originalValue(target), value: targetValue(target),
+      } });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Save failed');
-    } finally { setLoading(false); }
+      const failed = error instanceof Error ? error.message : 'Save failed';
+      setMessage(failed);
+      postToEditor({ type: 'error', message: failed });
+    } finally {
+      setLoading(false);
+      postToEditor({ type: 'busy', busy: false });
+    }
   }
+
+  // Embedded in /dashboard/visual-editor: the dashboard inspector drives edits.
+  const bridge = useRef({ preview, save, closeSelection });
+  useEffect(() => { bridge.current = { preview, save, closeSelection }; });
+  useEffect(() => {
+    if (!isAdmin || !editMode || !isEmbeddedFrame()) return;
+    const onMessage = (event: MessageEvent) => {
+      const message = readBridgeMessage<EditorToFrame>(event, window.parent);
+      if (!message) return;
+      if (message.type === 'preview' && typeof message.value === 'string') bridge.current.preview(message.value.slice(0, 10000));
+      else if (message.type === 'save' && typeof message.value === 'string') void bridge.current.save('PATCH', message.value.slice(0, 10000));
+      else if (message.type === 'restore') void bridge.current.save('DELETE');
+      else if (message.type === 'deselect') bridge.current.closeSelection();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [isAdmin, editMode]);
 
   async function publish(scope: string) {
     setPendingPublishScope(null);
@@ -317,7 +363,8 @@ export default function VisualContentRuntime() {
     finally { setLoading(false); }
   }
 
-  if (!isAdmin || !editMode) return null;
+  // Inside the dashboard preview iframe, the dashboard renders all editor UI.
+  if (!isAdmin || !editMode || isEmbeddedFrame()) return null;
   const pageDirty = differs(docs?.page.draft, docs?.page.published);
   const globalDirty = differs(docs?.global.draft, docs?.global.published);
   return <div data-visual-editor-ui="true" className="pointer-events-none fixed inset-0 z-[99999] font-sans text-[#2b252a]">

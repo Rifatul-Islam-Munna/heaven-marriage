@@ -1,7 +1,8 @@
 // components/navbar.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { isEmbeddedFrame } from "@/lib/visual-editor-bridge";
 import Link from "next/link";
 import type { Route } from "next";
 import { Menu, X, Heart, ChevronRight, PencilLine } from "lucide-react";
@@ -47,12 +48,16 @@ const languages = [
   { value: "en", label: "English" },
 ];
 
+const noopSubscribe = () => () => {};
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState("bn");
   const { user } = useUser();
   const pathname = usePathname();
   const visualEditHref = `${pathname}?visualEdit=1`;
+  // Hide the shortcut inside the dashboard visual-editor preview frame.
+  const embedded = useSyncExternalStore(noopSubscribe, isEmbeddedFrame, () => false);
 
   return (
     <nav
@@ -94,7 +99,7 @@ export default function Navbar() {
 
           {/* Desktop Actions */}
           <div className="hidden items-center gap-4 md:flex">
-            {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && (
+            {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && !embedded && (
               <Link href={visualEditHref as Route} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">
                 <PencilLine size={14} /> Edit this page
               </Link>
@@ -143,7 +148,7 @@ export default function Navbar() {
               </SelectContent>
             </Select> */}
             <div className="flex  md:hidden">
-              {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && (
+              {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && !embedded && (
                 <Link href={visualEditHref as Route} aria-label="Edit this page" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700"><PencilLine size={17}/></Link>
               )}
               {user && <UserNav user={user} />}
