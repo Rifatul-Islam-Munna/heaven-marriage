@@ -18,7 +18,7 @@ function differs(a: VisualEntries = {}, b: VisualEntries = {}) {
 }
 const editHref = (path: string) => path + '?visualEdit=1';
 
-export default function VisualEditor() {
+export default function VisualEditor({canEditSeo=false}:{canEditSeo?:boolean}) {
   const [path, setPath] = useState('/');
   const [custom, setCustom] = useState('');
   const [search, setSearch] = useState('');
@@ -196,6 +196,10 @@ export default function VisualEditor() {
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-4 text-sm font-bold text-white shadow-sm hover:bg-rose-700">
               <ExternalLink size={17}/> Open visual editor
             </a>
+            {canEditSeo&&<a href={"/dashboard/seo?path="+encodeURIComponent(path)}
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-[#fff8fa] px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50">
+              <Search size={16}/> Edit this page’s SEO settings
+            </a>}
             <p className="mt-3 text-xs leading-6 text-[#8a7a83]">A new tab opens your actual page. Click any eligible text, button label, placeholder or image alt text to modify it.</p>
             <div className="mt-6 border-t border-[#f0e7ea] pt-5">
               <div className="flex items-center gap-2 text-sm font-semibold"><CircleHelp className="text-rose-500" size={17}/> Dynamic or newly added page?</div>

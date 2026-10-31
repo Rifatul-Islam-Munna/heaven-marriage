@@ -1,9 +1,9 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import VisualEditor from '@/components/custom/dashboard/VisualEditor';
+import {getDashboardSession} from '@/lib/dashboard-session';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Visual Page Editor | Niqaha', robots: { index: false, follow: false } };
 
 export default async function VisualEditorPage() {
   const token = (await cookies()).get('access_token')?.value;
@@ -20,5 +20,6 @@ export default async function VisualEditorPage() {
     return <p className="p-6">Content backend is currently unavailable.</p>;
   }
   if (!authorized) redirect('/dashboard');
-  return <VisualEditor />;
+  const session=await getDashboardSession();
+  return <VisualEditor canEditSeo={session?.permissions.includes('seo')||false}/>;
 }

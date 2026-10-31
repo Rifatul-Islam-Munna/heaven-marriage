@@ -1,3 +1,4 @@
+import {DashboardPermission} from '../staff-access/permissions';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, Logger, Res, BadRequestException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -97,10 +98,10 @@ export class UserController {
   }
   @Get('get-all-user-for-admin')
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('users')
 
-  getAllUserForAdmin(@Query() query: AdminUserDto) {
-    return this.userService.getUserForAdmin(query);
+  getAllUserForAdmin(@Query() query: AdminUserDto,@Req() req:ExpressRequest) {
+    return this.userService.getUserForAdmin(query,req.user.role);
   }
 
   @UseGuards(AuthGuard)
@@ -109,10 +110,10 @@ export class UserController {
     return this.userService.finMyProfile(req.user?.id);
   }
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('users')
   @Get("get-user-profile-admin")
-  getUserProfile(@Query() id: FindOneDto) {
-    return this.userService.finMyProfile(id?.id);
+  getUserProfile(@Query() id: FindOneDto,@Req() req:ExpressRequest) {
+    return this.userService.adminProfile(id?.id,req.user.role);
   }
 
   @UseGuards(AuthGuard)
@@ -159,15 +160,15 @@ export class UserController {
   @Patch('update-user-admin')
   @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
   @Throttle({default:{limit:200, ttl:3600000}})
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('users')
   UpdateUserAdmin( @Body() updateUserDto: UpdateUserDto,@Req() req:ExpressRequest) {
-    return this.userService.update( updateUserDto,req.user.id);
+    return this.userService.update( updateUserDto,req.user.id,req.user.role);
   }
   @Patch('update-user-subscriber')
     @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('users')
   UpdateUserSubscriber( @Body() updateUserDto: FindOneDto,@Req() req:ExpressRequest) {
-    return this.userService.toggleSubscription( updateUserDto.id,req.user.id);
+    return this.userService.toggleSubscription( updateUserDto.id,req.user.id,req.user.role);
   }
 
   @Delete('delete-my-account')
@@ -178,10 +179,10 @@ export class UserController {
   @Delete('delete-user-admin')
   @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
   @Throttle({default:{limit:200, ttl:3600000}})
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('users')
 
   deleteUser(@Query() id: FindOneDto,@Req() req:ExpressRequest) {
-    return this.userService.remove(id,req.user.id);
+    return this.userService.remove(id,req.user.id,req.user.role);
   }
 
 

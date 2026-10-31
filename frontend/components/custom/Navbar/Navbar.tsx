@@ -35,6 +35,7 @@ const navItems = [
   { label: "আমাদের সম্পর্কে", href: "/about" },
 
   { label: "জিজ্ঞাসা", href: "/faq" },
+  { label: "ব্লগ", href: "/blog" },
   { label: "নির্দেশনা", href: "/guidelines" },
   { label: "যোগাযোগ", href: "/contact" },
   { label: "প্রাইসিং", href: "/pricing" },
@@ -79,7 +80,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden items-center gap-8 md:flex">
+          <div className="hidden items-center gap-5 md:flex lg:gap-7">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -93,7 +94,7 @@ export default function Navbar() {
 
           {/* Desktop Actions */}
           <div className="hidden items-center gap-4 md:flex">
-            {user?.role === "admin" && pathname !== "/dashboard/visual-editor" && (
+            {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && (
               <Link href={visualEditHref as Route} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">
                 <PencilLine size={14} /> Edit this page
               </Link>
@@ -142,7 +143,7 @@ export default function Navbar() {
               </SelectContent>
             </Select> */}
             <div className="flex  md:hidden">
-              {user?.role === "admin" && pathname !== "/dashboard/visual-editor" && (
+              {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && (
                 <Link href={visualEditHref as Route} aria-label="Edit this page" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700"><PencilLine size={17}/></Link>
               )}
               {user && <UserNav user={user} />}

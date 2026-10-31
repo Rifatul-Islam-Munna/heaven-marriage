@@ -12,6 +12,10 @@ import { ContactModule } from './contact/contact.module';
 import { ImageModule } from './image/image.module';
 import { WebDataModule } from './web-data/web-data.module';
 import { VisualContentModule } from './visual-content/visual-content.module';
+import { QuestionConfigModule } from './profile-questions/question-config.module';
+import { SeoSettingsModule } from './seo-settings/seo-settings.module';
+import {BlogModule} from './blog/blog.module';
+import {StaffAccessModule} from './staff-access/staff-access.module';
 import { PricingModule } from './pricing/pricing.module';
 import pagination from "mongoose-paginate-v2"
 import virtuals from "mongoose-lean-virtuals"
@@ -60,6 +64,10 @@ import { Request } from 'express';
     ImageModule,
     WebDataModule,
     VisualContentModule,
+    QuestionConfigModule,
+    SeoSettingsModule,
+    BlogModule,
+    StaffAccessModule,
     PricingModule,
     CustomQuestionModule,
   ],

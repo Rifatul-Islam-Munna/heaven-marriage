@@ -259,7 +259,8 @@ export function UserNav({ user }: { user: UserInfo | null }) {
   }, [users]);
 
   // Profile is incomplete if missing critical fields OR less than 65% completion
-  const isProfileIncomplete = !hasCriticalFields || profileCompletion < 65;
+  // The backend computes completion from the current admin question schema.
+  const isProfileIncomplete = profileCompletion < 100;
 
   const getInitials = (name?: string) => {
     if (!name) return "U";
@@ -294,8 +295,16 @@ export function UserNav({ user }: { user: UserInfo | null }) {
   };
 
   const isAdmin = user?.role === "admin";
-  const url = isAdmin ? "/dashboard" : "/profile";
-  const settings = isAdmin ? "/dashboard/settings" : "/profile/settings";
+  const isStaff = ["admin","seo","blog","manager"].includes(user?.role||"");
+  const hasStaffSettings = isAdmin ||
+    (user?.role === "manager" && user?.dashboardPermissions?.includes("settings"));
+  const url = isStaff ? "/dashboard" : "/profile";
+  const settings = hasStaffSettings ? "/dashboard/settings" : "/profile/settings";
+  const avatarSrc = user?.gender === "male"
+    ? "/male.png"
+    : user?.gender === "female"
+      ? "/female.png"
+      : undefined;
 
   return (
     <>
@@ -303,36 +312,18 @@ export function UserNav({ user }: { user: UserInfo | null }) {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
             <Avatar className="h-10 w-10">
-              <AvatarImage
-                src={
-                  user?.gender === "male"
-                    ? "/male.png"
-                    : user?.gender === "female"
-                      ? "/female.png"
-                      : ""
-                }
-                alt={user?.name || "User"}
-              />
+              <AvatarImage src={avatarSrc} alt={user?.name || "User"} />
               <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-72" align="center">
           {/* Profile Completion Status - Only for non-admin users */}
-          {!isAdmin && (
+          {!isStaff && (
             <>
               <div className="flex flex-col items-center space-y-3 p-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage
-                    src={
-                      user?.gender === "male"
-                        ? "/male.png"
-                        : user?.gender === "female"
-                          ? "/female.png"
-                          : ""
-                    }
-                    alt={user?.name || "User"}
-                  />
+                  <AvatarImage src={avatarSrc} alt={user?.name || "User"} />
                   <AvatarFallback className="text-xl">
                     {getInitials(user?.name)}
                   </AvatarFallback>
@@ -395,7 +386,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
             </DropdownMenuItem>
 
             {/* Edit Biodata - Only for non-admin */}
-            {!isAdmin && (
+            {!isStaff && (
               <DropdownMenuItem asChild className="py-3 cursor-pointer">
                 <Link href="/profile/my-profile">
                   <Edit className="mr-3 h-5 w-5" />
@@ -407,7 +398,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
             )}
 
             {/* Shortlist - Only for non-admin */}
-            {!isAdmin && (
+            {!isStaff && (
               <DropdownMenuItem asChild className="py-3 cursor-pointer">
                 <Link href="/profile/short-list">
                   <Heart className="mr-3 h-5 w-5" />
@@ -417,7 +408,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
             )}
 
             {/* My Purchases - Only for non-admin */}
-            {!isAdmin && (
+            {!isStaff && (
               <DropdownMenuItem asChild className="py-3 cursor-pointer">
                 <Link href="/profile/numbers">
                   <ShoppingBag className="mr-3 h-5 w-5" />
@@ -435,7 +426,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
             </DropdownMenuItem>
 
             {/* Delete Biodata - Only for non-admin with Alert */}
-            {!isAdmin && (
+            {!isStaff && (
               <DropdownMenuItem
                 className="py-3 cursor-pointer text-orange-600 focus:text-orange-600"
                 onSelect={(e) => {

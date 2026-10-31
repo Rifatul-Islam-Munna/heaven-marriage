@@ -41,6 +41,9 @@ import {
 import { useRouter } from "next/navigation";
 import { leadEvent, viewContentEvent } from "@/lib/google-tag-manager";
 import { useEffect, useState } from "react";
+import { QuestionPublicContext,useQuestionPublicConfig,PublicProfileDataContext,usePublicProfileData } from "@/lib/QuestionPublicContext";
+import { defaultQuestions,questionUsesSeparateStorage } from "@/lib/profile-questions";
+import PublicAdditionalAnswers, {PublicExtraRows} from "./PublicAdditionalAnswers";
 
 interface ProfileViewProps {
   id: string;
@@ -50,20 +53,33 @@ const InfoRow = ({
   label,
   value,
   bgWhite = false,
+  fieldPath,
 }: {
+  fieldPath?: string;
   label: string;
   value: string | number | boolean | undefined;
   bgWhite?: boolean;
 }) => {
+  const schema=useQuestionPublicConfig();
+  const data=usePublicProfileData();
+  const config=schema.questions.find(q=>q.path===fieldPath);
+  const original=defaultQuestions.questions.find(q=>q.path===fieldPath);
+  if(config&&(!config.enabled||!config.showPublic||
+    questionUsesSeparateStorage(config)||
+    (original&&original.section!==config.section)))return null;
+  const displayLabel=config?.publicLabel||label;
   if (value === undefined || value === null || value === "") return null;
 
-  const displayValue =
-    typeof value === "boolean" ? (value ? "হ্যাঁ" : "না") : value;
+  const raw=fieldPath?.split('.').reduce<any>((part,key)=>part?.[key],data);
+  const option=config&&['select','dropdown'].includes(config.type)
+    ? config.options.find(o=>o.value===String(raw)) : undefined;
+  const displayValue=option?.label||
+    (typeof value === "boolean" ? (value ? "হ্যাঁ" : "না") : value);
 
   return (
     <tr className={bgWhite ? "bg-white" : ""}>
       <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-        {label}
+        {displayLabel}
       </td>
       <td className="border border-gray-300 px-4 py-3 text-sm text-gray-900 font-medium">
         {displayValue}
@@ -82,6 +98,20 @@ export default function ProfileView({ id }: ProfileViewProps) {
     0,
     "bio-data-info",
   );
+  // Always render the exact question revision the backend used to filter this
+  // public profile. Do not rely on a stale 20-minute browser schema cache.
+  const questionSchema=userData?.publicQuestionSchema||defaultQuestions;
+  const showField=(key:string)=>{
+    const q=questionSchema.questions.find(q=>q.path===key);
+    const original=defaultQuestions.questions.find(row=>row.path===key);
+    return !q||(q.enabled&&q.showPublic&&!questionUsesSeparateStorage(q)&&
+      (!original||original.section===q.section));
+  };
+  const publicFieldLabel=(key:string,fallback:string)=>
+    questionSchema.questions.find(q=>q.path===key)?.publicLabel||fallback;
+  const publicOptionLabel=(key:string,value:unknown,fallback:string|undefined)=>
+    questionSchema.questions.find(q=>q.path===key)?.options.find(
+      option=>option.value===String(value))?.label||fallback;
 
   useEffect(() => {
     if (userData) {
@@ -143,6 +173,19 @@ export default function ProfileView({ id }: ProfileViewProps) {
       </div>
     );
   }
+  // Gender may itself be private, so infer which existing marriage table has
+  // public answers without re-exposing the gender account field.
+  const hasAnswers=(data:Record<string,unknown>|undefined)=>
+    Object.values(data||{}).some(value=>value!==undefined&&value!==null&&value!=='');
+  const hasExtraFor=(gender:'female'|'male'|'both')=>
+    questionSchema.questions.some(q=>q.section===6&&q.gender===gender&&q.enabled&&q.showPublic&&
+      userData.publicAnswers?.[q.id]!==undefined);
+  const showWomenMarriageSection=userData.gender==='female'||
+    hasAnswers(userData.marriageInformationWomen as Record<string,unknown>|undefined)||hasExtraFor('female');
+  const showMenMarriageSection=userData.gender==='male'||
+    hasAnswers(userData.marriageInformationMan as Record<string,unknown>|undefined)||hasExtraFor('male');
+  const showGeneralMarriageSection=!showWomenMarriageSection&&!showMenMarriageSection&&hasExtraFor('both');
+
   const formatHeightToBangla = (height: string | number): string => {
     const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
 
@@ -225,6 +268,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
   };
 
   return (
+    <QuestionPublicContext.Provider value={questionSchema}>
+    <PublicProfileDataContext.Provider value={userData}>
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Main Grid Layout */}
@@ -236,105 +281,103 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 {/* Avatar */}
                 <div className="flex justify-center mb-6">
                   <div className="w-32 h-32 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                    <Image
-                      src={
-                        userData?.gender === "male"
-                          ? "/male.png"
-                          : userData?.gender === "female"
-                            ? "/female.png"
-                            : "/male.png"
-                      }
-                      width={80}
-                      height={80}
-                      className="object-contain"
-                      alt="gender-image"
-                    />
+                    {showField("gender") && userData?.gender ? (
+                      <Image
+                        src={userData.gender === "male" ? "/male.png" : "/female.png"}
+                        width={80}
+                        height={80}
+                        className="object-contain"
+                        alt="Profile illustration"
+                      />
+                    ) : <Heart className="h-14 w-14 text-white" aria-hidden="true"/>}
                   </div>
                 </div>
-                <h2 className="text-2xl text-center font-bold mb-2">
-                  নাম : <span className={userData.identityUnlocked?"":"blur-sm select-none"}>{userData?.name || "পরিচয় সংরক্ষিত"}</span>
-                </h2>
+                {showField("name") && <h2 className="text-2xl text-center font-bold mb-2">
+                  {publicFieldLabel("name","নাম")} : <span className={userData.identityUnlocked?"":"blur-sm select-none"}>{userData?.name || "পরিচয় সংরক্ষিত"}</span>
+                </h2>}
 
                 {/* Biodata Number */}
                 <div className="text-center mb-8">
                   <h2 className="text-xl text-gray-100 font-bold mb-2">
-                    বায়োডাটা নং : {userData?.gender === "male" ? "NG" : "NB"}-
-                    {userData?.userId}
+                    বায়োডাটা নং : {showField("gender")&&userData.gender
+                      ? (userData.gender === "male" ? "NG-" : "NB-")
+                      : ""}{userData?.userId}
                   </h2>
-                  <Badge className="bg-white/20 text-white hover:bg-white/30 border-0">
-                    {userData?.gender === "male" ? "পুরুষ" : "মহিলা"}
-                  </Badge>
+                  {showField('gender')&&<Badge className="bg-white/20 text-white hover:bg-white/30 border-0">
+                    {publicFieldLabel("gender","লিঙ্গ")} : {userData?.gender === "male" ? "পুরুষ" : "মহিলা"}
+                  </Badge>}
                 </div>
 
                 {/* Quick Info Table */}
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">বৈবাহিক অবস্থা</span>
+                  {showField("maritalStatus") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("maritalStatus","বৈবাহিক অবস্থা")}</span>
                     <span className="font-semibold">
-                      {marriedStatus.find(
-                        (item) => item.en === userData?.maritalStatus,
-                      )?.bn || userData?.maritalStatus}
+                      {publicOptionLabel("maritalStatus",userData?.maritalStatus,
+                        marriedStatus.find((item)=>item.en===userData?.maritalStatus)?.bn||
+                        userData?.maritalStatus)}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
+                  {showField("age") && (<div className="flex justify-between py-2 border-b border-white/20">
                     <span className="text-white/80">জন্মসন</span>
                     <span className="font-semibold">
                       {userData?.age
                         ? new Date().getFullYear() - userData.age
                         : "তথ্য নেই"}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">বয়স</span>
+                  {showField("age") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("age","বয়স")}</span>
                     <span className="font-semibold">
                       {userData?.age
                         ? `${userData?.age?.toLocaleString("bn-BD")} বছর`
                         : "তথ্য নেই"}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">উচ্চতা</span>
+                  {showField("personalInformation.height") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("personalInformation.height","উচ্চতা")}</span>
                     <span className="font-semibold">
                       {userData?.personalInformation?.height
                         ? `${formatHeightToBangla(userData.personalInformation.height)} `
                         : "তথ্য নেই"}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">গাত্রবর্ণ</span>
+                  {showField("personalInformation.skinTone") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("personalInformation.skinTone","গাত্রবর্ণ")}</span>
                     <span className="font-semibold">
-                      {userData?.personalInformation?.skinTone}
+                      {publicOptionLabel("personalInformation.skinTone",
+                        userData?.personalInformation?.skinTone,userData?.personalInformation?.skinTone)}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">রক্তের গ্রুপ</span>
+                  {showField("bloodGroup") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("bloodGroup","রক্তের গ্রুপ")}</span>
                     <span className="font-semibold">
                       {userData?.bloodGroup || "তথ্য নেই"}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2 border-b border-white/20">
-                    <span className="text-white/80">ওজন</span>
+                  {showField("weight") && (<div className="flex justify-between py-2 border-b border-white/20">
+                    <span className="text-white/80">{publicFieldLabel("weight","ওজন")}</span>
                     <span className="font-semibold">
                       {userData?.weight
                         ? `${userData.weight?.toLocaleString("bn-BD")} কেজি`
                         : "তথ্য নেই"}
                     </span>
-                  </div>
+                  </div>)}
 
-                  <div className="flex justify-between py-2">
-                    <span className="text-white/80">জাতীয়তা</span>
+                  {showField("nationality") && (<div className="flex justify-between py-2">
+                    <span className="text-white/80">{publicFieldLabel("nationality","জাতীয়তা")}</span>
                     <span className="font-semibold">
-                      {countries.find(
-                        (item) => item.en.trim() === userData?.nationality,
-                      )?.bn || userData?.nationality}
+                      {publicOptionLabel("nationality",userData?.nationality,
+                        countries.find((item)=>item.en.trim()===userData?.nationality)?.bn||
+                        userData?.nationality)}
                     </span>
-                  </div>
+                  </div>)}
                 </div>
 
                 {/* Action Buttons */}
@@ -408,7 +451,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
 
           {/* Right Side - Information Tables */}
           <div className="space-y-6">
-            <Card className="shadow-none"><CardContent className="p-6"><h2 className="text-xl font-bold text-pink-700 mb-4">পরিচয় ও যোগাযোগ</h2><table className="w-full"><tbody><InfoRow label="পিতার নাম" value={userData.fatherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow label="মাতার নাম" value={userData.motherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow label="মোবাইল" value={userData.phoneNumber}/><InfoRow label="WhatsApp" value={userData.whatsapp}/><InfoRow label="অভিভাবকের নম্বর" value={userData.guardianPhone}/></tbody></table><div className="mt-3 flex gap-2"><Badge>{userData.isSubscriber?"Premium":"General"}</Badge>{userData.isVerified&&<Badge>Verified</Badge>}</div></CardContent></Card>
+            <Card className="shadow-none"><CardContent className="p-6"><h2 className="text-xl font-bold text-pink-700 mb-4">পরিচয় ও যোগাযোগ</h2><table className="w-full"><tbody><InfoRow fieldPath="fatherName" label="পিতার নাম" value={userData.fatherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow fieldPath="motherName" label="মাতার নাম" value={userData.motherName || "কানেকশনের পরে দেখা যাবে"}/><InfoRow label="মোবাইল" value={userData.phoneNumber}/><InfoRow fieldPath="whatsapp" label="WhatsApp" value={userData.whatsapp}/><InfoRow fieldPath="guardianPhone" label="অভিভাবকের নম্বর" value={userData.guardianPhone}/><PublicExtraRows user={userData} schema={questionSchema} section={0}/>
+                      </tbody></table><div className="mt-3 flex gap-2"><Badge>{userData.isSubscriber?"Premium":"General"}</Badge>{userData.isVerified&&<Badge>Verified</Badge>}</div></CardContent></Card>
             {/* ঠিকানা */}
             <Card className=" shadow-none">
               <CardContent className="p-6">
@@ -417,7 +461,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="address.permanentAddress"
                       label="স্থায়ী ঠিকানা"
                       value={
                         userData?.address?.permanentAddress ||
@@ -437,7 +481,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="address.presentAddress"
                       label="বর্তমান ঠিকানা"
                       value={
                         userData?.address?.presentAddress ||
@@ -456,7 +500,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         }, বাংলাদেশ`
                       }
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="address.district"
                       label="জেলা"
                       value={
                         districts?.find(
@@ -465,7 +509,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="address.upazila"
                       label="উপজেলা"
                       value={
                         upazilas?.find(
@@ -473,12 +517,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         )?.bn_name || userData?.address?.upazila
                       }
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="address.extraInfo"
                       label="কোথায় বড় হয়েছেন?"
                       value={userData?.address?.extraInfo}
                       bgWhite
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={1}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
@@ -491,7 +536,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.educationMethod"
                       label="আপনার শিক্ষা মাধ্যম"
                       value={
                         educationMediumOptions?.find(
@@ -502,65 +547,66 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.highestEducation"
                       label="সর্বোচ্চ শিক্ষাগত যোগ্যতা"
                       value={userData?.educationInfo?.highestEducation}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.educationBackground"
                       label="শিক্ষাগত পটভূমি"
                       value={userData?.educationInfo?.educationBackground}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.highestEducationBoard"
                       label="বিভাগ"
                       value={userData?.educationInfo?.highestEducationBoard}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.highestEducationGroup"
                       label="বিষয়/বিভাগ"
                       value={userData?.educationInfo?.highestEducationGroup}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.highestEducationPassingYear"
                       label="পাসের সন"
                       value={
                         userData?.educationInfo?.highestEducationPassingYear
                       }
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.currentlyDoingHightEducation"
                       label="বর্তমান শিক্ষা"
                       value={
                         userData?.educationInfo?.currentlyDoingHightEducation
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.sSCPassingYear"
                       label="এস.এস.সি / দাখিল / সমমান পাসের সন"
                       value={userData?.educationInfo?.sSCPassingYear}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.sSCPassingGroup"
                       label="এস.এস.সি বিভাগ"
                       value={userData?.educationInfo?.sSCPassingGroup}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.sSCResult"
                       label="এস.এস.সি ফলাফল"
                       value={userData?.educationInfo?.sSCResult}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.hSCPassingYear"
                       label="এইচ.এস.সি / আলিম / সমমান পাসের সন"
                       value={userData?.educationInfo?.hSCPassingYear}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.hSCPassingGroup"
                       label="এইচ.এস.সি বিভাগ"
                       value={userData?.educationInfo?.hSCPassingGroup}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="educationInfo.hSCResult"
                       label="এইচ.এস.সি ফলাফল"
                       value={userData?.educationInfo?.hSCResult}
                       bgWhite
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={2}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
@@ -573,43 +619,43 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.isFatherAlive"
                       label="আপনার পিতা কি জীবিত?"
                       value={userData?.familyInfo?.isFatherAlive ? "জী" : "মৃত"}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.fathersProfession"
                       label="পিতার পেশার বিবরণ"
                       value={userData?.familyInfo?.fathersProfession}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.isMotherAlive"
                       label="আপনার মাতা কি জীবিত ?"
                       value={userData?.familyInfo?.isMotherAlive ? "জী" : "মৃত"}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.mothersProfession"
                       label="মাতার পেশার বিবরণ"
                       value={userData?.familyInfo?.mothersProfession}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.brotherCount"
                       label="ভাই কতগুলি ?"
                       value={userData?.familyInfo?.brotherCount}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.brotherInformation"
                       label="ভাইদের তথ্য "
                       value={userData?.familyInfo?.brotherInformation}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.sisterCount"
                       label="বোন কতগুলি"
                       value={userData?.familyInfo?.sisterCount}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.sisterInformation"
                       label="বোনদের তথ্য"
                       value={userData?.familyInfo?.sisterInformation}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.familyFinancial"
                       label="পারিবারিক অর্থনৈতিক অবস্থা"
                       value={
                         economicStatusOptions?.find(
@@ -619,16 +665,17 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.familyAssetDetails"
                       label="পারিবারিক সম্পদের বিবরণ"
                       value={userData?.familyInfo?.familyAssetDetails}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="familyInfo.familyReligiousCondition"
                       label="পারিবারিক দ্বীনি পরিবেশ কেমন?"
                       value={userData?.familyInfo?.familyReligiousCondition}
                       bgWhite
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={4}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
@@ -641,7 +688,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.skinTone"
                       label="গাত্রবর্ণ"
                       value={
                         skinColorOptions?.find(
@@ -651,16 +698,16 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.prayerFiverTimeFrom"
                       label="প্রতিদিন পাঁচ ওয়াক্ত নামাজ পড়েন কি?"
                       value={userData?.personalInformation?.prayerFiverTimeFrom}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.reciteQuran"
                       label="কুরআন তিলওয়াত করতে পারেন?"
                       value={userData?.personalInformation?.reciteQuran}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.fiqhFollow"
                       label="কোন ফিকহ অনুসরণ করেন?"
                       value={
                         fiqhOptions?.find(
@@ -670,7 +717,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         )?.label
                       }
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.islamicStudy"
                       label="দ্বীনের শিক্ষা"
                       value={
                         religiousEducationOptions?.find(
@@ -681,12 +728,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.outsideClothes"
                       label="ঘরের বাহিরে সাধারণত কি ধরণের পোশাক পরেন?"
                       value={userData?.personalInformation?.outsideClothes}
                     />
                     {userData?.gender === "female" && (
-                      <InfoRow
+                      <InfoRow fieldPath="personalInformation.womenNiqbYear"
                         label="কবে থেকে নিকাব সহ পর্দা করছেন?"
                         value={userData?.personalInformation?.womenNiqbYear}
                         bgWhite
@@ -694,12 +741,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
                     )}
                     {userData?.gender === "male" && (
                       <>
-                        <InfoRow
+                        <InfoRow fieldPath="personalInformation.manBeard"
                           label="সুন্নতি দাড়ি আছে কি না? কবে থেকে রেখেছেন?"
                           value={userData?.personalInformation?.manBeard}
                           bgWhite
                         />
-                        <InfoRow
+                        <InfoRow fieldPath="personalInformation.manClothAboveAnkels"
                           label="টাখনুর উপরে কাপড় পরেন?"
                           value={
                             userData?.personalInformation?.manClothAboveAnkels
@@ -707,54 +754,55 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         />
                       </>
                     )}
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.maharaNonMahram"
                       label="মাহরাম/নন-মাহরাম মেনে চলেন কি?"
                       value={userData?.personalInformation?.maharaNonMahram}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.MissPrayerTime"
                       label="সাধারণত সপ্তাহে কত ওয়াক্ত নামায আপনার কাযা হয়?"
                       value={userData?.personalInformation?.MissPrayerTime}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.physicalStructure"
                       label="শারীরিক কাঠামো"
                       value={userData?.personalInformation?.physicalStructure}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.digitalMedia"
                       label="নাটক / সিনেমা / সিরিয়াল / গান এসব দেখেন বা শুনেন?"
                       value={userData?.personalInformation?.digitalMedia}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.mentalOrPhysicalIssue"
                       label="দ্বীনের কোন বিশেষ মেহনতে যুক্ত আছেন?"
                       value={
                         userData?.personalInformation?.mentalOrPhysicalIssue
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.extraInfoHobby"
                       label="নিজের শখ, পছন্দ-অপছন্দ ইত্যাদি বিষয়ে লিখুন"
                       value={userData?.personalInformation?.extraInfoHobby}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.islamicScholarsName"
                       label="আপনার পছন্দের  আলেমের নাম লিখুন"
                       value={userData?.personalInformation?.islamicScholarsName}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.islamicBookName"
                       label="আপনার পড়া  ইসলামি বই এর নাম লিখুন"
                       value={userData?.personalInformation?.islamicBookName}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.specialWorkOfDeen"
                       label="দ্বীনের কোন বিশেষ মেহনতে যুক্ত আছেন?"
                       value={userData?.personalInformation?.specialWorkOfDeen}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="personalInformation.majarBeliveStatus"
                       label="মাজার সম্পর্কে আপনার ধারণা  কি?"
                       value={userData?.personalInformation?.majarBeliveStatus}
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={3}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
@@ -767,7 +815,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="occupational.profession"
                       label="পেশা"
                       value={
                         professionOptions?.find(
@@ -776,22 +824,23 @@ export default function ProfileView({ id }: ProfileViewProps) {
                       }
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="occupational.workingDetails"
                       label="পেশার বিস্তারিত বিবরণ"
                       value={userData?.occupational?.workingDetails}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="occupational.salary"
                       label="মাসিক আয়"
                       value={userData?.occupational?.salary}
                       bgWhite
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={5}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
 
             {/* বিবাহ সম্পর্কিত তথ্য - Female */}
-            {userData?.gender === "female" && (
+            {showWomenMarriageSection && (
               <Card className="shadow-none">
                 <CardContent className="p-6">
                   <h2 className="text-xl font-bold text-pink-700 mb-4 pb-3 border-b-2 border-pink-200">
@@ -799,38 +848,38 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   </h2>
                   <table className="w-full border-collapse">
                     <tbody>
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.isGuardiansAgreed"
                         label="অভিভাবক আপনার বিয়েতে রাজি কি না?"
                         value={
                           userData?.marriageInformationWomen?.isGuardiansAgreed
                         }
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.jobAfterMarriage"
                         label="আপনি কি বিয়ের পর চাকরি করতে ইচ্ছুক?"
                         value={
                           userData?.marriageInformationWomen?.jobAfterMarriage
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.studyAfterMarriage"
                         label="বিয়ের পর পড়াশোনা চালিয়ে যেতে চান?"
                         value={
                           userData?.marriageInformationWomen?.studyAfterMarriage
                         }
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.thoughtsOnMarriage"
                         label="বিয়ে সম্পর্কে আপনার ধারণা কি?"
                         value={
                           userData?.marriageInformationWomen?.thoughtsOnMarriage
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.childCustody"
                         label="অন্য ঘরের সন্তানদের থাকার সিদ্ধান্ত?"
                         value={userData?.marriageInformationWomen?.childCustody}
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.polygamyConsentOptions"
                         label="বহুবিবাহে রাজি আছেন?(মাসনা)"
                         value={
                           polygamyConsentOptions?.find(
@@ -841,21 +890,22 @@ export default function ProfileView({ id }: ProfileViewProps) {
                           )?.label
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationWomen.caringforChildren"
                         label="মা-হারা সৎ সন্তানের দায়িত্ব গ্রহণে প্রস্তুত?"
                         value={
                           userData?.marriageInformationWomen?.caringforChildren
                         }
                         bgWhite
                       />
-                    </tbody>
+                    <PublicExtraRows user={userData} schema={questionSchema} section={6}/>
+                      </tbody>
                   </table>
                 </CardContent>
               </Card>
             )}
 
             {/* বিবাহ সম্পর্কিত তথ্য - Male */}
-            {userData?.gender === "male" && (
+            {showMenMarriageSection && (
               <Card className="shadow-none">
                 <CardContent className="p-6">
                   <h2 className="text-xl font-bold text-pink-700 mb-4 pb-3 border-b-2 border-pink-200">
@@ -863,21 +913,21 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   </h2>
                   <table className="w-full border-collapse">
                     <tbody>
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.isGuardiansAgreed"
                         label="অভিভাবক আপনার বিয়েতে রাজি কি না?"
                         value={
                           userData?.marriageInformationMan?.isGuardiansAgreed
                         }
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.wifeVailAfterMarriage"
                         label="বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন?"
                         value={
                           userData?.marriageInformationMan
                             ?.wifeVailAfterMarriage
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.allowWifeStudyAfterMarriage"
                         label="বিয়ের পর স্ত্রীকে পড়াশোনা করতে দিতে চান?"
                         value={
                           userData?.marriageInformationMan
@@ -885,13 +935,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         }
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.wifeJobAfterMarriage"
                         label="বিয়ের পর স্ত্রীকে চাকরী করতে দিতে চান?"
                         value={
                           userData?.marriageInformationMan?.wifeJobAfterMarriage
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.livingPlaceAfterMarriage"
                         label="বিয়ের পর স্ত্রীকে কোথায় নিয়ে থাকবেন?"
                         value={
                           userData?.marriageInformationMan
@@ -899,26 +949,35 @@ export default function ProfileView({ id }: ProfileViewProps) {
                         }
                         bgWhite
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.expectedAnyGiftFromMarriage"
                         label="পাত্রীপক্ষের কাছে কোনো উপহার আশা করবেন কি না?"
                         value={
                           userData?.marriageInformationMan
                             ?.expectedAnyGiftFromMarriage
                         }
                       />
-                      <InfoRow
+                      <InfoRow fieldPath="marriageInformationMan.thoughtsOnMarriage"
                         label="বিয়ে সম্পর্কে আপনার ধারণা কি?"
                         value={
                           userData?.marriageInformationMan?.thoughtsOnMarriage
                         }
                         bgWhite
                       />
-                    </tbody>
+                    <PublicExtraRows user={userData} schema={questionSchema} section={6}/>
+                      </tbody>
                   </table>
                 </CardContent>
               </Card>
             )}
 
+            {showGeneralMarriageSection && (
+              <Card className="shadow-none"><CardContent className="p-6">
+                <h2 className="text-xl font-bold text-pink-700 mb-4">বিবাহ সম্পর্কিত তথ্য</h2>
+                <table className="w-full border-collapse"><tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={6}/>
+                </tbody></table>
+              </CardContent></Card>
+            )}
             {/* প্রত্যাশিত জীবনসঙ্গী */}
             <Card className="shadow-none">
               <CardContent className="p-6">
@@ -927,84 +986,65 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </h2>
                 <table className="w-full border-collapse">
                   <tbody>
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.age"
                       label="বয়স"
                       value={userData?.expectedLifePartner?.age}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.complexion"
                       label="গাত্রবর্ণ"
                       value={userData?.expectedLifePartner?.complexion}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.height"
                       label="উচ্চতা"
                       value={userData?.expectedLifePartner?.height ?? "N/A"}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.education"
                       label="শিক্ষাগত যোগ্যতা"
                       value={userData?.expectedLifePartner?.education}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.district"
                       label="জেলা"
                       value={userData?.expectedLifePartner?.district}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.upazila"
                       label="উপজেলা"
                       value={userData?.expectedLifePartner?.upazila}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.maritalStatus"
                       label="বৈবাহিক অবস্থা"
                       value={userData?.expectedLifePartner?.maritalStatus}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.profession"
                       label="পেশা"
                       value={userData?.expectedLifePartner?.profession}
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.financialCondition"
                       label="অর্থনৈতিক অবস্থা"
                       value={userData?.expectedLifePartner?.financialCondition}
                       bgWhite
                     />
-                    <InfoRow
+                    <InfoRow fieldPath="expectedLifePartner.expectedQuality"
                       label="জীবনসঙ্গীর যে গুণাবলী প্রত্যাশা করেন"
                       value={userData?.expectedLifePartner?.expectedQuality}
                     />
-                  </tbody>
+                  <PublicExtraRows user={userData} schema={questionSchema} section={7}/>
+                      </tbody>
                 </table>
               </CardContent>
             </Card>
 
-            {/* অতিরিক্ত তথ্য */}
-            {userData?.customFields &&
-              Object.keys(userData.customFields).length > 0 && (
-                <Card className="shadow-none">
-                  <CardContent className="p-6">
-                    <h2 className="text-xl font-bold text-pink-700 mb-4 pb-3 border-b-2 border-pink-200">
-                      অতিরিক্ত তথ্য
-                    </h2>
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        {Object.entries(userData.customFields).map(
-                          ([question, answer], index) => (
-                            <InfoRow
-                              key={index}
-                              label={question}
-                              value={answer}
-                              bgWhite={index % 2 === 0}
-                            />
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  </CardContent>
-                </Card>
-              )}
+            {/* Legacy and newly added answers must BOTH pass admin visibility
+                filtering. Never render raw customFields on a public profile. */}
+            <PublicAdditionalAnswers user={userData} schema={questionSchema}/>
           </div>
         </div>
       </div>
     </div>
+    </PublicProfileDataContext.Provider>
+    </QuestionPublicContext.Provider>
   );
 }

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { publicMetadata } from "@/lib/seo";
+import { seoMetadata } from '@/lib/seo-settings-server';
+import SeoStructuredData from '@/components/custom/seo/SeoStructuredData';
 import supplied from "@/content/policies.json";
 import PolicyDocument, {
   type PolicyContent,
@@ -16,11 +18,11 @@ export async function generateMetadata({
   params: Promise<{ kind: string }>;
 }) {
   const { kind } = await params;
-  return publicMetadata(
-    (names[kind] || "Policy") + " | Niqaha.com",
-    "Niqaha.com " + (names[kind] || "service policy"),
-    "/policies/" + kind,
-  );
+  return seoMetadata('/policies/'+kind,publicMetadata(
+    (names[kind] || 'Policy') + ' | Niqaha.com',
+    'Niqaha.com '+(names[kind]||'service policy'),
+    '/policies/'+kind,
+  ));
 }
 export default async function Policy({
   params,
@@ -47,5 +49,5 @@ export default async function Policy({
       /* Approved bundled documents remain available if the API is unavailable. */
     }
   if (hidden || !policy) notFound();
-  return <PolicyDocument kind={kind} policy={policy} />;
+  return <><PolicyDocument kind={kind} policy={policy} /><SeoStructuredData path={'/policies/'+kind}/></>;
 }

@@ -31,7 +31,7 @@ export default function LoginWithGoogle({
         registrationEvent(String(result.data.user._id), "google");
       queryClient.clear();
       router.replace(
-        result.data.user.role === "admin" ? "/dashboard" : "/profile",
+        ["admin","seo","blog","manager"].includes(result.data.user.role) ? "/dashboard" : "/profile",
       );
       router.refresh();
     },

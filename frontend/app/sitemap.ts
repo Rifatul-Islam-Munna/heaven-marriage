@@ -1,19 +1,49 @@
-import type { MetadataRoute } from "next";
-export default function sitemap(): MetadataRoute.Sitemap {
-  // Private biodata and authentication pages are deliberately excluded.
-  return [
-    "/",
-    "/about",
-    "/biodata",
-    "/contact",
-    "/faq",
-    "/guidelines",
-    "/pricing",
-    "/policies/terms",
-    "/policies/refund",
-  ].map((path) => ({
-    url: "https://niqaha.com" + (path === "/" ? "" : path),
-    changeFrequency: path === "/" ? "weekly" : "monthly",
-    priority: path === "/" ? 1 : 0.7,
-  }));
+import type {MetadataRoute} from 'next';
+import {getSitemapOverrides,seoTemplate} from '@/lib/seo-settings-server';
+import {blogSitemap} from '@/lib/blog-server';
+import {SITE_ORIGIN,isPrivateSeoPath} from '@/lib/seo-settings-types';
+import {visualPageCatalog} from '@/lib/visual-page-catalog';
+
+export const dynamic='force-dynamic';
+const original=['/','/about','/biodata','/contact','/faq',
+  '/guidelines','/pricing','/premium','/blog','/policies/terms',
+  '/policies/refund','/policies/privacy'];
+const known=new Set(visualPageCatalog.filter(p=>!p.dynamic).map(p=>p.path));
+for(const policy of ['/policies/terms','/policies/privacy','/policies/refund'])known.add(policy);
+
+export default async function sitemap():Promise<MetadataRoute.Sitemap>{
+  const [overrides,articles]=await Promise.all([getSitemapOverrides(),blogSitemap()]);
+  const map=new Map(overrides.map(item=>[item.path,item]));
+  const paths=new Set([...original,...overrides.filter(o=>o.settings.sitemap?.include===true).map(o=>o.path)]);
+  const result:MetadataRoute.Sitemap=[];
+  for(const path of paths){
+    if(!known.has(path)||isPrivateSeoPath(path)||path.includes('['))continue;
+    const exact=map.get(path),inherited=map.get(seoTemplate(path));
+    const item=exact?.settings&&Object.keys(exact.settings).length?exact:inherited;
+    const seo=item?.settings;
+    if(seo?.sitemap?.include===false||seo?.robots?.index===false)continue;
+    const canonical=seo?.canonical;
+    const url=canonical
+      ? canonical.startsWith('/')?SITE_ORIGIN+canonical:canonical
+      : SITE_ORIGIN+(path==='/'?'':path);
+    result.push({
+      url,
+      changeFrequency:seo?.sitemap?.changeFrequency||(path==='/'?'weekly':'monthly'),
+      priority:seo?.sitemap?.priority??(path==='/'?1:0.7),
+      ...(item?.updatedAt?{lastModified:new Date(item.updatedAt)}:{}),
+    });
+  }
+  for(const article of articles){
+    const path='/blog/'+encodeURIComponent(article.slug);
+    const exact=map.get(path),inherited=map.get('/blog/[slug]');
+    const value=exact?.settings&&Object.keys(exact.settings).length?exact:inherited;
+    const settings=value?.settings;
+    if(settings?.robots?.index===false||settings?.sitemap?.include===false)continue;
+    const canonical=settings?.canonical;
+    const url=canonical?(canonical.startsWith('/')?SITE_ORIGIN+canonical:canonical):SITE_ORIGIN+path;
+    result.push({url,changeFrequency:settings?.sitemap?.changeFrequency||'monthly',
+      priority:settings?.sitemap?.priority??0.65,
+      ...(article.lastModified?{lastModified:new Date(article.lastModified)}:{})});
+  }
+  return result;
 }

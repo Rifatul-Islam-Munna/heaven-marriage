@@ -1,3 +1,4 @@
+import {DashboardPermission} from '../staff-access/permissions';
 import {
   Body, Controller, Delete, Get, Patch, Post, Query, Req, UseGuards,
 } from '@nestjs/common';
@@ -23,31 +24,31 @@ export class AdminVisualContentController {
   constructor(private readonly content: VisualContentService) {}
 
   @Get()
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('visual-editor')
   page(@Query('path') path: string) {
     return this.content.adminPage(path);
   }
 
   @Get('list')
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('visual-editor')
   list() {
     return this.content.list();
   }
 
   @Patch()
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('visual-editor')
   update(@Req() req: ExpressRequest, @Body() body: Record<string, unknown>) {
     return this.content.update(req.user.id, body);
   }
 
   @Delete()
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('visual-editor')
   reset(@Req() req: ExpressRequest, @Body() body: Record<string, unknown>) {
     return this.content.reset(req.user.id, body);
   }
 
   @Post('publish')
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('visual-editor')
   publish(@Req() req: ExpressRequest, @Body() body: Record<string, unknown>) {
     return this.content.publish(req.user.id, body);
   }

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import ManualConnectionPayment from "@/components/custom/common/ManualConnectionPayment";
 import PolicyLinks from "@/components/custom/common/PolicyLinks";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
@@ -123,7 +122,6 @@ const PricingPage = () => {
       <div className="container mx-auto max-w-7xl">
         {/* Back Button */}
 
-        <ManualConnectionPayment />
         {/* Header */}
         <div className="text-center mb-12 md:mb-16">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">

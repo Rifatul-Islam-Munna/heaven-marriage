@@ -26,6 +26,7 @@ import {
 import { PROFILE_OPTIONS } from './profile-ai-options';
 import { normalizePhone } from './messaging.service';
 import { ProfileAiTurnDto } from './profile-ai.dto';
+import { QuestionConfigService, usesSeparateAnswerStorage, type ProfileQuestion } from '../profile-questions/question-config.service';
 
 type ChatMessage = {
   id: string;
@@ -47,6 +48,7 @@ export class ProfileAiService {
     @InjectModel(User.name) private readonly users: Model<UserDocument>,
     @InjectConnection() private readonly db: Connection,
     private readonly gemini: GeminiService,
+    private readonly questionConfig: QuestionConfigService,
   ) {}
   async onModuleInit() {
     await this.db
@@ -68,36 +70,40 @@ export class ProfileAiService {
       throw new UnauthorizedException('Account suspended');
     return profile;
   }
-  private next(profile: any, skipped: string[]): Question | undefined {
-    const q = QUESTIONS.find(
-      (q) =>
-        (!q.gender || q.gender === profile.gender) &&
-        !skipped.includes(q.path) &&
-        !present(valueAt(profile, q.path)),
+  private next(profile: any, skipped: string[], questions: readonly ProfileQuestion[]): Question | undefined {
+    const allowed = new Map(questions.filter(q=>q.enabled&&q.path&&!usesSeparateAnswerStorage(q)&&
+      (q.gender==='both'||q.gender===profile.gender)).map(q=>[q.path,q]));
+    const q = QUESTIONS.find(item =>
+      allowed.has(item.path) &&
+      !skipped.includes(item.path) &&
+      !present(valueAt(profile, item.path)),
     );
     if (!q) return undefined;
+    const configured=allowed.get(q.path)!;
+    const configuredQuestion={...q,question:configured.question,label:configured.question};
+    if(configured.options.length)return {...configuredQuestion,options:configured.options};
     if (q.path === 'maritalStatus')
       return {
-        ...q,
+        ...configuredQuestion,
         options: PROFILE_OPTIONS.maritalStatus.filter(
           (o) => o.gender === 'all' || o.gender === profile.gender,
         ),
       };
     if (q.path === 'educationInfo.highestEducation')
       return {
-        ...q,
+        ...configuredQuestion,
         options: PROFILE_OPTIONS.education.filter(
           (o) => o.gender === 'both' || o.gender === profile.gender,
         ),
       };
     if (q.path === 'address.upazila' && profile.address?.district)
       return {
-        ...q,
+        ...configuredQuestion,
         options: PROFILE_OPTIONS.upazila.filter(
           (o) => o.district === profile.address.district,
         ),
       };
-    return q;
+    return configuredQuestion;
   }
   private question(q?: Question) {
     return (
@@ -105,8 +111,8 @@ export class ProfileAiService {
       'এ পর্যন্ত উত্তরগুলো সংরক্ষিত হয়েছে। বাকি তথ্য, অতিরিক্ত প্রশ্ন ও অঙ্গীকারগুলো ফর্মে যাচাই করে তারপর জমা দিন।'
     );
   }
-  private state(session: any, profile: any) {
-    const q = this.next(profile, session.skipped || []);
+  private state(session: any, profile: any, questions: readonly ProfileQuestion[]) {
+    const q = this.next(profile, session.skipped || [],questions);
     return {
       enabled: this.gemini.enabled(),
       revision: session.revision,
@@ -119,19 +125,20 @@ export class ProfileAiService {
           }
         : null,
       done: !q,
-      completion: completion(profile),
+      completion: completion(profile,questions),
       messages: session.messages,
     };
   }
   async session(actor: string) {
     const profile = await this.profile(actor);
+    const config=await this.questionConfig.get();
     if (!this.gemini.enabled())
       return {
         enabled: false,
         revision: 0,
         currentField: null,
         done: false,
-        completion: completion(profile),
+        completion: completion(profile,config.questions),
         messages: [],
       };
     const c = this.db.collection('profile_ai_sessions');
@@ -140,7 +147,7 @@ export class ProfileAiService {
       expiresAt: { $lt: new Date() },
       lockUntil: { $not: { $gt: new Date() } },
     });
-    const q = this.next(profile, []);
+    const q = this.next(profile, [],config.questions);
     const session = await c.findOneAndUpdate(
       { _id: actor as any },
       {
@@ -159,7 +166,7 @@ export class ProfileAiService {
       },
       { upsert: true, returnDocument: 'after' },
     );
-    return this.state(session, profile);
+    return this.state(session, profile, config.questions);
   }
   async turn(actor: string, p: ProfileAiTurnDto) {
     if (p.consent !== true)
@@ -169,6 +176,7 @@ export class ProfileAiService {
         'AI সহায়তা এখন চালু নেই। ফর্মটি নিজে পূরণ করতে পারবেন।',
       );
     let profile = await this.profile(actor);
+    const config=await this.questionConfig.get();
     const c = this.db.collection('profile_ai_sessions');
     const existing = await c.findOne({ _id: actor as any });
     if (!existing) throw new ConflictException('কথোপকথনটি আবার লোড করুন।');
@@ -190,7 +198,7 @@ export class ProfileAiService {
         'আগের উত্তর প্রক্রিয়াধীন অথবা প্রোফাইল বদলেছে। আবার লোড করুন।',
       );
     try {
-      const q = this.next(profile, session.skipped || []);
+      const q = this.next(profile, session.skipped || [],config.questions);
       if (!q)
         throw new BadRequestException('বাকি তথ্য ফর্মে যাচাই করে জমা দিন।');
       const input = p.message.trim();
@@ -292,7 +300,7 @@ export class ProfileAiService {
             'এই তথ্যটি সঠিকভাবে বুঝতে পারিনি। অনুগ্রহ করে স্পষ্ট করে বলুন। ' +
             q.question;
       }
-      const next = this.next(profile, skipped);
+      const next = this.next(profile, skipped,config.questions);
       const text =
         reply +
         (changed || skipped.includes(q.path)
@@ -316,7 +324,7 @@ export class ProfileAiService {
             }
           : null,
         done: !next,
-        completion: completion(profile),
+        completion: completion(profile,config.questions),
         changed,
         messages,
         message: assistant,

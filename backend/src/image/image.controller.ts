@@ -1,8 +1,9 @@
+import {DashboardPermission} from '../staff-access/permissions';
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UseInterceptors, BadRequestException, UploadedFile } from '@nestjs/common';
 import { ImageService } from './image.service';
 import { CreateImageDto } from './dto/create-image.dto';
 import { UpdateImageDto } from './dto/update-image.dto';
-import { AuthGuard } from 'src/lib/auth.guard';
+import { AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
 import { ApiConsumes } from '@nestjs/swagger';
 import { existsSync, mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
@@ -17,7 +18,7 @@ export class ImageController {
   constructor(private readonly imageService: ImageService) {}
   @Post("upload-image")
     @UseGuards(AuthGuard,RolesGuard)
-    @Roles(UserType.ADMIN)
+    @DashboardPermission('images','blog','visual-editor')
   
      @ApiConsumes('multipart/form-data')
    @UseInterceptors(FileInterceptor("file",{
@@ -38,6 +39,12 @@ export class ImageController {
   'video/quicktime',     // .mov
   'video/x-matroska'];
     
+      const staff=(req as unknown as ExpressRequest).user;
+      const canUploadExtendedMedia=staff?.role===UserType.ADMIN||
+        staff?.dashboardPermissions?.includes('images');
+      const imageMimeTypes=['image/jpeg','image/png','image/webp','image/avif','image/jpg'];
+      if (!canUploadExtendedMedia&&!imageMimeTypes.includes(file.mimetype))
+        return callback(new BadRequestException('This role can upload image files only'),false);
       if (!allowedMimeTypes.includes(file.mimetype)) {
         return callback(new BadRequestException('Only PDF and image files are allowed'), false);
       }

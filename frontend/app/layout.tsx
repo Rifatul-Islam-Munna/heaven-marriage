@@ -44,6 +44,7 @@ import TrackingConsent from "@/lib/TrackingConsent";
 import { publicMetadata } from "@/lib/seo";
 import { PageViewTracker } from "@/lib/PageViewTracker";
 import VisualContentRuntime from "@/components/custom/dashboard/VisualContentRuntime";
+import { SeoSiteStructuredData } from '@/components/custom/seo/SeoStructuredData';
 import { Suspense } from "react";
 export const metadata: Metadata = { ...publicMetadata("Niqaha.com | ইসলামিক ম্যাট্রিমনি", "বাংলাদেশ ও প্রবাসী বাংলাদেশিদের জন্য ইসলামিক ম্যাট্রিমনি। বায়োডাটা জমা দিন, পাত্র-পাত্রীর বায়োডাটা খুঁজুন এবং নিরাপদে সংযোগ নিন।", "/"), metadataBase: new URL("https://niqaha.com"), icons: { icon: "/favicon.ico", apple: "/logo.png" } };
 
@@ -57,6 +58,7 @@ export default function RootLayout({
 
       <body className={` ${cormorant.variable} ${lato.variable} antialiased`}>
         <TrackingConsent />
+        <SeoSiteStructuredData />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "Niqaha.com", url: "https://niqaha.com", logo: "https://niqaha.com/logo.png", email: "niqahabd@gmail.com", telephone: "+8801748919251", address: { "@type": "PostalAddress", addressLocality: "Dashghar, Bishwanath, Sylhet", addressCountry: "BD" } }) }} />
 
 

@@ -327,7 +327,8 @@ const User = () => {
   }, [user]);
 
   // Profile is incomplete if missing critical fields OR less than 65% completion
-  const isProfileIncomplete = !hasCriticalFields || profileCompletion < 65;
+  // The backend computes completion from the current admin question schema.
+  const isProfileIncomplete = profileCompletion < 100;
 
   // Loading state
   if (isLoading) {

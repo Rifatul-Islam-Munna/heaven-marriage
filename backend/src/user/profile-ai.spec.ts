@@ -12,6 +12,7 @@ import { AuthGuard } from '../lib/auth.guard';
 import { User, UserSchema } from './entities/user.entity';
 import { ProfileAiController } from './profile-ai.controller';
 import { ProfileAiService } from './profile-ai.service';
+import { QuestionConfigService } from '../profile-questions/question-config.service';
 import { MessagingService } from './messaging.service';
 import { GeminiService } from './gemini.service';
 
@@ -64,6 +65,7 @@ describe('Authenticated Gemini profile assistant', () => {
         AuthGuard,
         JwtService,
         { provide: getConnectionToken(), useValue: db },
+        { provide: QuestionConfigService, useValue: new QuestionConfigService(db) },
         { provide: getModelToken(User.name), useValue: users },
         {
           provide: ConfigService,

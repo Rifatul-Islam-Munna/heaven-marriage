@@ -1,52 +1,14 @@
 import type { User } from "@/@types/user";
-export const requiredSteps = [
-  [
-    "name",
-    "gender",
-    "maritalStatus",
-    "age",
-    "weight",
-    "nationality",
-    "personalInformation.height",
-    "personalInformation.skinTone",
-  ],
-  ["address.district", "address.upazila"],
-  ["educationInfo.educationMethod", "educationInfo.highestEducation"],
-  [
-    "personalInformation.outsideClothes",
-    "personalInformation.prayerFiverTimeFrom",
-    "personalInformation.reciteQuran",
-  ],
-  ["familyInfo.familyFinancial"],
-  ["occupational.profession"],
-  [],
-  ["expectedLifePartner.age", "expectedLifePartner.expectedQuality"],
-  [],
-  [
-    "pledge.youGordianKnowsThis",
-    "pledge.allTheInformationTrue",
-    "pledge.anyMisInformationWeAreNotKnowing",
-  ],
-];
-export function missingFields(data: Partial<User>, step?: number) {
-  const fields =
-    step === undefined ? requiredSteps.flat() : requiredSteps[step];
-  return fields.filter((path) => {
-    const value = path
-      .split(".")
-      .reduce<unknown>(
-        (v, k) =>
-          v && typeof v === "object"
-            ? (v as Record<string, unknown>)[k]
-            : undefined,
-        data,
-      );
-    return (
-      value === undefined ||
-      value === null ||
-      value === "" ||
-      value === 0 ||
-      (path.startsWith("pledge.") && value !== true)
-    );
-  });
+import { defaultQuestions, getMissingQuestions, type ProfileQuestionSchema } from "./profile-questions";
+
+// Compatibility export. Questions are configured from the admin panel rather
+// than a second, hard-coded list that can contradict current requirements.
+export const requiredSteps = defaultQuestions.sections.map(section =>
+  defaultQuestions.questions.filter(q=>q.section===section.id&&q.enabled&&q.required)
+    .map(q=>q.path||q.id),
+);
+
+export function missingFields(data: Partial<User>, step?: number,
+  schema: ProfileQuestionSchema=defaultQuestions) {
+  return getMissingQuestions(data as Record<string,any>,schema,step);
 }

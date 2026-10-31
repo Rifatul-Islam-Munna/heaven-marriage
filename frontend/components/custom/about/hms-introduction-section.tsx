@@ -11,6 +11,7 @@ export default function HMSIntroductionSectionV2() {
     { gcTime: 85000, staleTime: 85000 },
     25000,
   );
+  const introductionImage = webData?.about?.images?.right?.trim();
   return (
     <section className="w-full border-y bg-background py-12 md:py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,13 +29,15 @@ export default function HMSIntroductionSectionV2() {
             {/* Image Section */}
             <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl shadow-2xl">
               <div className="relative aspect-[16/9]">
-                <Image
-                  src={webData?.about?.images?.right || ""}
-                  alt="Niqaha.com Introduction"
-                  width={1000}
-                  height={1000}
-                  className="object-cover"
-                />
+                {introductionImage && (
+                  <Image
+                    src={introductionImage}
+                    alt="Niqaha.com Introduction"
+                    width={1000}
+                    height={1000}
+                    className="object-cover"
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
                 {/* Quote Overlay */}

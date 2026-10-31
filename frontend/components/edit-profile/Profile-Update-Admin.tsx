@@ -12,8 +12,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
+import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
+import { defaultQuestions, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import {
@@ -72,6 +74,15 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const setCurrentStep = useProfileStore((state) => state.setCurrentStep);
   const getFormData = useProfileStore((state) => state.getFormData);
   const initializeForm = useProfileStore((state) => state.initializeForm);
+  const [questionSchema,setQuestionSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
+  useEffect(()=>{
+    const controller=new AbortController();
+    void fetch("/api/profile-questions",{signal:controller.signal})
+      .then(r=>r.ok?r.json():Promise.reject(Error()))
+      .then((v:ProfileQuestionSchema)=>{if(Array.isArray(v.questions))setQuestionSchema(v);})
+      .catch(()=>{});
+    return ()=>controller.abort();
+  },[]);
   const router = useRouter();
 
   // Alert dialog states
@@ -80,6 +91,17 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const contacts = useProfileStore(state => state.formData);
+  const activeSteps=useMemo(()=>{
+    const indices=steps.map((_,index)=>index).filter(index=>
+      questionSchema.questions.some(q=>q.section===index&&q.enabled&&
+        (q.gender==='both'||q.gender===contacts.gender)));
+    return indices.length?indices:[0];
+  },[questionSchema,contacts.gender]);
+  const stepPosition=Math.max(0,activeSteps.indexOf(currentStep));
+  useEffect(()=>{
+    if(!activeSteps.includes(currentStep))
+      setCurrentStep(activeSteps.find(index=>index>currentStep)??activeSteps[activeSteps.length-1]);
+  },[activeSteps,currentStep,setCurrentStep]);
   const updateField = useProfileStore(state => state.updateField);
   const { mutate: saveContacts, isPending: isSavingContacts } = useCommonMutationApi({
     method: "PATCH", url: "/user/update-user-admin", mutationKey: ["admin-user-contacts", id],
@@ -88,8 +110,8 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   });
 
   const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+    if (activeSteps[stepPosition+1]!==undefined) {
+      setCurrentStep(activeSteps[stepPosition+1]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -145,30 +167,15 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   }, [data, initializeForm]);
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    if (activeSteps[stepPosition-1]!==undefined) {
+      setCurrentStep(activeSteps[stepPosition-1]);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const handleSubmit = async () => {
     const formData = getFormData();
-    if (
-      !formData?.maritalStatus ||
-      !formData?.age ||
-      !formData?.personalInformation?.height ||
-      !formData?.personalInformation?.skinTone ||
-      !formData?.bloodGroup ||
-      !formData?.weight ||
-      !formData?.nationality
-    ) {
-      toast.error(
-        "বৈবাহিক অবস্থা, বয়স, উচ্চতা, ত্বকের রং, রক্তের গ্রুপ, ওজন এবং জাতীয়তা - এই তথ্যগুলি আবশ্যক",
-        { duration: 10000, style: { background: "red", color: "white" } },
-      );
-      return;
-    }
-
+    // Administrator edits do not have legacy mandatory profile fields.
     const submitData = {
       id,
       ...formData,
@@ -272,32 +279,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     setShareDialogOpen(false);
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 0:
-        return <BasicInfoStep admin />;
-      case 1:
-        return <AddressStep />;
-      case 2:
-        return <EducationStep />;
-      case 3:
-        return <PersonalInfoStep />;
-      case 4:
-        return <FamilyInfoStep />;
-      case 5:
-        return <OccupationalStep />;
-      case 6:
-        return <MarriageInfoStep />;
-      case 7:
-        return <ExpectedPartnerStep />;
-      case 8:
-        return <CustomQuestionsStep />;
-      case 9:
-        return <PledgeStep />;
-      default:
-        return <BasicInfoStep admin />;
-    }
-  };
+  const renderStep = () => <DynamicQuestionStep step={currentStep} schema={questionSchema} />;
 
   return (
     <div className="min-h-screen w-full bg-gray-50 py-4 sm:py-6 lg:py-8">
@@ -415,7 +397,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
           <div className="block sm:hidden mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">
-                ধাপ {currentStep + 1} / {steps.length}
+                ধাপ {stepPosition + 1} / {activeSteps.length}
               </span>
               <span className="text-sm font-semibold text-gray-800">
                 {steps[currentStep]}
@@ -425,7 +407,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
               <div
                 className="bg-pink-600 h-2 rounded-full transition-all duration-300"
                 style={{
-                  width: `${((currentStep + 1) / steps.length) * 100}%`,
+                  width: `${((stepPosition + 1) / activeSteps.length) * 100}%`,
                 }}
               />
             </div>
@@ -433,7 +415,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
 
           {/* Desktop: Detailed Steps */}
           <div className="hidden sm:flex items-center justify-between">
-            {steps.map((step, index) => (
+            {activeSteps.map((index,position) => (
               <div key={index} className="flex-1 flex items-center">
                 <div className="flex flex-col items-center flex-1">
                   <div
@@ -456,10 +438,10 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
                     )}
                   </div>
                   <p className="text-[10px] md:text-xs mt-2 text-center max-w-[60px] md:max-w-[80px] line-clamp-2 text-gray-600">
-                    {step}
+                    {steps[index]}
                   </p>
                 </div>
-                {index < steps.length - 1 && (
+                {position < activeSteps.length - 1 && (
                   <div
                     className={`h-1 flex-1 mx-1 md:mx-2 transition-all duration-200 -mt-6 ${
                       index < currentStep ? "bg-green-500" : "bg-gray-200"
@@ -478,7 +460,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
               {steps[currentStep]}
             </CardTitle>
             <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              ধাপ {currentStep + 1} / {steps.length}
+              ধাপ {stepPosition + 1} / {activeSteps.length}
             </p>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 py-4 sm:py-6">
@@ -490,7 +472,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
         <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mt-4 sm:mt-6">
           <Button
             onClick={handlePrevious}
-            disabled={currentStep === 0}
+            disabled={stepPosition === 0}
             variant="outline"
             className="w-full sm:w-auto flex items-center justify-center gap-2 h-11 sm:h-10"
           >
@@ -498,7 +480,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             পূর্ববর্তী
           </Button>
 
-          {currentStep === steps.length - 1 ? (
+          {stepPosition === activeSteps.length - 1 ? (
             <Button
               onClick={handleSubmit}
               className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-11 sm:h-10"

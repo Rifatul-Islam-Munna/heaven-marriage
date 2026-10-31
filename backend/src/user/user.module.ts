@@ -1,4 +1,5 @@
 import { GeminiService } from './gemini.service';
+import { QuestionConfigModule } from '../profile-questions/question-config.module';
 import { ProfileAiService } from './profile-ai.service';
 import { ProfileAiController } from './profile-ai.controller';
 import { PublicController } from './public.controller';
@@ -24,7 +25,7 @@ import { Counter, CounterSchema } from './entities/counter.schema';
 import { PdfService } from './pdf.service';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
+  imports: [QuestionConfigModule,MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
   controllers: [UserController,PlatformController,AiController,PublicController,ProfileAiController],
   providers: [GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
 })

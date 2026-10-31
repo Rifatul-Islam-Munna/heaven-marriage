@@ -12,6 +12,7 @@ import { User, UserDocument } from './entities/user.entity';
 import { BkashService } from './bkash.service';
 import { MessagingService } from './messaging.service';
 import { completion, publicProfile, visibleFilter } from './profile-rules';
+import { QuestionConfigService } from '../profile-questions/question-config.service';
 
 @Injectable()
 export class PlatformService implements OnModuleInit {
@@ -20,6 +21,7 @@ export class PlatformService implements OnModuleInit {
     @InjectModel(User.name) private users: Model<UserDocument>,
     private bkash: BkashService,
     private messages: MessagingService,
+    private questionConfig: QuestionConfigService,
   ) {}
   async onModuleInit() {
     await this.db
@@ -85,7 +87,15 @@ export class PlatformService implements OnModuleInit {
           .collection('requestnumbers')
           .findOne({ userId: this.oid(actor), requestUserId: u._id }));
     }
-    return publicProfile(u, unlocked);
+    const data=publicProfile(u, unlocked);
+    const schema=await this.questionConfig.get();
+    this.questionConfig.applyPublicVisibility(data,schema);
+    data.publicAnswers=await this.questionConfig.publicAnswers(u,unlocked,schema);
+    // The public page uses the exact same revision that filtered these values.
+    // A 20-minute browser cache cannot accidentally display stale labels or
+    // previously-public answers after an admin hides/archives a question.
+    data.publicQuestionSchema=schema;
+    return data;
   }
   async unlock(actor: string, target: string) {
     const profile: any = await this.users
@@ -360,7 +370,8 @@ export class PlatformService implements OnModuleInit {
       throw new BadRequestException('Profile is required');
     if (kind === 'premium') {
       const u = await this.users.findById(actor).lean();
-      if (!u || completion(u).percentage < 100)
+      const config = await this.questionConfig.get();
+      if (!u || completion(u,config.questions).percentage < 100)
         throw new BadRequestException(
           'Please submit your completed biodata first.',
         );
@@ -602,8 +613,10 @@ export class PlatformService implements OnModuleInit {
   async summary(actor: string) {
     const u: any = await this.users.findById(actor).lean();
     if (!u) throw new NotFoundException('Account unavailable');
+    const config=await this.questionConfig.get();
+    const profileCompletion=completion(u,config.questions);
     return {
-      completion: completion(u),
+      completion: profileCompletion,
       accountType: u.isSubscriber ? 'premium' : 'general',
       verificationStatus:
         u.verificationStatus || (u.isPublishFromAdmin ? 'approved' : 'pending'),
@@ -612,7 +625,7 @@ export class PlatformService implements OnModuleInit {
       profileViews: u.profileViews || 0,
       journey: {
         created: true,
-        completed: completion(u).percentage === 100,
+        completed: profileCompletion.percentage === 100,
         submitted: ['submitted', 'approved'].includes(u.biodataStatus),
         approved: u.isPublishFromAdmin,
         published: u.isPublished,
@@ -754,68 +767,6 @@ export class PlatformService implements OnModuleInit {
     };
   }
 
-  async manualPayment(actor: string, p: any) {
-    if (
-      !['bkash', 'nagad', 'rocket'].includes(p.method) ||
-      !p.transactionReference
-    )
-      throw new BadRequestException(
-        'Payment method and reference are required',
-      );
-    const pkg = await this.db
-      .collection('pricings')
-      .findOne({ _id: this.oid(p.packageId), disabled: { $ne: true } });
-    if (
-      !pkg ||
-      !Number.isInteger(pkg.numberOfConnections) ||
-      pkg.numberOfConnections < 1
-    )
-      throw new BadRequestException('Package unavailable');
-    const reference = String(p.transactionReference).trim().slice(0, 100);
-    const paymentId = 'manual:' + p.method + ':' + reference;
-    const existing = await this.db
-      .collection('connection_orders')
-      .findOne({ paymentId });
-    if (existing) {
-      if (existing.userId !== actor)
-        throw new BadRequestException(
-          'Transaction reference already submitted',
-        );
-      return { message: 'Payment already submitted' };
-    }
-    const amount = pkg.discountPrice ?? pkg.originalPrice;
-    if (!Number.isFinite(amount) || amount <= 0)
-      throw new BadRequestException('Invalid price');
-    try {
-      await this.db
-        .collection('connection_orders')
-        .insertOne({
-          id: randomUUID(),
-          paymentId,
-          userId: actor,
-          packageId: p.packageId,
-          packageName: pkg.title,
-          quantity: pkg.numberOfConnections,
-          amount,
-          currency: 'BDT',
-          validityDays: pkg.validityDays || null,
-          method: p.method,
-          transactionId: reference,
-          status: 'pending_manual',
-          createdAt: new Date(),
-        });
-    } catch (e) {
-      if (e.code === 11000)
-        throw new BadRequestException(
-          'Transaction reference already submitted',
-        );
-      throw e;
-    }
-    return {
-      message:
-        'Payment submitted. Connections will be added after admin verification.',
-    };
-  }
   async verifyManualPayment(actor: string, id: string, p: any) {
     if (p.confirm !== true || !p.reason)
       throw new BadRequestException(
@@ -824,6 +775,7 @@ export class PlatformService implements OnModuleInit {
     const orders = this.db.collection('connection_orders'),
       order = await orders.findOne({
         id,
+        paymentId: /^manual:/,
         status: { $in: ['pending_manual', 'paid'] },
       });
     if (!order) throw new NotFoundException('Manual payment unavailable');

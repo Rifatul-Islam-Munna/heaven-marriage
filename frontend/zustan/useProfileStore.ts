@@ -19,6 +19,7 @@ interface ProfileStore {
   // NEW: Custom fields actions ✅
   updateCustomField: (questionKey: string, answer: string) => void;
   setAllCustomFields: (customFields: Record<string, string>) => void;
+  updateDynamicAnswer: (key: string, answer: string | number | boolean | string[]) => void;
   
   // Initialize with existing data
   initializeForm: (data: Partial<User>) => void;
@@ -45,6 +46,7 @@ const getInitialFormData = (): Partial<User> => ({
   
   // ADD THIS ✅
   customFields: {},
+  dynamicAnswers: {},
   
   address: {
     presentAddress: '',
@@ -186,6 +188,12 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       }
     })),
 
+  updateDynamicAnswer: (key, answer) => set((state) => ({
+    formData: {...state.formData, dynamicAnswers: {
+      ...(state.formData.dynamicAnswers || {}), [key]: answer,
+    }},
+  })),
+
   // NEW: Set all custom fields at once ✅
   setAllCustomFields: (customFields) =>
     set((state) => ({
@@ -202,7 +210,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         ...getInitialFormData(),
         ...data,
         // Ensure customFields is merged properly ✅
-        customFields: data.customFields || {}
+        customFields: data.customFields || {},
+        dynamicAnswers: data.dynamicAnswers || {}
       },
       shouldShowEmail: !data.email,
       shouldShowPhoneNumber: !data.phoneNumber,

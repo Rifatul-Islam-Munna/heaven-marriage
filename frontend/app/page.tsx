@@ -1,8 +1,9 @@
 // app/bn/page.tsx
 import type { Metadata } from "next";
+import { seoMetadata } from '@/lib/seo-settings-server';
+import SeoStructuredData from '@/components/custom/seo/SeoStructuredData';
 import Script from "next/script";
 
-import ProfileDiscovery from "@/components/custom/Home/ProfileDiscovery";
 import AboutSection from "@/components/custom/Home/about-sections";
 import BiodataFilter from "@/components/custom/Home/biodata-filter";
 import CreateBiodataSection from "@/components/custom/Home/CreateBiodataSection";
@@ -20,7 +21,8 @@ const BN_TITLE = "হালাল ম্যাট্রিমনি বাংল
 const BN_DESC =
   "Niqaha বাংলাদেশের হালাল ম্যাট্রিমনি প্ল্যাটফর্ম। বায়োডাটা তৈরি করুন, উপযুক্ত প্রোফাইল খুঁজুন এবং নিরাপদভাবে প্রস্তাব আদান-প্রদান করুন।";
 
-export const metadata: Metadata = {
+export const dynamic='force-dynamic';
+const defaultMetadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: BN_TITLE,
   description: BN_DESC,
@@ -44,6 +46,7 @@ export const metadata: Metadata = {
   },
 };
 
+export async function generateMetadata(){return seoMetadata('/',defaultMetadata);}
 export default function PageBn() {
   const jsonLdWebSiteBn = {
     "@context": "https://schema.org",
@@ -63,6 +66,7 @@ export default function PageBn() {
 
   return (
     <main className="w-full min-h-dvh">
+      <SeoStructuredData path="/" />
       <Script
         id="jsonld-website-bn"
         type="application/ld+json"
@@ -77,7 +81,6 @@ export default function PageBn() {
       {/* Ideally your HeroSection should show Bangla H1 + intro text on /bn */}
       <HeroSection />
       <BiodataFilter />
-      <ProfileDiscovery />
       <CreateBiodataSection />
       <PricingSection />
       <AboutSection />

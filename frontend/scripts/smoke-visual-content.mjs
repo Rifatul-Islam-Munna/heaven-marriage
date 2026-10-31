@@ -25,6 +25,10 @@ const json = (res, status, value) => {
 };
 const backend = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
+  if(url.pathname==='/staff-access/me'){
+    if(req.headers.access_token==='smoke-token')return json(res,200,{role:'admin',isAdmin:true,permissions:['users','faq','guidelines','contact','visual-editor','seo','blog','images','pricing','questions','settings','upgrades']});
+    return json(res,401,{message:'Unauthorized'});
+  }
   if (url.pathname === '/visual-content' && req.method === 'GET') {
     const scope = url.searchParams.get('path') || '/';
     calls.set(scope, (calls.get(scope) || 0) + 1);

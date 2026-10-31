@@ -1,6 +1,9 @@
 export enum UserType {
   ADMIN = 'admin',
   EDITOR = 'editor',
+  SEO = 'seo',
+  BLOG = 'blog',
+  MANAGER = 'manager',
   USER = 'user',
 }
 
@@ -128,6 +131,7 @@ export interface User {
   isPublishFromAdmin?: boolean;
   userId?: string;
   role: UserType;
+  dashboardPermissions?: string[];
   email?: string;
   phoneNumber: string;
   whatsapp?: string;
@@ -155,6 +159,9 @@ export interface User {
   updatedAt?: Date;
   numberOfConnections?:number;
   customFields?: Record<string, string>;
+  dynamicAnswers?: Record<string, string | number | boolean | string[]>;
+  publicAnswers?: Record<string, string | number | boolean | string[]>;
+  publicQuestionSchema?: import("@/lib/profile-questions").ProfileQuestionSchema;
   howYouWannaGetMarried?: string;
 
 }
@@ -163,6 +170,7 @@ export interface UserInfo {
   name: string;               // "Rifat Islam"
   userId: string;             // "user123"
   role: UserType;             // UserType.USER
+  dashboardPermissions?: string[];
   email: string;              // "rifat@example.com"
   phoneNumber: string;        // "+8801712345678"
   whatsapp?: string;

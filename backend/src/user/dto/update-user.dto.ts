@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CreateUserDto } from './create-user.dto';
-import { IsIn, IsDateString, IsArray, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsIn, IsDateString, IsArray, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsObject, IsOptional, IsPhoneNumber, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
+ @IsOptional() @IsObject() dynamicAnswers?:Record<string,unknown>;
  @IsOptional() @IsString() adjustmentReason?:string;
  @IsOptional() @IsString() requestId?:string;
  @IsOptional() @IsString() fatherName?:string;
@@ -315,7 +316,7 @@ export class AdminUserDto extends UserFilterDto {
  @IsOptional() @IsIn(['true','false','all']) emailVerified?:string;
  @IsOptional() @IsIn(['true','false','all']) hasPhone?:string;
  @IsOptional() @IsIn(['true','false','all']) hasEmail?:string;
- @IsOptional() @IsIn(['user','admin','editor','all']) role?:string;
+ @IsOptional() @IsIn(['user','admin','editor','seo','blog','manager','all']) role?:string;
  @IsOptional() @IsDateString() registeredFrom?:string;
  @IsOptional() @IsDateString() registeredTo?:string;
  @IsOptional() @Type(()=>Number) @IsInt() @Min(0) connectionsMin?:number;

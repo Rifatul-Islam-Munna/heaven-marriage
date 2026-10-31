@@ -1,7 +1,8 @@
 import { IdentityService } from './identity.service';
+import { QuestionConfigService, sanitizeDynamicAnswers } from '../profile-questions/question-config.service';
 import { PlatformService } from './platform.service';
 import { samePhone, adminSort, adminFilter, editableProfile, completion, visibleFilter } from './profile-rules';
-import { HttpException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -28,7 +29,7 @@ import { PdfService } from './pdf.service';
 @Injectable()
 export class UserService  implements OnModuleInit{
   private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService, private identity:IdentityService, private platform:PlatformService){}
+  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService, private identity:IdentityService, private platform:PlatformService, private questions:QuestionConfigService){}
    async onModuleInit() {
     await this.ensurePhoneNumberIndex();
     const findOneAdmin = await this.userModel.findOne({role:UserType.ADMIN}).lean().exec();
@@ -114,7 +115,12 @@ async findUserAndUpdated() {
   async updatedFullUserInformation(updated:UpdateUserDto,userId:string) {
     const current:any=await this.userModel.findById(userId).lean();
     if(!current)throw new HttpException('Account unavailable',404);
+    const schema=await this.questions.get();
     const payload=editableProfile(updated);
+    if((updated as any).dynamicAnswers!==undefined){
+      payload.dynamicAnswers=sanitizeDynamicAnswers((updated as any).dynamicAnswers,
+        current.dynamicAnswers,schema.questions,current.gender||payload.gender);
+    }
     // Account contact changes use separate verification; existing contact data stays intact.
     if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
     if(typeof (updated as any).isPublished==='boolean')payload.isPublished=(updated as any).isPublished;
@@ -122,13 +128,14 @@ async findUserAndUpdated() {
     payload.draftSavedAt=new Date();
     if((updated as any).submit===true) {
       const state={...current,...payload};
-      if(completion(state).percentage<100)throw new HttpException({message:'Required information is missing',missing:completion(state).remaining},400);
+      const status=completion(state,schema.questions);
+      if(status.percentage<100)throw new HttpException({message:'Required questions are unanswered',missing:status.remaining},400);
       payload.biodataStatus='submitted';
       payload.isPublishFromAdmin=false;
       payload.verificationStatus='pending';
     }
     const data=await this.userModel.findByIdAndUpdate(userId,{$set:payload},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
-    return {message:(updated as any).submit?'Biodata submitted for review':'Draft saved',data,completion:completion(data)};
+    return {message:(updated as any).submit?'Biodata submitted for review':'Draft saved',data,completion:completion(data,schema.questions)};
   }
 
   async loginUser(payload:LoginDto){return this.identity.login(payload);}
@@ -529,15 +536,27 @@ async getShortlist(userId: string, paginationDto: PaginationDto) {
 
 async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.profile(id.id,actor,role);}
 
+  async adminProfile(id:string,actorRole:string) {
+    await this.assertManageableTarget(id,actorRole);
+    return this.finMyProfile(id);
+  }
+  private async assertManageableTarget(id:string,actorRole:string){
+    if(actorRole===UserType.ADMIN)return;
+    if(!Types.ObjectId.isValid(id))throw new ForbiddenException('Account not available');
+    const target=await this.userModel.findById(id).select('role').lean();
+    if(!target||target.role!==UserType.USER)
+      throw new ForbiddenException('Staff and administrator accounts can only be managed by administrators');
+  }
   async finMyProfile(id: string) {
     const findOne = await this.userModel.findById(id).select("  -password -otpNumber -otpValidatedAt ").lean();
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
-    return {...findOne,completion:completion(findOne)};
+    return {...findOne,completion:completion(findOne,(await this.questions.get()).questions)};
   }
 
- async update( updateUserDto: UpdateUserDto,actor:string) {
+ async update( updateUserDto: UpdateUserDto,actor:string,actorRole:string=UserType.ADMIN) {
+    await this.assertManageableTarget(updateUserDto.id,actorRole);
     if(updateUserDto.numberOfConnections!==undefined&&(await this.userModel.findById(updateUserDto.id).select("numberOfConnections").lean())?.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,updateUserDto.id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
     await this.platform.audit(actor,"profile.admin.update",updateUserDto.id);
     const {id,password, _v,updatedAt,createdAt,...raw} = updateUserDto
@@ -554,7 +573,8 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
 
    async removeUser(id:string){return this.platform.createCase(id,'deletion',{});}
 
-   async remove(id: FindOneDto,actor:string) {
+   async remove(id: FindOneDto,actor:string,actorRole:string=UserType.ADMIN) {
+     await this.assertManageableTarget(id.id,actorRole);
      await this.platform.audit(actor,"account.admin.delete",id.id);
      const findOne = await this.userModel.findByIdAndDelete(id.id).lean();
     if(!findOne) {
@@ -584,12 +604,13 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
 
 
 
- async getUserForAdmin(query: AdminUserDto) {
+ async getUserForAdmin(query: AdminUserDto,actorRole:string=UserType.ADMIN) {
   const { page = 1, limit = 10, gender = 'all', query: searchQuery,isPublished } = query;
   const skip = (page - 1) * limit;
   this.logger.debug("searchQuery->",isPublished)
 
   const filter:any=adminFilter(query);
+  if(actorRole!==UserType.ADMIN)filter.role=UserType.USER;
 
   // Execute query with pagination
   const [data, totalItems] = await Promise.all([
@@ -617,7 +638,8 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
   };
 }
 
-async toggleSubscription(id:string,actor:string) {
+async toggleSubscription(id:string,actor:string,actorRole:string=UserType.ADMIN) {
+  await this.assertManageableTarget(id,actorRole);
   await this.platform.audit(actor,"membership.admin.toggle",id);
   const findOne = await this.userModel.findById(id).select("isSubscriber").lean();
   if(!findOne) {

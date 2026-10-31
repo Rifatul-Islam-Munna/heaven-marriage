@@ -1,3 +1,4 @@
+import {DashboardPermission} from '../staff-access/permissions';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { PricingService } from './pricing.service';
 import { CreatePricingDto, IdTypeDto } from './dto/create-pricing.dto';
@@ -13,14 +14,14 @@ export class PricingController {
 
   @Post()
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('pricing')
   create(@Body() createPricingDto: CreatePricingDto) {
     return this.pricingService.create(createPricingDto);
   }
 
   @Get('admin/all')
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('pricing')
   adminAll(){return this.pricingService.findAllAdmin();}
   @Get()
   findAll() {
@@ -34,14 +35,14 @@ export class PricingController {
 
   @Patch('')
     @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('pricing')
   update( @Body() updatePricingDto: UpdatePricingDto) {
     return this.pricingService.update( updatePricingDto);
   }
 
   @Delete('delete-one')
     @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('pricing')
   remove(@Query() id: IdTypeDto) {
     return this.pricingService.remove(id.id);
   }

@@ -1,3 +1,4 @@
+import {DashboardPermission} from '../staff-access/permissions';
 import { normalizeMessengerUrl } from './messenger-url';
 import { resolvePolicySettings, suppliedPolicies } from './policy-defaults';
 import { IdentityService } from './identity.service';
@@ -24,12 +25,14 @@ import { RolesGuard } from '../lib/roles.guard';
 import { Roles } from '../lib/roles.decorator';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { completion } from './profile-rules';
+import { QuestionConfigService } from '../profile-questions/question-config.service';
 @Controller('platform')
 @UseGuards(AuthGuard, ThrottlerGuard)
 export class PlatformController {
   constructor(
     private service: PlatformService,
     private identity: IdentityService,
+    private questionConfig: QuestionConfigService,
     @InjectConnection() private db: Connection,
     @InjectModel(User.name) private users: Model<UserDocument>,
   ) {}
@@ -105,13 +108,13 @@ export class PlatformController {
   }
   @Get('admin/cases')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   cases() {
     return this.service.adminCases();
   }
   @Patch('admin/cases/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   caseAction(
     @Req() r: ExpressRequest,
     @Param('id') id: string,
@@ -121,27 +124,28 @@ export class PlatformController {
   }
   @Post('admin/remind/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   remind(@Req() r: ExpressRequest, @Param('id') id: string, @Body() p: any) {
     return this.service.remind(r.user.id, id, p);
   }
   @Get('admin/summary')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   async stats() {
     const [users, cases, orders] = await Promise.all([
       this.users
         .find({ role: UserType.USER })
         .select(
-          'createdAt gender isSubscriber isPublished isPublishFromAdmin verificationStatus biodataStatus numberOfConnections connectionUnlocks name maritalStatus age weight nationality address educationInfo personalInformation occupational expectedLifePartner pledge familyInfo',
+          'createdAt gender isSubscriber isPublished isPublishFromAdmin verificationStatus biodataStatus numberOfConnections connectionUnlocks name maritalStatus age weight nationality address educationInfo personalInformation occupational expectedLifePartner pledge familyInfo dynamicAnswers customFields',
         )
         .lean(),
       this.db.collection('service_cases').find({}).toArray(),
       this.db.collection('connection_orders').find({}).toArray(),
     ]);
+    const config=await this.questionConfig.get();
     return {
       total: users.length,
-      incomplete: users.filter((u) => completion(u).percentage < 100).length,
+      incomplete: users.filter((u) => completion(u,config.questions).percentage < 100).length,
       submitted: users.filter((u: any) => u.biodataStatus === 'submitted')
         .length,
       approved: users.filter((u) => u.isPublishFromAdmin).length,
@@ -171,7 +175,7 @@ export class PlatformController {
   }
   @Get('admin/audit')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   audit() {
     return this.db
       .collection('platform_audit')
@@ -182,13 +186,13 @@ export class PlatformController {
   }
   @Get('admin/connections/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   userConnections(@Param('id') id: string) {
     return this.service.connections(id);
   }
   @Get('admin/reminders')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   reminders() {
     return this.db
       .collection('reminder_history')
@@ -200,7 +204,7 @@ export class PlatformController {
 
   @Get('admin/settings')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('settings','upgrades')
   async settings() {
     return {
       discoveryEnabled: true,
@@ -221,7 +225,7 @@ export class PlatformController {
   }
   @Patch('admin/settings')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('settings','upgrades')
   async saveSettings(@Req() r: ExpressRequest, @Body() p: any) {
     const allowed = [
       'messengerUrl',
@@ -303,7 +307,7 @@ export class PlatformController {
   }
   @Post('admin/adjust-connections/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   async adjust(
     @Req() r: ExpressRequest,
     @Param('id') id: string,
@@ -323,25 +327,20 @@ export class PlatformController {
   }
   @Post('admin/refund/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   refund(@Req() r: ExpressRequest, @Param('id') id: string, @Body() p: any) {
     return this.service.refund(r.user.id, id, p);
   }
   @Get('admin/matches/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   adminMatches(@Param('id') id: string) {
     return this.service.matches(id);
   }
 
-  @Post('manual-connection-payment')
-  @Throttle({ default: { limit: 5, ttl: 600000 } })
-  async manualConnection(@Req() r: ExpressRequest, @Body() p: any) {
-    return this.service.manualPayment(r.user.id, p);
-  }
   @Post('admin/verify-manual-payment/:id')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   async verifyManual(
     @Req() r: ExpressRequest,
     @Param('id') id: string,
@@ -351,7 +350,7 @@ export class PlatformController {
   }
   @Get('admin/payments')
   @UseGuards(RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('upgrades')
   payments() {
     return this.db
       .collection('connection_orders')

@@ -1,3 +1,7 @@
+import {DashboardPermission} from '../staff-access/permissions';
+import {AuthGuard} from '../lib/auth.guard';
+import {RolesGuard} from '../lib/roles.guard';
+import {UseGuards} from '@nestjs/common';
 // web-data/web-data.controller.ts
 import { Controller, Get, Post, Body, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -23,6 +27,8 @@ export class WebDataController {
 
   // Create or update web data
   @Patch()
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('visual-editor')
   @ApiOperation({ summary: 'Update website data (Create if not exists)' })
   @ApiResponse({
     status: 200,

@@ -1,3 +1,4 @@
+import {DashboardPermission} from '../staff-access/permissions';
 // contact/contact.controller.ts
 import {
   UseGuards,
@@ -49,7 +50,7 @@ export class ContactController {
 
   // Get all contacts (admin only)
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Get()
   @ApiBearerAuth() // If authentication required
   @ApiOperation({ summary: 'Get all contact messages with pagination (Admin)' })
@@ -63,7 +64,7 @@ export class ContactController {
 
   // Get single contact
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Get('get-one')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get contact by ID (Admin)' })
@@ -78,7 +79,7 @@ export class ContactController {
 
   // Update contact (mark as read)
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Patch('mark-as-read')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark contact as read (Admin)' })
@@ -93,7 +94,7 @@ export class ContactController {
 
   // Delete contact
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Delete('delete')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
@@ -109,7 +110,7 @@ export class ContactController {
 
   // Get unread count
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Get('unread-count')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get unread contact count (Admin)' })
@@ -123,7 +124,7 @@ export class ContactController {
 
   // Get statistics
   @UseGuards(AuthGuard,RolesGuard)
-  @Roles(UserType.ADMIN)
+  @DashboardPermission('contact')
   @Get('stats')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get contact statistics (Admin)' })

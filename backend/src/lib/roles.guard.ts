@@ -6,6 +6,7 @@ import { ROLES_KEY } from './roles.decorator';
 
 import { Reflector } from '@nestjs/core';
 import { UserType } from 'src/user/entities/user.entity';
+import {DASHBOARD_PERMISSION_KEY,type DashboardSection} from '../staff-access/permissions';
 
 
 @Injectable()
@@ -22,9 +23,19 @@ export class RolesGuard implements CanActivate {
         if (!user) {
             throw new UnauthorizedException('You need to be authenticated to access this resource.');
           }
-          const requiredRoles:UserType[] = this.reflector.get<UserType[]>(ROLES_KEY, context.getHandler());
+          // Respect both method-level and controller-level @Roles decorators.
+          // Controller-level admin restrictions must never be silently ignored.
+          const requiredRoles:UserType[] | undefined = this.reflector.getAllAndOverride<UserType[]>(ROLES_KEY,
+            [context.getHandler(), context.getClass()]);
+          const requiredSections=this.reflector.getAllAndOverride<DashboardSection[]>(
+            DASHBOARD_PERMISSION_KEY,[context.getHandler(),context.getClass()]);
+          if(requiredSections?.length){
+            if(user.role===UserType.ADMIN)return true;
+            if(requiredSections.some(section=>user.dashboardPermissions?.includes(section)))return true;
+            throw new ForbiddenException('You cannot access this dashboard section.');
+          }
           if (!requiredRoles) {
-            return true; 
+            return true;
           }
           const hasRole = requiredRoles.some((role) => user.role === role);
           if (!hasRole) {

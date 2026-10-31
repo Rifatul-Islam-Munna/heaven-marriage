@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { BUILTINS, answerForQuestion, type ProfileQuestion } from '../profile-questions/question-config.service';
 
 export const PROFILE_FIELDS = [
   'name',
@@ -22,59 +23,30 @@ export const PROFILE_FIELDS = [
   'expectedLifePartner',
   'pledge',
   'customFields',
+  'dynamicAnswers',
   'howYouWannaGetMarried',
 ] as const;
-export const STEP_REQUIRED = [
-  [
-    'name',
-    'gender',
-    'maritalStatus',
-    'age',
-    'weight',
-    'nationality',
-    'personalInformation.height',
-    'personalInformation.skinTone',
-  ],
-  ['address.district', 'address.upazila'],
-  ['educationInfo.educationMethod', 'educationInfo.highestEducation'],
-  [
-    'personalInformation.outsideClothes',
-    'personalInformation.prayerFiverTimeFrom',
-    'personalInformation.reciteQuran',
-  ],
-  ['familyInfo.familyFinancial'],
-  ['occupational.profession'],
-  [],
-  ['expectedLifePartner.age', 'expectedLifePartner.expectedQuality'],
-  [],
-  [
-    'pledge.youGordianKnowsThis',
-    'pledge.allTheInformationTrue',
-    'pledge.anyMisInformationWeAreNotKnowing',
-  ],
-];
-export const valueAt = (u: any, p: string) =>
-  p.split('.').reduce((v, k) => v?.[k], u);
-export function completion(u: any) {
-  const fields = STEP_REQUIRED.flat();
-  const missing = fields.filter((p) => {
-    const v = valueAt(u, p);
-    return (
-      v === undefined ||
-      v === null ||
-      v === '' ||
-      v === 0 ||
-      (p.startsWith('pledge.') && v !== true)
-    );
+// This fallback is used only if a caller has not loaded the live schema.
+// All profile submission and completion APIs pass the current DB questions.
+export const STEP_REQUIRED = Array.from({length:10},(_,section)=>
+  BUILTINS.filter(q=>q.section===section&&q.required&&q.enabled).map(q=>q.path||q.id));
+export const valueAt = (u:any,p:string)=>p.split('.').reduce((value,key)=>value?.[key],u);
+
+export function completion(u:any, questions:readonly ProfileQuestion[]=BUILTINS) {
+  const applicable=questions.filter(q=>q.enabled&&q.required&&
+    (q.gender==='both'||q.gender===u?.gender));
+  const missing=applicable.filter(q=>{
+    const value=answerForQuestion(u||{},q);
+    return value===undefined||value===null||value===''||
+      (Array.isArray(value)&&value.length===0)||
+      (q.type==='checkbox'&&value!==true)||
+      (q.type==='number'&&value===0);
   });
   return {
-    percentage: Math.round(
-      (100 * (fields.length - missing.length)) / fields.length,
-    ),
-    remaining: missing,
-    nextStep: STEP_REQUIRED.findIndex((s) =>
-      s.some((p) => missing.includes(p)),
-    ),
+    percentage:applicable.length===0?100:Math.round(
+      100*(applicable.length-missing.length)/applicable.length),
+    remaining:missing.map(q=>q.path||q.id),
+    nextStep:missing.length?Math.min(...missing.map(q=>q.section)):-1,
   };
 }
 export function publicProfile(u: any, unlocked = false) {

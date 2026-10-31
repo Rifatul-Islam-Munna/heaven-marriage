@@ -21,6 +21,16 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
     "dynamic": true
   },
   {
+    "path": "/blog",
+    "label": "Blog",
+    "dynamic": false
+  },
+  {
+    "path": "/blog/[slug]",
+    "label": "Blog / Dynamic page",
+    "dynamic": true
+  },
+  {
     "path": "/contact",
     "label": "Contact",
     "dynamic": false
@@ -29,6 +39,21 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
     "path": "/dashboard",
     "label": "Dashboard",
     "dynamic": false
+  },
+  {
+    "path": "/dashboard/access",
+    "label": "Dashboard / Access",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/blog",
+    "label": "Dashboard / Blog",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/blog/[id]",
+    "label": "Dashboard / Blog / Dynamic page",
+    "dynamic": true
   },
   {
     "path": "/dashboard/contact",
@@ -58,6 +83,11 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
   {
     "path": "/dashboard/pricing",
     "label": "Dashboard / Pricing",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/seo",
+    "label": "Dashboard / Seo",
     "dynamic": false
   },
   {

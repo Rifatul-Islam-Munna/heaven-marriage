@@ -77,6 +77,8 @@ export default function AboutSection() {
     { gcTime: 85000, staleTime: 85000 },
     25000,
   );
+  const homeLeftImage = webData?.home?.images?.left?.trim();
+  const homeRightImage = webData?.home?.images?.right?.trim();
   return (
     <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/30 to-background pt-20 pb-10 md:pt-32 md:pb-12">
       {/* Decorative Elements */}
@@ -120,13 +122,15 @@ export default function AboutSection() {
         <div className="mx-auto mb-20 grid max-w-6xl gap-6 md:grid-cols-2">
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
             <div className="relative aspect-[4/3] overflow-hidden">
-              <Image
-                src={webData?.home?.images?.left ?? ""}
-                alt="Wedding ceremony"
-                width={1000}
-                height={1000}
-                className="object-conatin transition-transform duration-500 group-hover:scale-105"
-              />
+              {homeLeftImage && (
+                <Image
+                  src={homeLeftImage}
+                  alt="Wedding ceremony"
+                  width={1000}
+                  height={1000}
+                  className="object-conatin transition-transform duration-500 group-hover:scale-105"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
                 <Badge className="bg-pink-500/90 backdrop-blur-sm">
@@ -138,13 +142,15 @@ export default function AboutSection() {
 
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
             <div className="relative aspect-[4/3] overflow-hidden">
-              <Image
-                src={webData?.home?.images?.right ?? ""}
-                alt="Islamic marriage"
-                width={1000}
-                height={1000}
-                className="object-contain transition-transform duration-500 group-hover:scale-105"
-              />
+              {homeRightImage && (
+                <Image
+                  src={homeRightImage}
+                  alt="Islamic marriage"
+                  width={1000}
+                  height={1000}
+                  className="object-contain transition-transform duration-500 group-hover:scale-105"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
                 <Badge className="bg-pink-500/90 backdrop-blur-sm">

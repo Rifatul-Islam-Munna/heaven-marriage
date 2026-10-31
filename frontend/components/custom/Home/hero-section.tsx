@@ -36,9 +36,9 @@ export default function HeroSection() {
     }
   }, [webData]);
 
-  const videoSrc = isMobile
-    ? webData?.home?.heroVideo?.mobileScreen
-    : webData?.home?.heroVideo?.bigScreen;
+  const desktopVideoSrc = webData?.home?.heroVideo?.bigScreen?.trim();
+  const mobileVideoSrc = webData?.home?.heroVideo?.mobileScreen?.trim();
+  const videoSrc = isMobile ? mobileVideoSrc : desktopVideoSrc;
 
   return (
     <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
@@ -49,12 +49,10 @@ export default function HeroSection() {
           <div className="absolute inset-0 bg-gradient-to-br from-pink-950 via-black to-purple-950 animate-pulse" />
         )}
 
-        {/* Only render video when we have the source */}
-        {videoSrc && (
-          <>
-            {/* Desktop Video */}
+        {/* Desktop Video */}
+        {desktopVideoSrc && (
             <video
-              key={webData?.home?.heroVideo?.bigScreen} // Force re-render when URL changes
+              key={desktopVideoSrc}
               autoPlay
               loop
               muted
@@ -73,15 +71,13 @@ export default function HeroSection() {
                 isVideoLoaded && !videoError ? "opacity-100" : "opacity-0"
               } transition-opacity duration-1000`}
             >
-              <source
-                src={webData?.home?.heroVideo?.bigScreen}
-                type="video/mp4"
-              />
+              <source src={desktopVideoSrc} type="video/mp4" />
             </video>
-
-            {/* Mobile Video */}
+        )}
+        {/* Mobile Video */}
+        {mobileVideoSrc && (
             <video
-              key={webData?.home?.heroVideo?.mobileScreen} // Force re-render when URL changes
+              key={mobileVideoSrc}
               autoPlay
               loop
               muted
@@ -100,12 +96,8 @@ export default function HeroSection() {
                 isVideoLoaded && !videoError ? "opacity-100" : "opacity-0"
               } transition-opacity duration-1000`}
             >
-              <source
-                src={webData?.home?.heroVideo?.mobileScreen}
-                type="video/mp4"
-              />
+              <source src={mobileVideoSrc} type="video/mp4" />
             </video>
-          </>
         )}
 
         {/* Error Fallback */}

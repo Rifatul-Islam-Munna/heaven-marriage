@@ -1,3 +1,7 @@
+import {DashboardPermission} from '../staff-access/permissions';
+import {AuthGuard} from '../lib/auth.guard';
+import {RolesGuard} from '../lib/roles.guard';
+import {UseGuards} from '@nestjs/common';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { GuidelinesService } from './guidelines.service';
 import { CreateGuidelineDto, IdDto } from './dto/create-guideline.dto';
@@ -10,6 +14,8 @@ export class GuidelinesController {
 
  // Create FAQ
    @Post()
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('guidelines')
  
    @ApiOperation({ summary: 'Create a new FAQ' })
    @ApiResponse({
@@ -47,6 +53,8 @@ export class GuidelinesController {
  
    // Update FAQ
    @Patch('update-faq-one')
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('guidelines')
  
    @ApiOperation({ summary: 'Update FAQ' })
    
@@ -62,6 +70,8 @@ export class GuidelinesController {
  
    // Delete FAQ
    @Delete('delete-faq')
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('guidelines')
   
    @ApiOperation({ summary: 'Delete FAQ' })
   

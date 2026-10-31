@@ -1,3 +1,7 @@
+import {DashboardPermission} from '../staff-access/permissions';
+import {AuthGuard} from '../lib/auth.guard';
+import {RolesGuard} from '../lib/roles.guard';
+import {UseGuards} from '@nestjs/common';
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { FaqService } from './faq.service';
 import { CreateFaqDto, IdDto } from './dto/create-faq.dto';
@@ -11,6 +15,8 @@ export class FaqController {
 
   // Create FAQ
   @Post()
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('faq')
 
   @ApiOperation({ summary: 'Create a new FAQ' })
   @ApiResponse({
@@ -48,6 +54,8 @@ export class FaqController {
 
   // Update FAQ
   @Patch('update-faq-one')
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('faq')
 
   @ApiOperation({ summary: 'Update FAQ' })
   
@@ -63,6 +71,8 @@ export class FaqController {
 
   // Delete FAQ
   @Delete('delete-faq')
+  @UseGuards(AuthGuard,RolesGuard)
+  @DashboardPermission('faq')
  
   @ApiOperation({ summary: 'Delete FAQ' })
  

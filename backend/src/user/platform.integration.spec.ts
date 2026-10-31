@@ -1,6 +1,7 @@
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createConnection, Connection, Model } from 'mongoose';
 import { PlatformService } from './platform.service';
+import { QuestionConfigService } from '../profile-questions/question-config.service';
 import { User, UserSchema } from './entities/user.entity';
 import { publicProfile, editableProfile } from './profile-rules';
 import { plainToInstance } from 'class-transformer';
@@ -33,7 +34,7 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
       dbName: 'niqaha_upgrade_tests',
     }).asPromise();
     users = db.model(User.name, UserSchema);
-    service = new PlatformService(db, users, bkash as any, messages as any);
+    service = new PlatformService(db, users, bkash as any, messages as any, new QuestionConfigService(db));
     await service.onModuleInit();
   }, 120000);
   afterAll(async () => {
@@ -268,15 +269,22 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
     });
     expect(await validate(dto)).toEqual([]);
   });
-  it('deduplicates manual payment verification and audits grants', async () => {
+  it('deduplicates verification of existing manual payments', async () => {
     const a = await account();
     const pkg = await db
       .collection('pricings')
       .insertOne({ title: 'Five', originalPrice: 500, numberOfConnections: 5 });
-    await service.manualPayment(String(a._id), {
+    await db.collection('connection_orders').insertOne({
+      id: 'legacy-manual-order',
+      paymentId: 'manual:bkash:unique-txn',
+      userId: String(a._id),
       packageId: String(pkg.insertedId),
-      method: 'bkash',
-      transactionReference: 'unique-txn',
+      packageName: 'Five',
+      quantity: 5,
+      amount: 500,
+      currency: 'BDT',
+      status: 'pending_manual',
+      createdAt: new Date(),
     });
     const order = await db
       .collection('connection_orders')

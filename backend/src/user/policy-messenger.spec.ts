@@ -98,6 +98,7 @@ describe('Supplied policy pages and Messenger settings', () => {
     const c = new PlatformController(
       service as any,
       {} as any,
+      {} as any, // QuestionConfigService; unused in this settings test
       db as any,
       {} as any,
     );

@@ -21,6 +21,7 @@ const navItems = [
   { label: "হোম", href: "/" },
   { label: "আমাদের সম্পর্কে", href: "/about" },
   { label: "জিজ্ঞাসা", href: "/biodata" },
+  { label: "ব্লগ", href: "/blog" },
   { label: "নির্দেশনা", href: "/guidelines" },
   { label: "যোগাযোগ", href: "/contact" },
 ];

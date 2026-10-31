@@ -35,7 +35,7 @@ export default function SignIn() {
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
     onSuccess: (data) => {
       if (data.data) {
-        data?.data?.user?.role === "admin"
+        ["admin","seo","blog","manager"].includes(data?.data?.user?.role||"")
           ? router.push("/dashboard")
           : router.push("/profile");
         return toast.success("সফলভাবে লগইন হয়েছে");

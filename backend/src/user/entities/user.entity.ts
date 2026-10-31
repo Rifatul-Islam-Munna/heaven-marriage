@@ -4,6 +4,9 @@ import pagination from "mongoose-paginate-v2"
 export enum UserType {
   ADMIN = 'admin',
   EDITOR = 'editor',
+  SEO = 'seo',
+  BLOG = 'blog',
+  MANAGER = 'manager',
   USER = 'user',
 
 }
@@ -24,6 +27,9 @@ export class User {
 
     @Prop({type: String, enum: UserType, default: UserType.USER})
     role:UserType
+
+    @Prop({type:[String],default:[]})
+    dashboardPermissions:string[];
 
     @Prop()
     email:string
@@ -215,6 +221,9 @@ export class User {
   default: {}
 })
 customFields?: Map<string, string>;
+
+@Prop({type: Object, default: {}})
+dynamicAnswers?: Record<string, unknown>;
 
 
 @Prop()

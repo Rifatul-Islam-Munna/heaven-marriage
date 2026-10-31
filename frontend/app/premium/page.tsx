@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { publicMetadata } from "@/lib/seo";
-export const metadata = publicMetadata(
+import { seoMetadata } from '@/lib/seo-settings-server';
+import SeoStructuredData from '@/components/custom/seo/SeoStructuredData';
+const defaultMetadata = publicMetadata(
   "Premium Marriage Assistance | Niqaha.com",
   "Niqaha.com-এর প্রিমিয়াম বিবাহ সহায়তা সেবার আবেদন প্রক্রিয়া ও ফি।",
   "/premium",
 );
+export const dynamic='force-dynamic';
+export async function generateMetadata(){return seoMetadata('/premium',defaultMetadata);}
 export default function Premium() {
   return (
     <main className="container mx-auto max-w-3xl px-4 py-12">
+      <SeoStructuredData path="/premium" />
       <h1 className="text-3xl font-bold text-pink-700">
         Premium Marriage Assistance
       </h1>
