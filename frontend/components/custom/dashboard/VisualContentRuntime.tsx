@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, ChevronLeft, Eye, Globe2, Pencil, RotateCcw, Save, Send, X } from 'lucide-react';
+import VisualPublishDialog from './VisualPublishDialog';
 import {
   applyVisualValue, originalValue, restoreVisualValue, safeVisualPage,
   targetValue, visualTarget,
@@ -93,6 +94,7 @@ export default function VisualContentRuntime() {
   const [selected, setSelected] = useState<VisualTarget | null>(null);
   const [value, setValue] = useState('');
   const [message, setMessage] = useState('');
+  const [pendingPublishScope, setPendingPublishScope] = useState<string | null>(null);
   const contents = useRef<{ page: VisualEntries; global: VisualEntries }>({ page: {}, global: {} });
   const changed = useRef(new Set<Node>());
   const selectedRef = useRef<VisualTarget | null>(null);
@@ -192,6 +194,7 @@ export default function VisualContentRuntime() {
   useEffect(() => {
     if (!isAdmin || !editMode) return;
     const click = (event: MouseEvent) => {
+      if (pendingPublishScope) return;
       if ((event.target as Element | null)?.closest?.('[data-visual-editor-ui]')) return;
       // Do not navigate, submit forms, buy anything or interact with live data
       // while the admin is merely choosing page copy to edit.
@@ -213,6 +216,11 @@ export default function VisualContentRuntime() {
       setMessage('');
     };
     const move = (event: MouseEvent) => {
+      if (pendingPublishScope) {
+        hoveredRef.current?.classList.remove('visual-hover-selection');
+        hoveredRef.current = null;
+        return;
+      }
       if ((event.target as Element | null)?.closest?.('[data-visual-editor-ui]')) {
         hoveredRef.current?.classList.remove('visual-hover-selection');
         hoveredRef.current = null;
@@ -240,7 +248,7 @@ export default function VisualContentRuntime() {
       hoveredRef.current?.classList.remove('visual-hover-selection');
       selectedRef.current?.element.classList.remove('visual-current-selection');
     };
-  }, [isAdmin, editMode]);
+  }, [isAdmin, editMode, pendingPublishScope]);
 
   function preview(next: string) {
     setValue(next);
@@ -289,8 +297,7 @@ export default function VisualContentRuntime() {
   }
 
   async function publish(scope: string) {
-    if (!window.confirm('Publish all saved draft text for ' +
-      (scope === '@global' ? 'the shared header and footer' : pathname) + '?')) return;
+    setPendingPublishScope(null);
     setLoading(true); setMessage('');
     try {
       const response = await fetch('/api/visual-content', {
@@ -327,9 +334,9 @@ export default function VisualContentRuntime() {
           <a href={pathname || '/'} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-neutral-50"><Eye size={13}/> Exit editor</a>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button disabled={loading || !pageDirty} onClick={() => void publish(path!)}
+          <button disabled={loading || !pageDirty} onClick={() => setPendingPublishScope(path!)}
             className="flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-35"><Send size={13}/> Publish page {pageDirty ? '●' : ''}</button>
-          <button disabled={loading || !globalDirty} onClick={() => void publish('@global')}
+          <button disabled={loading || !globalDirty} onClick={() => setPendingPublishScope('@global')}
             className="flex items-center gap-1 rounded-lg bg-[#332833] px-3 py-2 text-xs font-semibold text-white disabled:opacity-35"><Send size={13}/> Publish shared {globalDirty ? '●' : ''}</button>
         </div>
         {!selected && message && <p role="status" className="text-xs text-rose-700">{message}</p>}
@@ -363,5 +370,12 @@ export default function VisualContentRuntime() {
       {message && <p role="status" className="mt-3 flex items-start gap-1.5 rounded-lg bg-[#faf0f4] p-3 text-xs leading-5 text-[#884157]"><Check size={14} className="shrink-0"/>{message}</p>}
       <p className="mt-3 text-[10px] text-[#92858c]">Drafts are private. Click Publish page (top left) to update visitors.</p>
     </aside>}
+    <VisualPublishDialog
+      scope={pendingPublishScope}
+      busy={loading}
+      onClose={() => setPendingPublishScope(null)}
+      onConfirm={scope => void publish(scope)}
+      aboveEditor
+    />
   </div>;
 }

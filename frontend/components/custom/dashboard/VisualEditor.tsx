@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { visualPageCatalog } from '@/lib/visual-page-catalog';
 import { safeVisualPage, type AdminVisualPage, type VisualEntries } from '@/lib/visual-content';
+import VisualPublishDialog from './VisualPublishDialog';
 
 type SavedPage = {
   scope: string; edits: number; published: number;
@@ -27,6 +28,7 @@ export default function VisualEditor({canEditSeo=false}:{canEditSeo?:boolean}) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [pendingPublishScope, setPendingPublishScope] = useState<string | null>(null);
   const pages = useMemo(() => visualPageCatalog.filter(page =>
     page.path.toLowerCase().includes(search.toLowerCase()) ||
     page.label.toLowerCase().includes(search.toLowerCase())
@@ -68,7 +70,7 @@ export default function VisualEditor({canEditSeo=false}:{canEditSeo?:boolean}) {
     await reloadList();
   }
   async function publish(scope: string) {
-    if (!window.confirm('Publish all saved draft changes in ' + (scope === '@global' ? 'the shared header/footer' : path) + '?')) return;
+    setPendingPublishScope(null);
     setBusy(true); setMessage('');
     try {
       const r = await fetch('/api/visual-content', {
@@ -230,7 +232,7 @@ export default function VisualEditor({canEditSeo=false}:{canEditSeo?:boolean}) {
                         {hasDraft ? '● Draft has unpublished changes' : <><Check size={13}/> Everything published</>}
                       </p>
                     </div>
-                    <button disabled={!hasDraft || busy || !doc} onClick={() => void publish(item.scope)}
+                    <button disabled={!hasDraft || busy || !doc} onClick={() => setPendingPublishScope(item.scope)}
                       className="flex items-center gap-2 rounded-lg bg-[#29222a] px-4 py-2.5 text-xs font-bold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-35">
                       <Send size={14}/> Publish
                     </button>
@@ -268,5 +270,11 @@ export default function VisualEditor({canEditSeo=false}:{canEditSeo?:boolean}) {
         </div>
       </div>
     </div>
+    <VisualPublishDialog
+      scope={pendingPublishScope}
+      busy={busy}
+      onClose={() => setPendingPublishScope(null)}
+      onConfirm={scope => void publish(scope)}
+    />
   </div>;
 }

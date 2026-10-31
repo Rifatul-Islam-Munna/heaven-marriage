@@ -152,7 +152,16 @@ export default function Footer() {
           </div>
         </div>
 
-        <PolicyLinks />
+        <div className="flex flex-wrap items-center gap-3">
+          <PolicyLinks />
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("niqaha:open-cookie-settings"))}
+            className="text-xs font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+          >
+            কুকি সেটিংস
+          </button>
+        </div>
         {/* Bottom */}
         <div className="mt-8 border-t border-pink-200 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
