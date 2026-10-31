@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Briefcase, Check, ChevronRight, CloudOff, Flame, Gem, GraduationCap, HeartHandshake, House, ListChecks,
-  Loader2, MapPin, MessageCircle, PartyPopper, Pencil, Search, ShieldCheck, Sparkles, Star, Trophy, User, X,
+  ArrowLeft, AlertCircle, Briefcase, Check, ChevronRight, Flame, Gem, GraduationCap, HeartHandshake, House, ListChecks,
+  Loader2, MapPin, MessageCircle, PartyPopper, Pencil, RefreshCw, Search, ShieldCheck, Sparkles, Trophy, User, X,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
 import AiBiodataAssistant from "./AiBiodataAssistant";
+import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
 type Answer = string | number | boolean | string[];
@@ -164,27 +165,32 @@ export default function ProfileUpdateForm() {
   const updateNestedField = useProfileStore(state => state.updateNestedField);
   const updateCustomField = useProfileStore(state => state.updateCustomField);
   const updateDynamicAnswer = useProfileStore(state => state.updateDynamicAnswer);
-  const initialized = useRef(false), saved = useRef(""), saveChain = useRef(Promise.resolve());
+  const initialized = useRef(false);
+  const saved = useRef<Record<string, unknown>>({});
+  const savedStep = useRef(0);
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState("");
   const [schema, setSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
+  const [schemaReady, setSchemaReady] = useState(false);
   const [view, setView] = useState<View>("journey");
   const [qi, setQi] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [cheer, setCheer] = useState<{ text: string; points: boolean; n: number } | null>(null);
+  const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
   const [shake, setShake] = useState(0);
-  const openedAnswered = useRef(false);
   const nextRef = useRef<(skipped?: boolean) => void>(() => {});
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/profile-questions", { signal: controller.signal })
+    void fetch("/api/profile-questions", { signal: controller.signal, cache: "no-store" })
       .then(r => r.ok ? r.json() : Promise.reject(Error()))
       .then((next: ProfileQuestionSchema) => { if (Array.isArray(next?.questions)) setSchema(next); })
-      .catch(() => { /* The built-in questions stay as the fallback. */ });
+      .catch(() => { /* The built-in questions stay as the fallback. */ })
+      .finally(() => { if (!controller.signal.aborted) setSchemaReady(true); });
     return () => controller.abort();
   }, []);
 
-  const { data, isLoading } = useQueryWrapper(["get-my-profile"], "/user/get-my-profile");
+  const { data, isLoading, isError: profileLoadError, refetch: reloadProfile } = useQueryWrapper(["get-my-profile"], "/user/get-my-profile");
   const { mutate, isPending } = useCommonMutationApi({
     method: "PATCH", url: "/user/update-user", mutationKey: ["update-user"],
     successMessage: "আলহামদুলিল্লাহ! আপনার বায়োডাটা জমা হয়েছে।",
@@ -192,35 +198,81 @@ export default function ProfileUpdateForm() {
   });
   useEffect(() => {
     if (data && !initialized.current) {
-      initialized.current = true;
       initializeForm(data);
-      saved.current = JSON.stringify(useProfileStore.getState().getFormData());
-      setCurrentStep(Math.max(0, Math.min(9, (data as { draftStep?: number }).draftStep || 0)));
+      saved.current = JSON.parse(JSON.stringify(useProfileStore.getState().getFormData())) as Record<string, unknown>;
+      const step = Math.max(0, Math.min(9, Number((data as { draftStep?: number }).draftStep) || 0));
+      savedStep.current = step;
+      setCurrentStep(step);
+      initialized.current = true;
     }
   }, [data, initializeForm, setCurrentStep]);
 
-  const saveDraft = async (snapshot = useProfileStore.getState().getFormData(), step = useProfileStore.getState().currentStep) => {
+  const saveDraft = async () => {
+    if (!initialized.current) return;
+    // Re-read the current form AFTER any older request finishes; never save an
+    // obsolete snapshot over a newer answer.
+    const snapshot = useProfileStore.getState().getFormData();
+    const step = useProfileStore.getState().currentStep;
+    const changes = diffBiodataDraft(saved.current, snapshot as Record<string, unknown>);
+    if (!hasBiodataChanges(changes) && step === savedStep.current) {
+      setSaveState("saved");
+      return;
+    }
     setSaveState("saving");
-    const [result, error] = await PatchRequestAxios("/user/update-user", { ...snapshot, draftStep: step });
-    if (!result) { setSaveState("error"); throw new Error(error?.message || "Draft save failed"); }
-    saved.current = JSON.stringify(snapshot);
-    setSaveState("saved");
+    setSaveError("");
+    try {
+      const [result, error] = await PatchRequestAxios<{ message: string; data: unknown }>(
+        "/user/update-user", { ...changes, draftStep: step },
+      );
+      if (!result?.data) throw new Error(error?.message || "সার্ভারে সেভ নিশ্চিত করা যায়নি।");
+      saved.current = applyBiodataDraft(saved.current, changes);
+      savedStep.current = step;
+      const latest = useProfileStore.getState();
+      const remaining = diffBiodataDraft(saved.current, latest.getFormData() as Record<string, unknown>);
+      if (!hasBiodataChanges(remaining) && latest.currentStep === savedStep.current) setSaveState("saved");
+      else setSaveState("saving");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "সার্ভারে সেভ করা যায়নি।";
+      setSaveError(message);
+      setSaveState("error");
+      throw error;
+    }
   };
-  // Every answer is saved automatically a moment after it changes.
+  const queueSave = () => {
+    saveChain.current = saveChain.current.catch(() => {}).then(() => saveDraft());
+    return saveChain.current;
+  };
+  // Debounce typing. All writes use the same queue; manual retry and level
+  // completion cannot race or overwrite each other.
   useEffect(() => {
-    if (!initialized.current || saved.current === JSON.stringify(formData)) return;
-    const snapshot = formData;
-    const timer = setTimeout(() => {
-      saveChain.current = saveChain.current.catch(() => {}).then(() => saveDraft(snapshot, currentStep));
-      void saveChain.current.catch(() => {});
-    }, 1000);
-    return () => clearTimeout(timer);
+    if (!initialized.current) return;
+    if (!hasBiodataChanges(diffBiodataDraft(saved.current, formData as Record<string, unknown>))
+      && currentStep === savedStep.current) return;
+    const timer = window.setTimeout(() => { void queueSave().catch(() => {}); }, 1000);
+    return () => window.clearTimeout(timer);
   }, [formData, currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const retry = () => { void saveDraft().catch(() => {}); };
+    const retry = () => {
+      if (initialized.current) void queueSave().catch(() => {});
+    };
     window.addEventListener("online", retry);
     return () => window.removeEventListener("online", retry);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Warn before an accidental reload/close if any answer still awaits a
+  // confirmed server save. No private biodata is written to localStorage.
+  useEffect(() => {
+    const warnIfUnsaved = (event: BeforeUnloadEvent) => {
+      if (!initialized.current) return;
+      const store = useProfileStore.getState();
+      const changes = diffBiodataDraft(saved.current, store.getFormData() as Record<string, unknown>);
+      if (!hasBiodataChanges(changes) && store.currentStep === savedStep.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnIfUnsaved);
+    return () => window.removeEventListener("beforeunload", warnIfUnsaved);
+  }, []);
 
   const gender = formData.gender as string | undefined;
   const flow = useMemo(() => schema.questions.filter(q => !q.locked && questionApplies(q, gender))
@@ -241,11 +293,10 @@ export default function ProfileUpdateForm() {
   const percent = flow.length ? Math.round((answeredCount / flow.length) * 100) : 0;
   const levelComplete = (l: { questions: ProfileQuestion[] }) => l.questions.some(q => answered(q)) && l.questions.every(q => !q.required || answered(q));
   const completedLevels = levels.filter(levelComplete).length;
-  const points = answeredCount * 10 + completedLevels * 50;
+  const connectionBalance = (data as { numberOfConnections?: number } | undefined)?.numberOfConnections;
   const requiredMissing = flow.filter(q => q.required && !answered(q));
   const name = typeof formData.name === "string" ? formData.name.split(" ")[0] : "";
 
-  useEffect(() => { if (question) openedAnswered.current = answered(question); }, [question?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!cheer) return;
     const timer = window.setTimeout(() => setCheer(null), 1300);
@@ -293,7 +344,7 @@ export default function ProfileUpdateForm() {
   const finishLevel = async () => {
     setView("levelDone");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    try { await saveChain.current.catch(() => {}); await saveDraft(undefined, currentStep); } catch { /* the save badge shows the problem */ }
+    try { await queueSave(); } catch { /* Retry is visible in the save badge. */ }
   };
   const next = (skipped = false) => {
     if (!question) return;
@@ -307,7 +358,7 @@ export default function ProfileUpdateForm() {
     if (skipped || !isDone) setStreak(0);
     else {
       setStreak(s => s + 1);
-      setCheer({ text: CHEERS[Math.floor(Math.random() * CHEERS.length)], points: !openedAnswered.current, n: Date.now() });
+      setCheer({ text: CHEERS[Math.floor(Math.random() * CHEERS.length)], n: Date.now() });
     }
     if (qi < levelQuestions.length - 1) setQi(qi + 1);
     else void finishLevel();
@@ -316,23 +367,42 @@ export default function ProfileUpdateForm() {
   const autoAdvance = () => window.setTimeout(() => nextRef.current(false), 350);
   const submit = async () => {
     if (requiredMissing.length) { setView("finish"); toast.error("কয়েকটি আবশ্যিক প্রশ্ন বাকি আছে"); return; }
-    try { await saveChain.current.catch(() => {}); await saveDraft(); }
-    catch { toast.error("সংরক্ষণ করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।"); return; }
-    mutate({ ...useProfileStore.getState().getFormData(), submit: true, draftStep: currentStep });
+    try { await queueSave(); }
+    catch { toast.error("উত্তর সংরক্ষণ করা যায়নি। নিচে ‘আবার চেষ্টা করুন’ চাপ দিন।"); return; }
+    // The backend validates the already-saved full profile; do not resend
+    // credentials, identity metadata, or older answers at submission time.
+    mutate({ submit: true, draftStep: useProfileStore.getState().currentStep });
   };
 
-  const saveBadge = <span className="inline-flex items-center gap-1 text-xs text-gray-500" aria-live="polite">
-    {saveState === "saving" ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> সংরক্ষণ হচ্ছে</>
-      : saveState === "error" ? <span className="inline-flex items-center gap-1 text-red-600"><CloudOff className="h-3.5 w-3.5" /> সংরক্ষণ হয়নি, সংযোগ ফিরলে হবে</span>
+  const saveBadge = <span className="inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600" aria-live="polite">
+    {saveState === "saving" ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> সংরক্ষণ হচ্ছে…</>
+      : saveState === "error" ? <>
+        <span role="alert" className="inline-flex items-center gap-1 font-semibold text-red-600"><AlertCircle className="h-3.5 w-3.5" /> সংরক্ষণ ব্যর্থ</span>
+        <button type="button" onClick={() => { void queueSave().catch(() => {}); }}
+          className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-pink-200 bg-white px-2.5 py-1 font-semibold text-pink-700 hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-pink-600">
+          <RefreshCw className="h-3.5 w-3.5" /> আবার চেষ্টা করুন
+        </button>
+        {saveError && <span className="w-full break-words text-[11px] leading-5 text-red-600" title={saveError}>{saveError}</span>}
+      </>
         : saveState === "saved" ? <><Check className="h-3.5 w-3.5 text-emerald-600" /> সংরক্ষিত</> : null}
   </span>;
   const shell = (children: ReactNode) => <div className="min-h-[calc(100vh-4rem)] w-full bg-[#fff7f9] px-4 py-5 sm:py-8">
     <style>{CSS}</style>{children}
   </div>;
 
-  if (isLoading || (!!data && !initialized.current)) return shell(<div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-gray-600">
+  if (isLoading || !schemaReady || (!!data && !initialized.current)) return shell(<div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-gray-600">
     <Loader2 className="h-9 w-9 animate-spin text-pink-600" /> আপনার বায়োডাটা খোলা হচ্ছে...
   </div>);
+  if (profileLoadError || (!data && !isLoading)) return shell(
+    <div className="mx-auto flex min-h-[55vh] max-w-lg flex-col items-center justify-center gap-4 text-center">
+      <AlertCircle className="size-10 text-red-500" />
+      <h1 className="text-xl font-bold text-gray-900">বায়োডাটা খোলা যায়নি</h1>
+      <p className="text-sm leading-6 text-gray-600">সার্ভার থেকে তথ্য আনা যায়নি। আপনার আগের তথ্য মুছে দেওয়া হয়নি।</p>
+      <button type="button" onClick={() => { void reloadProfile(); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-pink-600 px-5 text-sm font-bold text-white hover:bg-pink-700">
+        <RefreshCw className="size-4" /> আবার চেষ্টা করুন
+      </button>
+    </div>
+  );
 
   if (view === "play" && question) {
     const value = readQuestionAnswer(formData, question);
@@ -350,13 +420,13 @@ export default function ProfileUpdateForm() {
             {levelQuestions.map((q, i) => <span key={q.id} className={`h-1.5 flex-1 rounded-full transition-colors ${i < qi || (i === qi && answered(q)) ? "bg-pink-600" : i === qi ? "bg-pink-300" : answered(q) ? "bg-pink-200" : "bg-gray-200"}`} />)}
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-amber-600 shadow-sm" title="পয়েন্ট"><Star className="h-4 w-4 fill-amber-400 text-amber-500" />{bn(points)}</span>
+        {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-pink-700 shadow-sm hover:bg-pink-50" title="বাকি কানেকশন"><Gem className="h-4 w-4" />{bn(connectionBalance)} কানেকশন</Link>}
         <button type="button" onClick={() => setView("journey")} aria-label="যাত্রার ম্যাপে ফিরুন"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm hover:bg-pink-50"><X className="h-5 w-5" /></button>
       </div>
 
       {cheer && <div key={cheer.n} className="qb-float pointer-events-none absolute right-2 top-16 z-10 rounded-full bg-emerald-500 px-3 py-1 text-sm font-bold text-white shadow-lg">
-        {cheer.text}{cheer.points && " +১০"}
+        {cheer.text}
       </div>}
 
       <div key={question.id + ":" + shake} className={`qb-in mt-6 rounded-3xl bg-white p-5 shadow-[0_10px_30px_rgba(219,39,119,0.08)] sm:p-8 ${shake ? "qb-shake" : ""}`}>
@@ -395,7 +465,7 @@ export default function ProfileUpdateForm() {
       <h1 className="mt-1 text-2xl font-extrabold text-gray-900">“{level.section.title}” ব্যাজ অর্জন</h1>
       <p className="mt-2 text-gray-600">{bn(level.questions.length)}টির মধ্যে {bn(done)}টি প্রশ্নের উত্তর দিয়েছেন।</p>
       <div className="mt-6 grid grid-cols-3 gap-2">
-        <div className="rounded-2xl bg-amber-50 p-3"><p className="flex items-center justify-center gap-1 text-lg font-extrabold text-amber-600"><Star className="h-4 w-4 fill-amber-400" />{bn(points)}</p><p className="text-xs text-gray-600">মোট পয়েন্ট</p></div>
+        <div className="rounded-2xl bg-amber-50 p-3"><p className="flex items-center justify-center gap-1 text-lg font-extrabold text-amber-600">{bn(answeredCount)}</p><p className="text-xs text-gray-600">মোট উত্তর</p></div>
         <div className="rounded-2xl bg-pink-50 p-3"><p className="text-lg font-extrabold text-pink-700">{bn(percent)}%</p><p className="text-xs text-gray-600">বায়োডাটা</p></div>
         <div className="rounded-2xl bg-orange-50 p-3"><p className="flex items-center justify-center gap-1 text-lg font-extrabold text-orange-600"><Flame className="h-4 w-4" />{bn(streak)}</p><p className="text-xs text-gray-600">টানা উত্তর</p></div>
       </div>
@@ -433,7 +503,7 @@ export default function ProfileUpdateForm() {
       </ul>
     </> : <>
       <h1 className="mt-5 text-2xl font-extrabold text-gray-900">মাশাআল্লাহ, আপনার বায়োডাটা তৈরি!</h1>
-      <p className="mt-2 text-gray-600">{bn(points)} পয়েন্ট আর {bn(completedLevels)}টি ব্যাজ অর্জন করেছেন। এবার জমা দিন, যাচাইয়ের পর প্রকাশ করা হবে।</p>
+      <p className="mt-2 text-gray-600">{bn(answeredCount)}টি প্রশ্নের উত্তর দিয়েছেন এবং {bn(completedLevels)}টি ব্যাজ অর্জন করেছেন। এবার জমা দিন, যাচাইয়ের পর প্রকাশ করা হবে।</p>
       <button type="button" onClick={() => void submit()} disabled={isPending}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-pink-600/25 hover:bg-pink-700 disabled:opacity-60">
         {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} বায়োডাটা জমা দিন
@@ -482,9 +552,9 @@ export default function ProfileUpdateForm() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-pink-700">{name ? `স্বাগতম, ${name}!` : "স্বাগতম!"}</p>
           <h1 className="mt-1 text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl">{percent >= 100 ? "আপনার বায়োডাটা সম্পূর্ণ" : started ? "আপনার বায়োডাটা যাত্রা চলছে" : "চলুন বায়োডাটা তৈরি শুরু করি"}</h1>
-          <p className="mt-1.5 text-sm text-gray-600">একবারে একটি প্রশ্ন। প্রতিটি উত্তরে পয়েন্ট, প্রতিটি লেভেলে নতুন ব্যাজ। সব উত্তর সাথে সাথে সংরক্ষিত হয়।</p>
+          <p className="mt-1.5 text-sm text-gray-600">একবারে একটি প্রশ্ন। প্রতিটি উত্তরে বায়োডাটা এগোবে এবং প্রতিটি লেভেলে নতুন ব্যাজ পাবেন। উত্তরগুলো স্বয়ংক্রিয়ভাবে সংরক্ষিত হয়।</p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-600"><Star className="h-4 w-4 fill-amber-400 text-amber-500" />{bn(points)} পয়েন্ট</span>
+            {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700 hover:bg-amber-100"><Gem className="h-4 w-4" />{bn(connectionBalance)} বাকি কানেকশন</Link>}
             <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-sm font-bold text-pink-700"><Trophy className="h-4 w-4" />{bn(completedLevels)}/{bn(levels.length)} ব্যাজ</span>
             {saveBadge}
           </div>

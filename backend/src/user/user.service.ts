@@ -1,7 +1,7 @@
 import { IdentityService } from './identity.service';
 import { QuestionConfigService, sanitizeDynamicAnswers } from '../profile-questions/question-config.service';
 import { PlatformService } from './platform.service';
-import { samePhone, adminSort, adminFilter, editableProfile, completion, visibleFilter } from './profile-rules';
+import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter } from './profile-rules';
 import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminSetPasswordDto, AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
@@ -127,14 +127,14 @@ async findUserAndUpdated() {
     payload.draftStep=Math.max(0,Math.min(9,Number((updated as any).draftStep)||0));
     payload.draftSavedAt=new Date();
     if((updated as any).submit===true) {
-      const state={...current,...payload};
+      const state=profileUpdatePreview(current,payload);
       const status=completion(state,schema.questions);
       if(status.percentage<100)throw new HttpException({message:'Required questions are unanswered',missing:status.remaining},400);
       payload.biodataStatus='submitted';
       payload.isPublishFromAdmin=false;
       payload.verificationStatus='pending';
     }
-    const data=await this.userModel.findByIdAndUpdate(userId,{$set:payload},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
+    const data=await this.userModel.findByIdAndUpdate(userId,{$set:profileUpdateSet(payload)},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
     return {message:(updated as any).submit?'Biodata submitted for review':'Draft saved',data,completion:completion(data,schema.questions)};
   }
 

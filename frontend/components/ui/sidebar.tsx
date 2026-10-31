@@ -152,14 +152,18 @@ function Sidebar({
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
+  beneathSiteHeader = false,
   className,
   children,
   dir,
+  style,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  /** Account areas sit below the public site's 64px navbar + 1px border. */
+  beneathSiteHeader?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
@@ -171,6 +175,7 @@ function Sidebar({
           "bg-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col",
           className
         )}
+        style={style}
         {...props}
       >
         {children}
@@ -190,6 +195,12 @@ function Sidebar({
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              ...(beneathSiteHeader ? {
+                top: "calc(4rem + 1px)",
+                bottom: 0,
+                height: "calc(100dvh - 4rem - 1px)",
+              } : {}),
+              ...style,
             } as React.CSSProperties
           }
           side={side}
@@ -236,6 +247,12 @@ function Sidebar({
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className
         )}
+        style={beneathSiteHeader ? {
+          top: "calc(4rem + 1px)",
+          bottom: 0,
+          height: "calc(100dvh - 4rem - 1px)",
+          ...style,
+        } : style}
         {...props}
       >
         <div

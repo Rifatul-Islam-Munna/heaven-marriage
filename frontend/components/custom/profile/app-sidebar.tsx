@@ -1,6 +1,8 @@
 "use client";
 import * as React from "react";
 import Image from "next/image";
+import Link from "next/link";
+import type { Route } from "next";
 import {
   Sidebar,
   SidebarContent,
@@ -12,10 +14,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Gem } from "lucide-react";
 
 export function AppSidebar({
   data,
@@ -34,13 +37,15 @@ export function AppSidebar({
       name: string;
       isProfileIncomplete: boolean;
       profileCompletion: number;
+      connections?: number;
     };
   };
 }) {
   const pathName = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
-    <Sidebar>
+    <Sidebar side="left" beneathSiteHeader>
       <SidebarHeader>
         {data.ProfileTop && (
           <div className="flex flex-col gap-3 p-4 border-b">
@@ -58,9 +63,15 @@ export function AppSidebar({
                 <h3 className="font-semibold text-sm truncate">
                   {data.ProfileTop.name}
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  {data.ProfileTop.profileCompletion}% সম্পন্ন
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    {data.ProfileTop.profileCompletion}% সম্পন্ন
+                  </span>
+                  {typeof data.ProfileTop.connections === "number" && <Link href="/profile/numbers" className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-2 py-0.5 text-xs font-semibold text-pink-700 hover:bg-pink-100">
+                    <Gem className="h-3.5 w-3.5" aria-hidden />
+                    {data.ProfileTop.connections.toLocaleString("bn-BD")} কানেকশন
+                  </Link>}
+                </div>
               </div>
             </div>
 
@@ -78,12 +89,12 @@ export function AppSidebar({
                     <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
                       আপনার প্রোফাইল সম্পূর্ণ করুন
                     </p>
-                    <a
-                      href="/profile/settings"
+                    <Link
+                      href="/profile/my-profile"
                       className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
                     >
                       এখনই সম্পূর্ণ করুন →
-                    </a>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -123,7 +134,7 @@ export function AppSidebar({
                 {item.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={pathName === item.url}>
-                      <a href={item.url}>{item.title}</a>
+                      <Link href={item.url as Route} onClick={() => { if (isMobile) setOpenMobile(false); }} className="font-medium">{item.title}</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

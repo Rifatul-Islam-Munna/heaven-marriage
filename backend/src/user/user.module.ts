@@ -28,5 +28,6 @@ import { PdfService } from './pdf.service';
   imports: [QuestionConfigModule,MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
   controllers: [UserController,PlatformController,AiController,PublicController,ProfileAiController],
   providers: [GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
+  exports: [MessagingService],
 })
 export class UserModule {}

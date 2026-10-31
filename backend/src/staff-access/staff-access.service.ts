@@ -126,10 +126,14 @@ export class StaffAccessService{
     const {role,permissions}=input as Record<string,unknown>;
     if(typeof role!=='string'||!ASSIGNABLE.includes(role))
       throw new BadRequestException('Choose member, SEO editor, blog editor, manager or administrator');
+    // Role editing may not demote an admin or promote a member to admin.
+    // Creating an administrator, when permitted, is a separate audited operation.
+    if(role===UserType.ADMIN)throw new BadRequestException('Administrator role cannot be assigned here');
     const chosen=chosenPermissions(role,permissions);
     const oid=new Types.ObjectId(id);
     const target=await this.users.findOne({_id:oid},{projection:PROJECTION});
     if(!target)throw new NotFoundException('Account not found');
+    if(target.role===UserType.ADMIN)throw new ForbiddenException('Administrator accounts cannot be reassigned here');
     const updated=await this.users.findOneAndUpdate(
       {_id:oid,role:target.role},
       {$set:{role,dashboardPermissions:chosen,updatedAt:new Date()}},

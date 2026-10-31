@@ -503,9 +503,9 @@ describe('OTP request validation and SMS submission', () => {
       }),
       sms as any,
     );
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({ ok: true } as Response);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      Response.json({ id: 'test-resend-email-id' }, { status: 200 }),
+    );
     try {
       await gateway.send('01712345678', 'synthetic');
       expect(sms.sendSms).toHaveBeenCalledTimes(1);
@@ -513,7 +513,9 @@ describe('OTP request validation and SMS submission', () => {
       expect(fetchMock.mock.calls[0][0]).toBe('https://api.resend.com/emails');
       await gateway.send('+14155550123', 'synthetic');
       expect(String(fetchMock.mock.calls[1][0])).toContain('api.twilio.com');
-      fetchMock.mockResolvedValueOnce({ ok: false } as Response);
+      fetchMock.mockResolvedValueOnce(
+        Response.json({ name: 'validation_error', message: 'sender not verified', statusCode: 403 }, { status: 403 }),
+      );
       await expect(
         gateway.send('test@example.com', 'synthetic'),
       ).rejects.toMatchObject({ status: 503 });

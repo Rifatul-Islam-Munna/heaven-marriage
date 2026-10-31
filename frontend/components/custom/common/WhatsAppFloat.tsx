@@ -16,11 +16,12 @@ export default function WhatsAppFloat() {
   const url = normalizeMessengerUrl(data?.messengerUrl ?? contacts.messenger);
   if (path.startsWith("/dashboard") || path.startsWith("/profile")) return null;
   const label = url ? "Messenger-এ যোগাযোগ করুন" : "সরাসরি কল করুন";
+  const onBiodataDetails = path.startsWith("/biodata/");
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className={onBiodataDetails ? "fixed bottom-28 right-3 z-30 lg:bottom-6 lg:right-6" : "fixed bottom-6 right-6 z-50"}>
       <Button
         asChild
-        className="h-14 rounded-full bg-pink-600 px-4 text-white shadow-xl hover:bg-pink-700"
+        className={onBiodataDetails ? "h-11 rounded-full bg-pink-600 px-3 text-white shadow-xl hover:bg-pink-700 lg:h-14 lg:px-4" : "h-14 rounded-full bg-pink-600 px-4 text-white shadow-xl hover:bg-pink-700"}
       >
         <a
           href={url || "tel:" + contacts.general}
@@ -34,7 +35,7 @@ export default function WhatsAppFloat() {
           ) : (
             <Phone aria-hidden="true" />
           )}
-          <span className="text-sm font-semibold">{label}</span>
+          <span className={onBiodataDetails ? "hidden text-sm font-semibold lg:inline" : "text-sm font-semibold"}>{label}</span>
         </a>
       </Button>
     </div>

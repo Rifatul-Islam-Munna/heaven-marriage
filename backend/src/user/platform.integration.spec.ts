@@ -3,7 +3,7 @@ import { createConnection, Connection, Model } from 'mongoose';
 import { PlatformService } from './platform.service';
 import { QuestionConfigService } from '../profile-questions/question-config.service';
 import { User, UserSchema } from './entities/user.entity';
-import { publicProfile, editableProfile } from './profile-rules';
+import { publicProfile, editableProfile, profileUpdateSet, profileUpdatePreview } from './profile-rules';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -89,6 +89,42 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
       personalInformation: { height: 5.5 },
     });
     expect(await validate(dto)).toEqual([]);
+  });
+  it('updates just the edited biodata fields without deleting saved siblings or credits', async () => {
+    const person = await account({
+      motherName: 'Old mother',
+      familyInfo: { fathersProfession: 'Teacher', mothersProfession: 'Homemaker', brotherCount: 2 },
+      address: { district: 'Dhaka', upazila: 'Savar' },
+      numberOfConnections: 7,
+    });
+    const changes = editableProfile({
+      motherName: 'New mother',
+      familyInfo: { mothersProfession: 'Engineer' },
+      address: { district: 'Sylhet' },
+      numberOfConnections: 9999,
+      role: 'admin',
+    });
+    const set = profileUpdateSet({ ...changes, draftStep: 2 });
+    expect(set).toEqual({
+      motherName: 'New mother',
+      'familyInfo.mothersProfession': 'Engineer',
+      'address.district': 'Sylhet',
+      draftStep: 2,
+    });
+    const updated = await users.findByIdAndUpdate(person._id, { $set: set }, {
+      new: true, runValidators: true,
+    }).lean();
+    expect(updated?.motherName).toBe('New mother');
+    expect(updated?.familyInfo?.fathersProfession).toBe('Teacher');
+    expect(updated?.familyInfo?.brotherCount).toBe(2);
+    expect(updated?.familyInfo?.mothersProfession).toBe('Engineer');
+    expect(updated?.address?.district).toBe('Sylhet');
+    expect(updated?.address?.upazila).toBe('Savar');
+    expect(updated?.numberOfConnections).toBe(7);
+    expect(updated?.role).not.toBe('admin');
+    const preview = profileUpdatePreview(person.toObject(), changes);
+    expect((preview.familyInfo as any).fathersProfession).toBe('Teacher');
+    expect((preview.familyInfo as any).mothersProfession).toBe('Engineer');
   });
   it('requires publication even if a connection exists', async () => {
     const a = await account({ numberOfConnections: 1 }),

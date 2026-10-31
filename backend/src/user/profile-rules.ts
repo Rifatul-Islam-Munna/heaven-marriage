@@ -225,6 +225,36 @@ export function editableProfile(input: any) {
     throw new BadRequestException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে');
   return out;
 }
+/** Nested biodata answers are patched independently: replacing a whole nested object
+ * whenever one question changes would silently erase its sibling answers. */
+const PARTIAL_BIODATA_OBJECTS = new Set([
+  'address', 'educationInfo', 'familyInfo', 'personalInformation',
+  'occupational', 'marriageInformationWomen', 'marriageInformationMan',
+  'expectedLifePartner', 'pledge', 'customFields',
+]);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+export function profileUpdateSet(payload: Record<string, unknown>): Record<string, unknown> {
+  const set: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (PARTIAL_BIODATA_OBJECTS.has(key) && isRecord(value)) {
+      for (const [field, answer] of Object.entries(value)) set[key + '.' + field] = answer;
+    } else {
+      set[key] = value;
+    }
+  }
+  return set;
+}
+export function profileUpdatePreview(current: Record<string, unknown>, payload: Record<string, unknown>) {
+  const state = { ...current, ...payload };
+  for (const key of PARTIAL_BIODATA_OBJECTS) {
+    if (isRecord(payload[key])) {
+      state[key] = { ...(isRecord(current[key]) ? current[key] : {}), ...payload[key] };
+    }
+  }
+  return state;
+}
 export const visibleFilter = {
   isPublished: true,
   isPublishFromAdmin: true,

@@ -14,7 +14,10 @@ export default function DashboardShell({children,session}:{children:React.ReactN
     navMain.push({title:'সেটিংস',url:'/dashboard/settings',
       items:[
         ...permitted.filter(item=>item.key==='settings').map(item=>({title:item.label,url:item.url})),
-        ...(session.role==='admin'?[{title:'কর্মী ও রোল পারমিশন',url:'/dashboard/access'}]:[]),
+        ...(session.role==='admin'?[
+          {title:'ইমেইল ও OTP টেস্ট',url:'/dashboard/delivery-test'},
+          {title:'কর্মী ও রোল পারমিশন',url:'/dashboard/access'},
+        ]:[]),
       ],
     });
   }
