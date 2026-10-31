@@ -87,7 +87,7 @@ export default function AiBiodataAssistant() {
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
               />
-              আমি এই লেখা/ফাইল Google Gemini-তে প্রক্রিয়াকরণের অনুমতি দিচ্ছি।
+              আমি এই লেখা/ফাইল AI-তে প্রক্রিয়াকরণের অনুমতি দিচ্ছি।
               প্রক্রিয়াকরণের জন্য ফাইল পাঠানো হবে; সার্ভারে কপি রাখা হবে না।
             </label>
             <div className="flex gap-3 flex-wrap">

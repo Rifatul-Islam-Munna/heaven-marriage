@@ -29,7 +29,7 @@ export class AiController {
   async extract(@UploadedFile() file: Express.Multer.File, @Body() p: any) {
     if (p.consent !== 'true')
       throw new BadRequestException(
-        'Explicit permission for Google AI processing is required',
+        'Explicit permission for AI processing is required',
       );
     if(!this.gemini.enabled()) throw new ServiceUnavailableException('AI is unavailable. Please complete the form manually.');
     let text = String(p.text || '').slice(0, 50000),
