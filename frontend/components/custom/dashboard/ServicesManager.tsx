@@ -732,8 +732,14 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
     <Panel title="Premium service" description="Controls the member profile card, public /premium page, and fee for new applications."
       actions={<a href="/premium" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] font-medium text-rose-700 hover:underline"><ExternalLink size={13} /> View page</a>}>
       <div className="space-y-4">
-        <Toggle id="premium-enabled" label="Accept premium applications" description="Off hides the promotion and blocks new applications. Existing requests remain visible to members."
-          checked={premium.enabled} onChange={value => set('enabled', value)} />
+        <Toggle id="premium-visible" label="Show premium to members"
+          description="Off hides premium everywhere: the profile card, the 'Account' label, the premium badge on biodata, and the /premium page. New applications are blocked. Saved text and existing requests are kept."
+          checked={premium.visible} onChange={value => set('visible', value)} />
+        {!premium.visible && <p role="status" className="rounded-md bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
+          Premium is hidden. Members and visitors won’t see it anywhere until you switch this back on and save.
+        </p>}
+        <Toggle id="premium-enabled" label="Accept premium applications" description="Off keeps premium visible but blocks new applications. Existing requests remain visible to members."
+          checked={premium.visible && premium.enabled} disabled={!premium.visible} onChange={value => set('enabled', value)} />
         <div className="grid gap-4 md:grid-cols-2">
           <div><label htmlFor="premium-title" className={labelClass}>Title</label>
             <input id="premium-title" value={premium.title} maxLength={120} onChange={event => set('title', event.target.value)} className={fieldClass} /></div>

@@ -55,6 +55,8 @@ describe('MongoDB blog draft/publish and SEO workflow',()=>{
   beforeEach(async()=>{
     await db.collection('blog_posts').deleteMany({});
     await db.collection('blog_audit').deleteMany({});
+    await db.collection('blog_categories').deleteMany({});
+    await service.onModuleInit();
   });
   afterAll(async()=>{await db?.close();await mongo?.stop();});
 
@@ -91,7 +93,7 @@ describe('MongoDB blog draft/publish and SEO workflow',()=>{
     one=await service.publish('admin',one.id,{revision:2});
     expect((await service.listPublic({category:'Islamic marriage'})).items).toHaveLength(1);
     expect((await service.listPublic({q:'practical'})).items).toHaveLength(1);
-    expect((await service.categories())[0].name).toBe('Islamic marriage');
+    expect((await service.categories()).find(item=>item.name==='Islamic Marriage')?.count).toBe(1);
     one=await service.save('admin',one.id,{revision:3,draft:{...draft(),noindex:true}});
     one=await service.publish('admin',one.id,{revision:4});
     expect(await service.sitemap()).toEqual([]);
@@ -103,6 +105,32 @@ describe('MongoDB blog draft/publish and SEO workflow',()=>{
     expect((await service.adminOne(one.id)).draft.title).toBe('First article');
     one=await service.save('admin',one.id,{revision:7,draft:draft()});
     expect(one.status).toBe('draft');
+  });
+
+  it('manages categories without losing draft or published articles',async()=>{
+    let post=await service.create('admin');
+    post=await service.save('admin',post.id,{revision:1,draft:draft()});
+    post=await service.publish('admin',post.id,{revision:2});
+    const created=await service.addCategory('admin',{name:'Community'});
+    expect((await service.adminCategories()).some(item=>item.name==='Community')).toBe(true);
+    await expect(service.addCategory('admin',{name:'community'})).rejects.toBeInstanceOf(ConflictException);
+    await service.renameCategory('admin',
+      (await service.adminCategories()).find(item=>item.name==='Islamic Marriage')!.id,{name:'Marriage Help'});
+    expect((await service.onePublished('first-article')).category).toBe('Marriage Help');
+    expect((await service.adminOne(post.id)).draft.category).toBe('Marriage Help');
+    expect((await service.listPublic({category:'Marriage Help'})).total).toBe(1);
+    const renamed=(await service.adminCategories()).find(item=>item.name==='Marriage Help')!;
+    await service.removeCategory('admin',renamed.id);
+    expect((await service.onePublished('first-article')).category).toBe('Guides');
+    expect((await service.adminOne(post.id)).draft.category).toBe('Guides');
+    expect((await service.listPublic({category:'Guides'})).total).toBe(1);
+    await expect(service.removeCategory('admin',
+      (await service.adminCategories()).find(item=>item.name==='Guides')!.id))
+      .rejects.toBeInstanceOf(BadRequestException);
+    await service.removeCategory('admin',created.id);
+    await service.onModuleInit();
+    expect((await service.adminCategories()).some(item=>item.name==='Marriage Help')).toBe(false);
+    expect((await service.adminCategories()).some(item=>item.name==='Community')).toBe(false);
   });
 
   it('protects published slugs and rejects conflicting URLs',async()=>{

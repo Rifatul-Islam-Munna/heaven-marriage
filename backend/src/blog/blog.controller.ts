@@ -28,6 +28,18 @@ export class AdminBlogController{
   constructor(private readonly blog:BlogService){}
   @Get()
   list(@Query()query:{page?:string;q?:string}){return this.blog.listAdmin(query);}
+  @Get('categories')
+  categories(){return this.blog.adminCategories();}
+  @Post('categories')
+  addCategory(@Req()req:ExpressRequest,@Body()input:unknown){return this.blog.addCategory(req.user.id,input);}
+  @Patch('categories/:id')
+  renameCategory(@Req()req:ExpressRequest,@Param('id')id:string,@Body()input:unknown){
+    return this.blog.renameCategory(req.user.id,id,input);
+  }
+  @Delete('categories/:id')
+  removeCategory(@Req()req:ExpressRequest,@Param('id')id:string){
+    return this.blog.removeCategory(req.user.id,id);
+  }
   @Get(':id')
   one(@Param('id')id:string){return this.blog.adminOne(id);}
   @Post()

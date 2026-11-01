@@ -3,7 +3,7 @@ import type {Metadata} from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import {notFound} from 'next/navigation';
-import {ArrowLeft,ArrowRight,BookOpen,CalendarDays,Clock3,Home} from 'lucide-react';
+import {ArrowLeft,ArrowRight,BookOpen,CalendarDays,ChevronDown,ChevronRight,Clock3,Heart} from 'lucide-react';
 import {blogArticle,relatedBlogPosts} from '@/lib/blog-server';
 import {blogDate,publicBlogPath} from '@/lib/blog-types';
 import {publicMetadata} from '@/lib/seo';
@@ -36,6 +36,7 @@ export async function generateMetadata({params}:Props):Promise<Metadata>{
   if(post.noindex)metadata.robots={index:false,follow:false};
   return metadata;
 }
+
 export default async function BlogArticlePage({params}:Props){
   const {slug}=await params,post=await blogArticle(slug);
   if(!post)notFound();
@@ -58,67 +59,126 @@ export default async function BlogArticlePage({params}:Props){
     {'@type':'ListItem',position:2,name:'Blog',item:'https://niqaha.com/blog'},
     {'@type':'ListItem',position:3,name:post.title,item:'https://niqaha.com'+path},
   ]};
-  return <main className="min-h-screen bg-[#fdfaf9] text-[#372832]">
+  return <main className="min-h-screen bg-background text-foreground">
     <SeoStructuredData path={path}/>
     <script type="application/ld+json" dangerouslySetInnerHTML={{
       __html:JSON.stringify([schema,breadcrumb]).replace(/</g,'\\u003c')}}/>
-    <div className="relative overflow-hidden border-b border-rose-100 bg-gradient-to-br from-[#fff3f2] to-[#faf0f3]">
-      <div className="mx-auto max-w-[1100px] px-5 pb-11 pt-10 md:px-8 md:pb-16 md:pt-14">
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-[#987d8a]">
-          <Link href="/" className="hover:text-rose-800">হোম</Link><span>/</span>
-          <Link href="/blog" className="hover:text-rose-800">ব্লগ</Link><span>/</span>
-          <span className="max-w-[280px] truncate text-rose-800">{post.category}</span>
+
+    <section className="relative overflow-hidden border-b border-pink-100 bg-gradient-to-br from-pink-50 via-purple-50/30 to-background">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-16 size-72 rounded-full bg-pink-200/25 blur-3xl"/>
+      <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-0 size-80 rounded-full bg-purple-200/25 blur-3xl"/>
+      <div className="container relative mx-auto max-w-6xl px-4 pb-14 pt-8 sm:px-6 md:pb-20 md:pt-12">
+        <nav aria-label="ব্রেডক্রাম্ব" className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
+          <Link href="/" className="shrink-0 transition-colors hover:text-primary">হোম</Link>
+          <ChevronRight size={14} className="shrink-0" aria-hidden/>
+          <Link href="/blog" className="shrink-0 transition-colors hover:text-primary">ব্লগ</Link>
+          <ChevronRight size={14} className="shrink-0" aria-hidden/>
+          <span aria-current="page" className="min-w-0 truncate font-medium text-foreground">{post.title}</span>
         </nav>
-        <div className="mt-9 flex flex-wrap items-center gap-2">
+        <div className="mx-auto mt-9 max-w-4xl text-center md:mt-11">
           <Link href={('/blog?category='+encodeURIComponent(post.category)) as Route}
-            className="rounded-full border border-rose-200 bg-white px-3.5 py-1.5 text-xs font-bold text-rose-700">{post.category}</Link>
-          <span className="text-xs text-[#907783]">{post.readMinutes} মিনিটে পড়ুন</span>
-        </div>
-        <h1 className="mt-5 max-w-4xl font-serif text-4xl font-semibold leading-tight text-[#31222e] md:text-[3.45rem] md:leading-[1.19]">{post.title}</h1>
-        <p className="mt-6 max-w-3xl text-base leading-8 text-[#75616e] md:text-lg">{post.excerpt}</p>
-        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-[#866d79]">
-          <span className="font-bold text-[#47313b]">{post.author}</span>
-          <time dateTime={post.publishedAt} className="inline-flex items-center gap-2"><CalendarDays size={15}/>{blogDate(post.publishedAt)}</time>
-          <span className="inline-flex items-center gap-2"><Clock3 size={15}/>{post.readMinutes} মিনিট</span>
-          <ShareArticle title={post.title}/>
+            className="inline-flex min-h-9 items-center gap-2 rounded-full border border-pink-100 bg-pink-100 px-4 py-1.5 text-sm font-semibold text-pink-700 transition-colors hover:border-pink-200 hover:bg-pink-200/70">
+            <Heart size={15} fill="currentColor" aria-hidden/>{post.category}
+          </Link>
+          <h1 className="mt-5 break-words font-heading text-3xl font-bold leading-[1.35] tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+            {post.title}
+          </h1>
+          <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-muted-foreground md:text-lg md:leading-9">
+            {post.excerpt}
+          </p>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[13px] font-medium text-muted-foreground sm:text-sm">
+            <span className="font-bold text-foreground">{post.author}</span>
+            <time dateTime={post.publishedAt} className="inline-flex items-center gap-1.5">
+              <CalendarDays size={16} className="text-pink-600" aria-hidden/>{blogDate(post.publishedAt)}
+            </time>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock3 size={16} className="text-pink-600" aria-hidden/>{post.readMinutes} মিনিটে পড়ুন
+            </span>
+            <ShareArticle title={post.title}/>
+          </div>
         </div>
       </div>
-    </div>
-    <div className="mx-auto max-w-[1250px] px-5 py-10 md:px-8 md:py-14">
-      {post.cover.url&&<figure className="mx-auto mb-12 max-w-[1050px] overflow-hidden rounded-[24px] border border-rose-100 bg-rose-50 shadow-[0_20px_70px_rgba(79,45,57,0.1)]">
-        <Image unoptimized priority width={1400} height={800} src={post.cover.url} alt={post.cover.alt}
-          sizes="(max-width: 768px) 100vw, 1050px" className="h-auto max-h-[620px] w-full object-cover"/>
+    </section>
+
+    <div className="container mx-auto max-w-6xl px-4 pb-16 sm:px-6 md:pb-24">
+      {post.cover.url&&<figure className="relative -mt-7 overflow-hidden rounded-2xl border-4 border-white bg-pink-50 shadow-[0_18px_55px_rgba(157,52,102,0.12)] sm:-mt-9 sm:rounded-3xl">
+        <Image unoptimized priority width={1400} height={840} src={post.cover.url} alt={post.cover.alt}
+          sizes="(max-width: 768px) 100vw, 1152px" className="max-h-[560px] w-full object-cover"/>
         <figcaption className="sr-only">{post.cover.alt}</figcaption>
       </figure>}
-      <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_255px]">
-        <article className="min-w-0 max-w-[790px]">
+
+      <div className={`grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_265px] lg:gap-14 ${post.cover.url?'mt-9 md:mt-12':'mt-12'}`}>
+        <article className="min-w-0">
+          {headings.length>0&&<details className="group mb-8 rounded-2xl border border-pink-100 bg-pink-50/50 p-4 lg:hidden">
+            <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+              <BookOpen size={17} className="text-pink-600" aria-hidden/> এই লেখায়
+              <ChevronDown size={17} className="ml-auto text-pink-600 transition-transform group-open:rotate-180" aria-hidden/>
+            </summary>
+            <ol className="mt-4 space-y-3 border-t border-pink-100 pt-4">
+              {headings.map(item=><li key={item.id} style={{paddingLeft:(item.level-2)*12}}>
+                <a href={'#'+item.id} className="block text-sm leading-6 text-muted-foreground hover:text-primary">{item.text}</a>
+              </li>)}
+            </ol>
+          </details>}
           <BlogContent document={post.content}/>
-          <div className="mt-11 flex flex-wrap gap-2 border-t border-rose-100 pt-7">
+          {post.tags.length>0&&<div className="mt-10 flex flex-wrap items-center gap-2 border-t border-pink-100 pt-6">
+            <span className="mr-1 text-sm font-semibold text-foreground">বিষয়:</span>
             {post.tags.map(tag=><Link key={tag} href={('/blog?q='+encodeURIComponent(tag)) as Route}
-              className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#765968]">#{tag}</Link>)}
-          </div>
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#fff2f4] p-6">
-            <div><p className="font-serif text-xl font-bold">আরও পড়তে চান?</p><p className="mt-1 text-sm text-[#8a7380]">নতুন ধারণা ও প্রয়োজনীয় পরামর্শ জানুন।</p></div>
-            <Link href="/blog" className="inline-flex items-center gap-2 rounded-full bg-[#8c3953] px-5 py-2.5 text-sm font-bold text-white hover:bg-rose-800">সব লেখা <ArrowRight size={16}/></Link>
+              className="rounded-full border border-pink-100 bg-pink-50 px-3.5 py-1.5 text-xs font-semibold text-pink-700 transition-colors hover:border-pink-300 hover:bg-pink-100">
+              #{tag}
+            </Link>)}
+          </div>}
+          <div className="mt-9 flex flex-col items-start justify-between gap-5 rounded-3xl border border-pink-100 bg-gradient-to-r from-pink-50 via-purple-50/30 to-white p-6 sm:flex-row sm:items-center sm:p-8">
+            <div>
+              <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-pink-600">
+                <Heart size={14} fill="currentColor" aria-hidden/> Niqaha ব্লগ
+              </span>
+              <h2 className="font-heading text-2xl font-bold leading-snug text-foreground">আরও পড়তে চান?</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">বিবাহ, পরিবার ও সম্পর্ক নিয়ে আরও প্রয়োজনীয় লেখা পড়ুন।</p>
+            </div>
+            <Link href="/blog" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-pink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              সব লেখা <ArrowRight size={16} aria-hidden/>
+            </Link>
           </div>
         </article>
+
         {headings.length>0&&<aside className="hidden lg:block">
-          <nav aria-label="Article table of contents" className="sticky top-28 rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#895567]"><BookOpen size={15}/> এই লেখায়</h2>
-            <ol className="space-y-3">{headings.map(item=><li key={item.id} style={{paddingLeft:(item.level-2)*11}}>
-              <a href={'#'+item.id} className="block text-sm leading-6 text-[#77626c] hover:text-rose-700">{item.text}</a>
-            </li>)}</ol>
+          <nav aria-label="Article table of contents" className="sticky top-28 rounded-2xl border border-pink-100 bg-white p-5 shadow-[0_8px_35px_rgba(157,52,102,0.06)]">
+            <h2 className="mb-4 flex items-center gap-2 border-b border-pink-100 pb-3 text-sm font-bold text-foreground">
+              <BookOpen size={17} className="text-pink-600" aria-hidden/> এই লেখায়
+            </h2>
+            <ol className="space-y-3">
+              {headings.map(item=><li key={item.id} style={{paddingLeft:(item.level-2)*12}}>
+                <a href={'#'+item.id} className="block text-[13px] leading-6 text-muted-foreground transition-colors hover:text-primary">
+                  {item.text}
+                </a>
+              </li>)}
+            </ol>
           </nav>
         </aside>}
       </div>
-      {related.length>0&&<section aria-labelledby="related" className="mt-20 border-t border-rose-100 pt-10">
+
+      {related.length>0&&<section aria-labelledby="related" className="mt-16 border-t border-pink-100 pt-10 md:mt-20 md:pt-12">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
-          <div><p className="text-xs font-bold uppercase tracking-[.18em] text-rose-700">Keep exploring</p>
-            <h2 id="related" className="mt-2 font-serif text-3xl font-semibold">আরও কিছু লেখা</h2></div>
-          <Link href="/blog" className="inline-flex items-center gap-1 text-sm font-bold text-rose-700">সব ব্লগ দেখুন <ArrowRight size={16}/></Link>
+          <div>
+            <p className="mb-1 inline-flex items-center gap-2 text-xs font-bold text-pink-600">
+              <Heart size={14} fill="currentColor" aria-hidden/> আরও আবিষ্কার করুন
+            </p>
+            <h2 id="related" className="font-heading text-3xl font-bold leading-snug text-foreground sm:text-4xl">আরও কিছু লেখা</h2>
+          </div>
+          <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-pink-700">
+            সব ব্লগ দেখুন <ArrowRight size={16} aria-hidden/>
+          </Link>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{related.map(item=><BlogCard key={item.id} post={item}/>)}</div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {related.map(item=><BlogCard key={item.id} post={item}/>)}
+        </div>
       </section>}
+      <div className="mt-10">
+        <Link href="/blog" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary">
+          <ArrowLeft size={16} aria-hidden/> ব্লগে ফিরে যান
+        </Link>
+      </div>
     </div>
   </main>;
 }

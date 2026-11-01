@@ -117,6 +117,9 @@ export default function ProfileView({ id }: ProfileViewProps) {
   );
   // Always render with the exact question revision the backend used to filter this profile.
   const questionSchema = userData?.publicQuestionSchema || defaultQuestions;
+  // Premium badge follows the admin's "Show premium to members" switch.
+  const { data: publicSettings } = useQueryWrapper<{ premium?: { visible?: boolean } }>(["public-settings"], "/public/settings");
+  const showPremiumBadge = publicSettings?.premium?.visible === true;
 
   useEffect(() => {
     if (userData) viewContentEvent({
@@ -476,7 +479,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
               <div className="mt-3 flex flex-wrap gap-2">
                 {gender && <span className="rounded-full border border-pink-100 bg-white px-3 py-1 text-xs font-semibold text-gray-600">{gender === "male" ? "পাত্র" : "পাত্রী"}</span>}
                 {userData.isVerified && <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-gray-600"><BadgeCheck className="size-3.5" aria-hidden /> যাচাইকৃত</span>}
-                {userData.isSubscriber && <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-gray-600"><Crown className="size-3.5" aria-hidden /> প্রিমিয়াম</span>}
+                {showPremiumBadge && userData.isSubscriber && <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-gray-600"><Crown className="size-3.5" aria-hidden /> প্রিমিয়াম</span>}
               </div>
 
               {keyFacts.length > 0 && <>

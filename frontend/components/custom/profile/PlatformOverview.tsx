@@ -61,6 +61,8 @@ export default function PlatformOverview() {
     "/public/settings",
   );
   const premium = resolvePremiumSettings(publicSettings?.premium);
+  // Admin master switch: when off, members see no premium card or membership label at all.
+  const showPremium = !publicSettingsLoading && premium.visible;
   const premiumCases = cases?.filter((item) => item.kind === "premium") ?? [];
   const [reference, setReference] = useState(""),
     [method, setMethod] = useState("bkash");
@@ -90,7 +92,7 @@ export default function PlatformOverview() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3 text-sm">
-            <span>Account: {data.accountType}</span>
+            {showPremium && <span>Account: {data.accountType}</span>}
             <span>Verification: {data.verificationStatus}</span>
             <span>Biodata: {data.biodataStatus}</span>
             <span>Profile views: {data.profileViews}</span>
@@ -187,7 +189,7 @@ export default function PlatformOverview() {
           ))}
         </CardContent>
       </Card>
-      {!publicSettingsLoading && (premium.enabled || premiumCases.length > 0) && <Card className="shadow-none border-pink-100">
+      {showPremium && (premium.enabled || premiumCases.length > 0) && <Card data-premium-card className="shadow-none border-pink-100">
         <CardHeader>
           <CardTitle>{premium.title}</CardTitle>
         </CardHeader>

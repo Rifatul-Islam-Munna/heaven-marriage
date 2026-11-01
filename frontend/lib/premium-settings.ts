@@ -1,4 +1,7 @@
 export type PremiumSettings = {
+  /** Master switch: off hides every premium surface from members and visitors. */
+  visible: boolean;
+  /** Accept new premium applications (only meaningful while visible). */
   enabled: boolean;
   title: string;
   summary: string;
@@ -12,6 +15,7 @@ export type PremiumSettings = {
 };
 
 export const defaultPremiumSettings: PremiumSettings = {
+  visible: true,
   enabled: true,
   title: 'Premium Marriage Assistance',
   summary: 'বায়োডাটা জমা দেওয়ার পর টিম আবেদন যাচাই করে যোগাযোগ করবে। পেমেন্ট নিশ্চিত হলে সেবা সক্রিয় হবে।',

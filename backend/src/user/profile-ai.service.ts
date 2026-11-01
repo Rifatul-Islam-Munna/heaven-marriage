@@ -26,7 +26,8 @@ import {
 import { PROFILE_OPTIONS } from './profile-ai-options';
 import { normalizePhone } from './messaging.service';
 import { ProfileAiTurnDto } from './profile-ai.dto';
-import { QuestionConfigService, usesSeparateAnswerStorage, type ProfileQuestion } from '../profile-questions/question-config.service';
+import { QuestionConfigService, sanitizeDynamicAnswers, usesSeparateAnswerStorage, type ProfileQuestion } from '../profile-questions/question-config.service';
+import { dynamicAnswerValue, nextDynamicQuestion } from './profile-ai-dynamic';
 
 type ChatMessage = {
   id: string;
@@ -78,7 +79,8 @@ export class ProfileAiService {
       !skipped.includes(item.path) &&
       !present(valueAt(profile, item.path)),
     );
-    if (!q) return undefined;
+    // Built-in fields first, then the admin's own (dynamic) questions.
+    if (!q) return nextDynamicQuestion(profile, skipped, questions);
     const configured=allowed.get(q.path)!;
     const configuredQuestion={...q,question:configured.question,label:configured.question};
     if(configured.options.length)return {...configuredQuestion,options:configured.options};
@@ -247,9 +249,25 @@ export class ProfileAiService {
           skipped.push(q.path);
         else reply = 'উত্তরটি বুঝতে পারিনি। ' + q.question;
       } else if (result.status === 'answered') {
-        let value = validateAnswer(q, result.value);
+        const dynamic = q.dynamicId
+          ? config.questions.find((item) => item.id === q.dynamicId)
+          : undefined;
+        let value: string | number | boolean | string[] | null = dynamic
+          ? dynamicAnswerValue(dynamic, result.value)
+          : validateAnswer(q, result.value);
         if (!result.evidence.trim() || !input.includes(result.evidence))
           value = null;
+        // Dynamic answers pass the exact validation the biodata form uses.
+        if (value !== null && dynamic) {
+          try {
+            value = sanitizeDynamicAnswers({ [dynamic.id]: value }, undefined,
+              config.questions, profile.gender)[dynamic.id] as typeof value;
+          } catch {
+            value = null;
+          }
+        }
+        // q.path is a session key for dynamic questions, never a MongoDB path.
+        const field = dynamic ? 'dynamicAnswers.' + dynamic.id : q.path;
         if (
           value !== null &&
           (q.path === 'guardianPhone' || q.path === 'whatsapp')
@@ -267,7 +285,9 @@ export class ProfileAiService {
         }
         if (value !== null) {
           // The model cannot choose this path or owner. Only this one pending field is written.
-          const current = valueAt(profile, q.path);
+          const current = dynamic
+            ? profile.dynamicAnswers?.[dynamic.id]
+            : valueAt(profile, q.path);
           const filter: any = {
             _id: new Types.ObjectId(actor),
             verificationStatus: { $ne: 'suspended' },
@@ -275,12 +295,12 @@ export class ProfileAiService {
               profile.authVersion === undefined
                 ? { $in: [null, 0] }
                 : profile.authVersion,
-            [q.path]: current === undefined ? { $exists: false } : current,
+            [field]: current === undefined ? { $exists: false } : current,
           };
           const updated: any = await this.users
             .findOneAndUpdate(
               filter,
-              { $set: { [q.path]: value, draftSavedAt: new Date() } },
+              { $set: { [field]: value, draftSavedAt: new Date() } },
               { returnDocument: 'after', runValidators: true },
             )
             .select(
@@ -293,7 +313,14 @@ export class ProfileAiService {
               'প্রোফাইলের তথ্য বদলেছে। আবার লোড করে উত্তর দিন।',
             );
           profile = updated;
-          changed = { path: q.path, label: q.label, value };
+          // Show members the option text they recognise, not the stored value.
+          const shown = (v: string) => dynamic?.options.find((o) => o.value === v)?.label || v;
+          changed = {
+            path: q.path,
+            label: q.label,
+            value: Array.isArray(value) ? value.map(shown).join(', ')
+              : typeof value === 'string' ? shown(value) : value,
+          };
           reply = q.label + ' সংরক্ষিত হয়েছে।';
         } else
           reply =

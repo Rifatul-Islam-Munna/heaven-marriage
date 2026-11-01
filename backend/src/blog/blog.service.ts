@@ -153,24 +153,56 @@ const objectId=(value:unknown):Types.ObjectId=>{
   return new Types.ObjectId(value);
 };
 const escapeRegex=(value:string)=>value.replace(/[\\^$.*+?()[\]{}|]/g,'\\$&');
+const DEFAULT_BLOG_CATEGORY='Guides';
+const STARTER_BLOG_CATEGORIES=['Guides','Islamic Marriage','Family','Relationships','Advice'];
+type BlogCategoryRecord={name:string;key:string;createdAt:Date;updatedAt:Date};
+function categoryName(value:unknown):string{
+  if(typeof value!=='string')throw new BadRequestException('Enter a category name');
+  const name=value.normalize('NFKC').replace(/\s+/g,' ').trim();
+  if(name.length<2||name.length>90||/[<>\\\x00-\x1f]/.test(name))
+    throw new BadRequestException('Category names must be 2–90 characters, without HTML brackets');
+  return name;
+}
+const categoryKey=(name:string)=>name.toLocaleLowerCase('en');
 
 @Injectable()
 export class BlogService implements OnModuleInit{
   constructor(@InjectConnection()private readonly db:Connection){}
   private get posts(){return this.db.collection<BlogRecord>('blog_posts');}
+  private get categoryStore(){return this.db.collection<BlogCategoryRecord>('blog_categories');}
   async onModuleInit(){
     await Promise.all([
       this.posts.createIndex({slug:1},{unique:true,name:'blog_slug_unique'}),
       this.posts.createIndex({status:1,'published.featured':-1,publishedAt:-1},{name:'blog_public_feed'}),
       this.posts.createIndex({status:1,'published.category':1,publishedAt:-1},{name:'blog_category'}),
+      this.categoryStore.createIndex({key:1},{unique:true,name:'blog_category_key_unique'}),
     ]);
+    // Import category names already used in old drafts and published posts, without changing posts.
+    const existing=await Promise.all([
+      this.posts.distinct('draft.category'),this.posts.distinct('published.category'),
+    ]);
+    const firstSetup=(await this.categoryStore.countDocuments({}))===0;
+    const names=[...(firstSetup?STARTER_BLOG_CATEGORIES:[DEFAULT_BLOG_CATEGORY]),...existing.flat()];
+    for(const raw of names){
+      if(typeof raw!=='string'||!raw.trim())continue;
+      let name:string;
+      try{name=categoryName(raw);}catch{continue;}
+      const now=new Date();
+      await this.categoryStore.updateOne({key:categoryKey(name)},
+        {$setOnInsert:{name,key:categoryKey(name),createdAt:now,updatedAt:now}},{upsert:true});
+    }
+  }
+  private async requireCategory(name:string){
+    const category=await this.categoryStore.findOne({key:categoryKey(categoryName(name))});
+    if(!category)throw new BadRequestException('Category no longer exists. Add it in Blog categories first.');
+    return category.name;
   }
   async listPublic(params:{page?:string;limit?:string;category?:string;q?:string}={}){
     const page=Math.max(1,Math.min(10000,Number(params.page)||1));
     const limit=Math.max(1,Math.min(24,Number(params.limit)||9));
     const category=str(params.category,'category',90),q=escapeRegex(str(params.q,'search',90));
     const filter:Record<string,unknown>={status:'published'};
-    if(category)filter['published.category']=category;
+    if(category)filter['published.category']={$regex:'^'+escapeRegex(category)+'$',$options:'i'};
     if(q)filter.$or=[{'published.title':{$regex:q,$options:'i'}},
       {'published.excerpt':{$regex:q,$options:'i'}},
       {'published.tags':{$regex:q,$options:'i'}}];
@@ -186,13 +218,75 @@ export class BlogService implements OnModuleInit{
     return {items:rows.map(summary),total,page,pages:Math.ceil(total/limit),limit};
   }
   async categories(){
-    const rows=await this.posts.aggregate([
-      {$match:{status:'published'}},
-      {$group:{_id:'$published.category',count:{$sum:1}}},
-      {$sort:{count:-1,_id:1}},{$limit:50},
-    ]).toArray();
-    return rows.filter(x=>typeof x._id==='string'&&x._id)
-      .map(x=>({name:x._id,count:x.count}));
+    const [stored,counts]=await Promise.all([
+      this.categoryStore.find({}).sort({name:1}).toArray(),
+      this.posts.aggregate([{$match:{status:'published'}},
+        {$group:{_id:{$toLower:'$published.category'},count:{$sum:1}}}]).toArray(),
+    ]);
+    const numbers=new Map(counts.map(row=>[String(row._id),Number(row.count)]));
+    return stored.map(item=>({id:String(item._id),name:item.name,count:numbers.get(item.key)||0}));
+  }
+  async adminCategories(){
+    const [categories,counts]=await Promise.all([
+      this.categories(),
+      this.posts.aggregate([{$group:{_id:{$toLower:'$draft.category'},count:{$sum:1}}}]).toArray(),
+    ]);
+    const drafts=new Map(counts.map(row=>[String(row._id),Number(row.count)]));
+    return categories.map(item=>({...item,drafts:drafts.get(categoryKey(item.name))||0,
+      protected:item.name===DEFAULT_BLOG_CATEGORY}));
+  }
+  async addCategory(actorId:string,input:unknown){
+    const name=categoryName(obj(input,'category').name);
+    const now=new Date();
+    try{
+      const result=await this.categoryStore.insertOne({name,key:categoryKey(name),
+        createdAt:now,updatedAt:now});
+      await this.audit(actorId,'category-create',name);
+      return {id:String(result.insertedId),name,count:0,drafts:0,protected:false};
+    }catch(e:any){
+      if(e?.code===11000)throw new ConflictException('A category with this name already exists');
+      throw e;
+    }
+  }
+  private async reassignCategory(oldName:string,newName:string){
+    const oldKey=categoryKey(oldName);
+    const match={$regex:'^'+escapeRegex(oldName)+'$',$options:'i'};
+    await this.posts.updateMany({$or:[{'draft.category':match},{'published.category':match}]},[
+      {$set:{
+        'draft.category':{$cond:[{$eq:[{$toLower:'$draft.category'},oldKey]},newName,'$draft.category']},
+        'published.category':{$cond:[{$eq:[{$toLower:{$ifNull:['$published.category','']}},oldKey]},
+          newName,'$published.category']},
+        revision:{$add:['$revision',1]},updatedAt:'$$NOW',
+        modifiedAt:{$cond:[{$eq:['$status','published']},'$$NOW','$modifiedAt']},
+      }},
+    ]);
+  }
+  async renameCategory(actorId:string,id:unknown,input:unknown){
+    const oid=objectId(id),name=categoryName(obj(input,'category').name);
+    const existing=await this.categoryStore.findOne({_id:oid});
+    if(!existing)throw new NotFoundException('Category not found');
+    if(existing.name===DEFAULT_BLOG_CATEGORY)
+      throw new BadRequestException('Guides is the default category and cannot be renamed');
+    if(categoryKey(name)===existing.key&&name===existing.name)return {id:String(oid),name};
+    try{
+      await this.categoryStore.updateOne({_id:oid},{$set:{name,key:categoryKey(name),updatedAt:new Date()}});
+    }catch(e:any){
+      if(e?.code===11000)throw new ConflictException('A category with this name already exists');
+      throw e;
+    }
+    await this.reassignCategory(existing.name,name);
+    await this.audit(actorId,'category-rename',existing.name+' -> '+name);
+    return {id:String(oid),name};
+  }
+  async removeCategory(actorId:string,id:unknown){
+    const oid=objectId(id),existing=await this.categoryStore.findOne({_id:oid});
+    if(!existing)throw new NotFoundException('Category not found');
+    if(existing.name===DEFAULT_BLOG_CATEGORY)
+      throw new BadRequestException('Guides is the default category and cannot be deleted');
+    await this.reassignCategory(existing.name,DEFAULT_BLOG_CATEGORY);
+    await this.categoryStore.deleteOne({_id:oid});
+    await this.audit(actorId,'category-delete',existing.name);
+    return {deleted:true,reassignedTo:DEFAULT_BLOG_CATEGORY};
   }
   async onePublished(value:unknown){
     const slug=normalizeSlug(value),item=await this.posts.findOne({slug,status:'published'});
@@ -245,6 +339,7 @@ export class BlogService implements OnModuleInit{
     if(!item)throw new NotFoundException('Article not found');
     if(item.revision!==revision)throw new ConflictException('Article changed elsewhere; refresh');
     const draft=validateDraft(body.draft,item.slug);
+    draft.category=await this.requireCategory(draft.category);
     if(item.publishedAt&&draft.slug!==item.slug)
       throw new BadRequestException('Published blog URLs are permanent; edit the title instead');
     try{

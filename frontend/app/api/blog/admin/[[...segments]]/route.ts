@@ -8,9 +8,11 @@ export const dynamic='force-dynamic';
 const noStore={'Cache-Control':'private, no-store, max-age=0'};
 type Context={params:Promise<{segments?:string[]}>};
 function validParts(parts:string[]){
-  return parts.length===0||(parts.length===1&&/^[a-f0-9]{24}$/i.test(parts[0]))||
-    (parts.length===2&&/^[a-f0-9]{24}$/i.test(parts[0])&&
-      ['publish','unpublish','restore'].includes(parts[1]));
+  return parts.length===0||
+    (parts.length===1&&(parts[0]==='categories'||/^[a-f0-9]{24}$/i.test(parts[0])))||
+    (parts.length===2&&(
+      (parts[0]==='categories'&&/^[a-f0-9]{24}$/i.test(parts[1]))||
+      (/^[a-f0-9]{24}$/i.test(parts[0])&&['publish','unpublish','restore'].includes(parts[1]))));
 }
 function allowedOrigin(req:NextRequest){
   const origin=req.headers.get('origin');
@@ -47,7 +49,7 @@ async function proxy(req:NextRequest,context:Context,method:'GET'|'POST'|'PATCH'
     });
     const raw=await response.text();
     if(response.ok&&
-      (method==='DELETE'||parts[1]==='publish'||parts[1]==='unpublish')){
+      (method==='DELETE'||parts[0]==='categories'||parts[1]==='publish'||parts[1]==='unpublish')){
       revalidateTag(BLOG_CACHE_TAG,{expire:0});
       revalidatePath('/blog');
       revalidatePath('/blog/[slug]','page');

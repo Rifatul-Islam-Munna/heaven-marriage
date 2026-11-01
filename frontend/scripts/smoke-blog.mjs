@@ -230,7 +230,7 @@ try{
     const tab=await browser.newPage();
     await tab.setCookie({name:'access_token',value:'smoke-admin',url:site,httpOnly:true});
     await tab.goto(site+'/dashboard/blog',{waitUntil:'domcontentloaded',timeout:30000});
-    await tab.waitForFunction(()=>document.body.textContent.includes('Stories worth sharing.'),{timeout:20000});
+    await tab.waitForFunction(()=>document.body.textContent.includes('Blog & articles'),{timeout:20000});
     await tab.goto(site+'/dashboard/blog/'+item.id,{waitUntil:'domcontentloaded',timeout:30000});
     await tab.waitForFunction(()=>!!document.querySelector('.blog-editor'),{timeout:25000});
     assert.ok(await tab.$('[aria-label="Insert image"]'));
@@ -255,7 +255,7 @@ try{
       if(!save)throw Error('Save article draft button disabled');
       save.click();
     });
-    await tab.waitForFunction(()=>document.body.textContent.includes('Draft saved in MongoDB'),{timeout:15000});
+    await tab.waitForFunction(()=>document.body.textContent.includes('Draft saved. Visitors still see the last published version.'),{timeout:15000});
     assert.ok(JSON.stringify(records.get(item.id).draft.content).includes('A new optimized inline photograph'),
       'Inserted image/alt text was not saved from the visual editor');
     assert.ok(!JSON.stringify(records.get(item.id).published.content).includes('A new optimized inline photograph'),
@@ -269,7 +269,7 @@ try{
       if(!button)throw Error('Publish update button not available');
       button.click();
     });
-    await tab.waitForFunction(()=>document.body.textContent.includes('Article published!'),{timeout:15000});
+    await tab.waitForFunction(()=>document.body.textContent.includes('Published. The article is live on the website.'),{timeout:15000});
     assert.ok((await get('/blog/thoughtful-marriage-guidance')).html.includes('A new optimized inline photograph'));
     console.log('PASS: Publishing in Chrome makes the inline image and alt text public.');
     item=records.get(item.id);

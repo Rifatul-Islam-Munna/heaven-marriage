@@ -1,28 +1,49 @@
 'use client';
 import type {Route} from 'next';
-import {useCallback,useMemo,useState} from 'react';
+import {useCallback,useMemo,useState,type ReactNode} from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
-import {ArrowLeft,ArrowUpRight,BookOpen,Check,ChevronDown,ExternalLink,
-  Eye,ImagePlus,Loader2,Lock,RefreshCw,Save,Search,Send,Trash2,UploadCloud} from 'lucide-react';
+import {ArrowLeft,ArrowUpRight,ChevronDown,ExternalLink,ImagePlus,Loader2,Lock,
+  RefreshCw,Save,Send,Trash2,UploadCloud,X} from 'lucide-react';
 import type {BlogAdminDoc,BlogDraft,BlogDocument} from '@/lib/blog-types';
 import {publicBlogPath} from '@/lib/blog-types';
+import {DashButton,DashboardHeader,DashboardPage,Panel,StatusPill,Toggle,fieldClass,labelClass} from '@/components/custom/dashboard/dashboard-kit';
+import {cn} from '@/lib/utils';
 import {uploadBlogFile} from './BlogRichEditor';
+import {useBlogCategories} from './BlogCategoryManager';
+import {blogErrorMessage} from '@/lib/blog-error';
 
 const RichEditor=dynamic(()=>import('./BlogRichEditor'),{ssr:false,
-  loading:()=> <div className="min-h-[500px] animate-pulse rounded-xl bg-rose-50"/>});
-const input='w-full rounded-xl border border-[#e8dce2] bg-white px-3.5 py-2.5 text-sm text-[#412f3a] outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100';
+  loading:()=> <div className="min-h-[420px] animate-pulse rounded-md bg-[#f8f9fa]"/>});
+const STATUS={published:{tone:'positive',label:'Published'},draft:{tone:'warning',label:'Draft'},
+  archived:{tone:'neutral',label:'Archived'}} as const;
+const darkLink='inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-3 py-2 text-[13px] font-medium text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+
 function slugFromTitle(value:string){
   return value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu,'-').replace(/^-+|-+$/g,'').slice(0,120);
 }
-function FormField({name,children,hint}:{name:string;children:React.ReactNode;hint?:string}){
-  return <label className="block space-y-2"><span className="block text-xs font-bold text-[#5a434f]">{name}</span>{children}
-    {hint&&<span className="block text-[11px] leading-5 text-[#9b8591]">{hint}</span>}</label>;
+/** Same rule as the backend: HTTPS, same-site paths, and localhost while developing. */
+function previewable(url:string){
+  if(/^https:\/\/[^\s/]+\/\S+$/.test(url))return true;
+  if(url.startsWith('/')&&!url.startsWith('//'))return true;
+  return process.env.NODE_ENV!=='production'&&/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/\S+$/.test(url);
 }
+function Field({id,label,hint,children}:{id:string;label:string;hint?:ReactNode;children:ReactNode}){
+  return <div>
+    <label htmlFor={id} className={labelClass}>{label}</label>
+    {children}
+    {hint&&<p className="mt-1 text-[11px] leading-4 text-[#6c757d]">{hint}</p>}
+  </div>;
+}
+function Counter({value,max}:{value:number;max:number}){
+  return <span className={cn('tabular-nums',value>max*0.9?'text-amber-700':'text-[#adb5bd]')}>{value}/{max}</span>;
+}
+
 export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:BlogAdminDoc;canEditSeo?:boolean}){
   const router=useRouter();
+  const {categories}=useBlogCategories();
   const [post,setPost]=useState(initial);
   const [draft,setDraft]=useState<BlogDraft>(initial.draft);
   const [busy,setBusy]=useState(false);
@@ -36,32 +57,33 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
     setDraft(prev=>({...prev,[key]:value})),[]);
   const onContentChange=useCallback((doc:BlogDocument)=>update('content',doc),[update]);
   const slugPreview=publicBlogPath(draft.slug||post.slug);
-  const coverPreview=/^https:\/\/[^\s/]+\/\S+$/.test(draft.cover.url)||
-    (draft.cover.url.startsWith('/')&&!draft.cover.url.startsWith('//'));
-  const estimatedWords=useMemo(()=>{
-    const extract=(node:{text?:string;content?:any[]}):string=>(node.text||'')+(node.content||[]).map(extract).join(' ');
-    return extract(draft.content).trim().split(/\s+/).filter(Boolean).length;
+  const coverPreview=previewable(draft.cover.url);
+  const words=useMemo(()=>{
+    type TextNode={text?:string;content?:TextNode[]};
+    const extract=(node:TextNode):string=>(node.text||'')+(node.content||[]).map(extract).join(' ');
+    return extract(draft.content as TextNode).trim().split(/\s+/).filter(Boolean).length;
   },[draft.content]);
+  const minutes=Math.max(1,Math.ceil(words/190));
 
   async function perform(method:'PATCH'|'POST'|'DELETE',action?:'publish'|'unpublish'|'restore'){
     setBusy(true);setError('');setMessage('');
     try{
-      if(action==='publish'&&dirty)throw Error('Save all edits as a draft before publishing.');
+      if(action==='publish'&&dirty)throw Error('Save your edits as a draft before publishing.');
       const response=await fetch('/api/blog/admin/'+post.id+(action?'/'+action:''),{
         method,headers:{'Content-Type':'application/json'},
         body:JSON.stringify({revision:post.revision,...(method==='PATCH'?{draft}:{})}),
       });
-      const result=await response.json();
-      if(!response.ok)throw Error(Array.isArray(result.message)?result.message.join(', '):result.message||'Operation failed');
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(blogErrorMessage(result,'That action could not be completed.'));
       if(method==='DELETE'){router.push('/dashboard/blog');return;}
       setPost(result);
       setDraft(result.draft);
-      setMessage(action==='publish'?'Article published! Public page, feeds and sitemap cache updated.':
-        action==='unpublish'?'Article unpublished. It is now hidden from visitors.':
-        action==='restore'?'Archived article restored as a private draft.':
-        'Draft saved in MongoDB. Visitors still see the last published version.');
+      setMessage(action==='publish'?'Published. The article is live on the website.':
+        action==='unpublish'?'Unpublished. Visitors can no longer see this article.':
+        action==='restore'?'Restored as a private draft.':
+        'Draft saved. Visitors still see the last published version.');
       router.refresh();
-    }catch(e){setError(e instanceof Error?e.message:'Request failed');}
+    }catch(e){setError(e instanceof Error?e.message:'That action could not be completed.');}
     finally{setBusy(false);}
   }
   async function uploadCover(file?:File){
@@ -70,158 +92,167 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
     try{
       const url=await uploadBlogFile(file);
       setDraft(prev=>({...prev,cover:{url,alt:prev.cover.alt||file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ')}}));
-      setMessage('Cover uploaded. Remember to save the draft.');
-    }catch(e){setError(e instanceof Error?e.message:'Image upload failed');}
+      setMessage('Cover uploaded. Save the draft to keep it.');
+    }catch(e){setError(e instanceof Error?e.message:'The image could not be uploaded.');}
     finally{setUploading(false);}
   }
-  return <main className="min-h-screen bg-[#fbf8f8] px-4 py-7 text-[#35232e] md:px-7">
-    <div className="mx-auto max-w-[1450px] space-y-6">
-      <header className="rounded-[24px] bg-[#2c1c27] p-6 text-white md:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <Link href="/dashboard/blog" className="inline-flex items-center gap-2 text-xs font-semibold text-rose-200 hover:text-white"><ArrowLeft size={16}/> All articles</Link>
-            <p className="mt-5 text-xs font-bold uppercase tracking-[.18em] text-[#f3b2c6]"><BookOpen size={15} className="mr-2 inline"/> Editorial workspace</p>
-            <h1 className="mt-2 font-serif text-3xl font-semibold md:text-4xl">{draft.title||'Untitled article'}</h1>
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-              <span className={'rounded-full px-3 py-1.5 font-bold '+(live?'bg-emerald-500/15 text-emerald-200':'bg-amber-500/15 text-amber-200')}>{post.status.toUpperCase()}</span>
-              <span className="text-white/60">Revision {post.revision}</span>
-              {dirty&&<span className="font-semibold text-amber-200">● Unsaved edits</span>}
-              {post.publishedAt&&<span className="text-white/60">Published {new Date(post.publishedAt).toLocaleDateString()}</span>}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {live&&<Link href={publicBlogPath(post.slug) as Route} target="_blank"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-3 text-xs font-semibold hover:bg-white/10"><Eye size={16}/> Live article</Link>}
-            <button type="button" disabled={busy||!dirty} onClick={()=>void perform('PATCH')}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-3 text-xs font-semibold hover:bg-white/10 disabled:opacity-40">
-              <Save size={16}/> Save draft</button>
-            <button type="button" disabled={busy||dirty||post.status==='archived'} onClick={()=>void perform('POST','publish')}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#f4a2b9] px-5 py-3 text-xs font-bold text-[#2c1c27] hover:bg-white disabled:opacity-40">
-              {busy?<Loader2 className="animate-spin" size={16}/>:<Send size={16}/>}
-              {live?'Publish update':'Publish article'}
-            </button>
-          </div>
-        </div>
-      </header>
-      {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-      {message&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</p>}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-6">
-          <section className="space-y-5 rounded-2xl border border-[#eadfe4] bg-white p-6 shadow-sm md:p-8">
-            <p className="text-xs font-bold uppercase tracking-[.16em] text-rose-700">Article details</p>
-            <FormField name="Article title *"><input dir="auto" className={input+' text-xl font-semibold'} maxLength={180}
-              value={draft.title} onChange={e=>setDraft(prev=>({...prev,title:e.target.value,
-                slug:!post.publishedAt&&(prev.slug.startsWith('draft-')||!prev.slug)
-                  ?slugFromTitle(e.target.value):prev.slug}))} placeholder="একটি সুন্দর ও অর্থবহ শিরোনাম লিখুন"/></FormField>
-            <FormField name="URL slug *" hint={post.publishedAt?'URL is locked after first publication to avoid breaking indexed links.':'Use short, meaningful words separated by hyphens.'}>
+
+  return <DashboardPage className="pb-24">
+    <DashboardHeader title={draft.title||'Untitled article'}
+      meta={<>
+        <StatusPill tone={STATUS[post.status].tone}>{STATUS[post.status].label}</StatusPill>
+        {dirty&&<StatusPill tone="warning">Unsaved changes</StatusPill>}
+      </>}
+      description={<>Revision {post.revision}
+        {post.publishedAt&&<> · Published {new Date(post.publishedAt).toLocaleDateString()}</>}
+        {' · '}{words} words · ~{minutes} min read</>}
+      actions={<>
+        <Link href="/dashboard/blog" className={darkLink}><ArrowLeft size={14} aria-hidden/> All articles</Link>
+        {live&&<a href={publicBlogPath(post.slug)} target="_blank" rel="noopener noreferrer" className={darkLink}>
+          <ExternalLink size={14} aria-hidden/> View live</a>}
+      </>}/>
+
+    {error&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
+    {message&&<p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-800">{message}</p>}
+
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 space-y-4">
+        <Panel title="Article details" description="Title, web address and the summary shown on blog cards.">
+          <div className="space-y-4">
+            <Field id="blog-title" label="Title *">
+              <input id="blog-title" dir="auto" maxLength={180} value={draft.title}
+                onChange={e=>setDraft(prev=>({...prev,title:e.target.value,
+                  slug:!post.publishedAt&&(prev.slug.startsWith('draft-')||!prev.slug)?slugFromTitle(e.target.value):prev.slug}))}
+                placeholder="একটি সুন্দর ও অর্থবহ শিরোনাম লিখুন" className={cn(fieldClass,'text-[16px] font-semibold')}/>
+            </Field>
+            <Field id="blog-slug" label="Web address *"
+              hint={post.publishedAt?<><Lock size={11} className="mr-1 inline" aria-hidden/>Locked after the first publish so links shared on Google and social media keep working.</>
+                :'Short words joined by hyphens.'}>
               <div className="flex gap-2">
-                <input className={input+' min-w-0 flex-1 font-mono'} value={draft.slug}
-                  disabled={!!post.publishedAt} onChange={e=>update('slug',slugFromTitle(e.target.value))}/>
-                {!post.publishedAt&&<button type="button" className="shrink-0 rounded-xl border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50"
-                  onClick={()=>update('slug',slugFromTitle(draft.title))}>From title</button>}
+                <input id="blog-slug" value={draft.slug} disabled={!!post.publishedAt}
+                  onChange={e=>update('slug',slugFromTitle(e.target.value))} className={cn(fieldClass,'min-w-0 flex-1 font-mono text-[13px]')}/>
+                {!post.publishedAt&&<DashButton onClick={()=>update('slug',slugFromTitle(draft.title))}>Use title</DashButton>}
               </div>
-              <p className="break-all text-xs text-[#927885]">niqaha.com{slugPreview}</p>
-            </FormField>
-            <FormField name="Short summary / excerpt *" hint="At least 20 characters before publishing. This appears on the blog card and can be reused in search descriptions.">
-              <textarea dir="auto" className={input+' min-h-28 resize-y'} maxLength={600}
-                value={draft.excerpt} onChange={e=>update('excerpt',e.target.value)} placeholder="এই লেখাটি কী নিয়ে? কয়েক লাইনে বর্ণনা করুন..."/>
-              <p className="text-right text-xs text-[#9a818d]">{draft.excerpt.length}/600</p>
-            </FormField>
-            <div className="grid gap-5 md:grid-cols-2">
-              <FormField name="Category"><input className={input} list="blog-categories" value={draft.category}
-                onChange={e=>update('category',e.target.value)} placeholder="Islamic marriage"/>
-                <datalist id="blog-categories"><option value="Guides"/><option value="Islamic Marriage"/><option value="Family"/><option value="Relationships"/><option value="Advice"/></datalist>
-              </FormField>
-              <FormField name="Author"><input className={input} value={draft.author} onChange={e=>update('author',e.target.value)} placeholder="Niqaha Editorial"/></FormField>
+              <p className="mt-1 break-all font-mono text-[11px] text-[#868e96]">niqaha.com{slugPreview}</p>
+            </Field>
+            <Field id="blog-excerpt" label="Summary *" hint={<span className="flex justify-between gap-2">
+              <span>At least 20 characters to publish. Shown on blog cards and used for Google when the SEO description is empty.</span>
+              <Counter value={draft.excerpt.length} max={600}/></span>}>
+              <textarea id="blog-excerpt" dir="auto" maxLength={600} rows={3} value={draft.excerpt}
+                onChange={e=>update('excerpt',e.target.value)} placeholder="এই লেখাটি কী নিয়ে? কয়েক লাইনে বর্ণনা করুন..."
+                className={cn(fieldClass,'resize-y leading-6')}/>
+            </Field>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field id="blog-category" label="Category">
+                <select id="blog-category" value={draft.category} className={fieldClass}
+                  onChange={e=>update('category',e.target.value)}>
+                  {!categories.some(item=>item.name===draft.category)&&<option value={draft.category}>{draft.category}</option>}
+                  {categories.map(item=><option key={item.id} value={item.name}>{item.name}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-[#6c757d]">Manage categories from the <Link className="text-rose-700 underline" href="/dashboard/blog">blog dashboard</Link>.</p>
+              </Field>
+              <Field id="blog-author" label="Author">
+                <input id="blog-author" value={draft.author} onChange={e=>update('author',e.target.value)} placeholder="Niqaha Editorial" className={fieldClass}/>
+              </Field>
             </div>
-            <FormField name="Tags (comma-separated)"><input className={input} value={draft.tags.join(', ')}
-              onChange={e=>update('tags',e.target.value.split(',').map(v=>v.trim()).filter(Boolean))}
-              placeholder="বিবাহ, ইসলামিক জীবন, পরিবার"/></FormField>
-          </section>
-          <section className="space-y-4 rounded-2xl border border-[#eadfe4] bg-white p-5 shadow-sm md:p-7">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div><p className="text-xs font-bold uppercase tracking-[.16em] text-rose-700">Rich article editor</p>
-                <h2 className="mt-2 font-serif text-2xl font-semibold">Your story</h2></div>
-              <span className="rounded-full bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700">{estimatedWords} words · ~{Math.max(1,Math.ceil(estimatedWords/190))} min read</span>
-            </div>
-            <RichEditor initial={initial.draft.content} onChange={onContentChange}/>
-          </section>
-        </div>
-        <aside className="space-y-5">
-          <section className="space-y-4 rounded-2xl border border-[#eadfe4] bg-white p-5 shadow-sm">
-            <div><p className="text-xs font-bold uppercase tracking-[.14em] text-rose-700">Hero image</p>
-              <h2 className="mt-1 font-serif text-xl font-semibold">Featured image</h2></div>
-            <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-gradient-to-br from-[#fbe7ed] to-[#f3dce6]">
-              {coverPreview?<Image src={draft.cover.url} alt={draft.cover.alt||'Article cover preview'} fill unoptimized sizes="340px" className="object-cover"/>:
-                <ImagePlus className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-300" size={48}/>}
-            </div>
-            <label className="block cursor-pointer rounded-xl border border-dashed border-rose-300 px-3 py-4 text-center text-sm font-semibold text-rose-700 hover:bg-rose-50">
-              {uploading?<Loader2 size={16} className="mr-2 inline animate-spin"/>:<UploadCloud size={17} className="mr-2 inline"/>}
-              {uploading?'Uploading image...':'Upload cover image'}
-              <input className="sr-only" type="file" disabled={uploading} accept="image/jpeg,image/png,image/webp,image/avif"
-                onChange={e=>void uploadCover(e.target.files?.[0])}/>
-            </label>
-            <FormField name="Image URL (optional)"><input className={input} value={draft.cover.url} placeholder="https:// or uploaded URL"
-              onChange={e=>update('cover',{...draft.cover,url:e.target.value})}/></FormField>
-            <FormField name="Image alt text *" hint="Describe the photo for screen readers and image search.">
-              <textarea className={input} rows={2} value={draft.cover.alt}
-                onChange={e=>update('cover',{...draft.cover,alt:e.target.value})}/></FormField>
-          </section>
-          <section className="space-y-4 rounded-2xl border border-[#eadfe4] bg-white p-5 shadow-sm">
-            <button onClick={()=>setOpenSeo(v=>!v)} className="flex w-full items-center justify-between gap-3 text-left">
-              <span className="flex items-center gap-2 font-serif text-xl font-semibold"><Search size={19} className="text-rose-600"/> SEO settings</span>
-              <ChevronDown size={18} className={openSeo?'rotate-180':''}/>
-            </button>
-            {openSeo&&<>
-              <FormField name="SEO title" hint="Defaults to the article title if empty.">
-                <input className={input} value={draft.seoTitle} maxLength={180} onChange={e=>update('seoTitle',e.target.value)}/>
-                <p className="text-right text-[11px] text-[#9d8992]">{draft.seoTitle.length} characters</p>
-              </FormField>
-              <FormField name="SEO description" hint="Defaults to the article excerpt if empty.">
-                <textarea className={input} value={draft.seoDescription} maxLength={350} rows={3}
-                  onChange={e=>update('seoDescription',e.target.value)}/>
-                <p className="text-right text-[11px] text-[#9d8992]">{draft.seoDescription.length} characters</p>
-              </FormField>
-              <div className="rounded-xl bg-[#fcf8fa] p-3">
-                <p className="text-[11px] text-emerald-700">niqaha.com{slugPreview}</p>
-                <p className="mt-1 line-clamp-2 font-medium text-[#2554b4]">{draft.seoTitle||draft.title||'Your SEO title'}</p>
-                <p className="mt-1 line-clamp-3 text-xs text-[#786a73]">{draft.seoDescription||draft.excerpt||'Your meta description preview'}</p>
-              </div>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.noindex}
-                onChange={e=>update('noindex',e.target.checked)} className="size-4 accent-rose-600"/> Noindex this article</label>
-              {live&&canEditSeo&&<Link href={('/dashboard/seo?path='+encodeURIComponent(publicBlogPath(post.slug))) as Route}
-                className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 underline">Advanced SEO editor <ArrowUpRight size={13}/></Link>}
-            </>}
-          </section>
-          <section className="space-y-4 rounded-2xl border border-[#eadfe4] bg-white p-5 shadow-sm">
-            <label className="flex items-center justify-between gap-3 text-sm font-semibold">
-              Feature on blog homepage
-              <input className="size-4 accent-rose-600" type="checkbox" checked={draft.featured}
-                onChange={e=>update('featured',e.target.checked)}/>
-            </label>
-            {post.status==='archived'&&<button type="button" disabled={busy} onClick={()=>void perform('POST','restore')}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 px-3 py-2.5 text-xs font-bold text-emerald-800"><RefreshCw size={15}/> Restore as draft</button>}
-            <div className="border-t border-rose-100 pt-4">
-              <button type="button" disabled={busy||!live} onClick={()=>{
-                if(window.confirm('Remove this post from the public website? The saved article is preserved.'))void perform('POST','unpublish');
-              }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200 px-3 py-2.5 text-xs font-bold text-amber-800 disabled:opacity-30"><Lock size={15}/> Unpublish</button>
-            </div>
-            <button type="button" disabled={busy} onClick={()=>{
-              if(window.confirm('Archive this article? It disappears publicly, but the content remains recoverable.'))void perform('DELETE');
-            }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-100 px-3 py-2.5 text-xs font-semibold text-red-700 disabled:opacity-30"><Trash2 size={15}/> Archive article</button>
-          </section>
-        </aside>
+            <Field id="blog-tags" label="Tags" hint="Separate tags with commas.">
+              <input id="blog-tags" value={draft.tags.join(', ')}
+                onChange={e=>update('tags',e.target.value.split(',').map(v=>v.trim()).filter(Boolean))}
+                placeholder="বিবাহ, ইসলামিক জীবন, পরিবার" className={fieldClass}/>
+            </Field>
+          </div>
+        </Panel>
+
+        <Panel title="Content" actions={<span className="text-[12px] text-[#6c757d]">{words} words · ~{minutes} min read</span>}>
+          <RichEditor initial={initial.draft.content} onChange={onContentChange}/>
+        </Panel>
       </div>
-      <div className="sticky bottom-4 z-10 flex flex-wrap justify-between gap-3 rounded-2xl border border-rose-200 bg-white/95 px-5 py-3 shadow-xl backdrop-blur">
-        <Link href="/dashboard/blog" className="inline-flex items-center gap-2 text-xs font-bold text-rose-700"><ArrowLeft size={16}/> All posts</Link>
-        <div className="flex items-center gap-2">
-          {dirty&&<span className="hidden text-xs text-amber-700 sm:inline">Unsaved changes</span>}
-          <button type="button" disabled={busy||!dirty} onClick={()=>void perform('PATCH')}
-            className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-700 disabled:opacity-40"><Save size={15}/> Save draft</button>
-          <button type="button" disabled={busy||dirty||post.status==='archived'} onClick={()=>void perform('POST','publish')}
-            className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40"><Send size={15}/> Publish</button>
-        </div>
+
+      <aside className="space-y-4">
+        <Panel title="Cover image" description="Shown at the top of the article and on blog cards.">
+          <div className="space-y-3">
+            <div className="relative aspect-[16/10] overflow-hidden rounded-md border border-[#e9ecef] bg-[#f8f9fa]">
+              {coverPreview
+                ?<Image src={draft.cover.url} alt={draft.cover.alt||'Cover preview'} fill unoptimized sizes="340px" className="object-cover"/>
+                :<div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[12px] text-[#adb5bd]">
+                  <ImagePlus size={30} aria-hidden/>{draft.cover.url?'Preview not available for this URL':'No cover yet'}
+                </div>}
+            </div>
+            <div className="flex gap-2">
+              <label className={cn('flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-rose-600 px-3 py-2 text-[13px] font-medium text-white hover:bg-rose-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-rose-600',
+                uploading&&'pointer-events-none opacity-60')}>
+                {uploading?<Loader2 size={15} className="animate-spin" aria-hidden/>:<UploadCloud size={15} aria-hidden/>}
+                {uploading?'Uploading…':draft.cover.url?'Replace image':'Upload image'}
+                <input className="sr-only" type="file" disabled={uploading} accept="image/jpeg,image/png,image/webp,image/avif"
+                  onChange={e=>{void uploadCover(e.target.files?.[0]);e.target.value='';}}/>
+              </label>
+              {draft.cover.url&&<DashButton tone="danger" aria-label="Remove cover image" onClick={()=>update('cover',{url:'',alt:''})}><X size={14}/></DashButton>}
+            </div>
+            <p className="text-[11px] text-[#6c757d]">JPEG, PNG, WebP or AVIF, up to 8 MB.</p>
+            <Field id="blog-cover-url" label="Or paste an image URL">
+              <input id="blog-cover-url" value={draft.cover.url} placeholder="https://…" className={fieldClass}
+                onChange={e=>update('cover',{...draft.cover,url:e.target.value})}/>
+            </Field>
+            <Field id="blog-cover-alt" label="Image description *" hint="Describe the photo for screen readers and Google Images.">
+              <textarea id="blog-cover-alt" rows={2} value={draft.cover.alt} className={cn(fieldClass,'resize-y')}
+                onChange={e=>update('cover',{...draft.cover,alt:e.target.value})}/>
+            </Field>
+          </div>
+        </Panel>
+
+        <Panel title="Search preview" description="How the article can appear on Google."
+          actions={<button type="button" onClick={()=>setOpenSeo(v=>!v)} aria-expanded={openSeo} aria-controls="blog-seo"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-[#495057] hover:bg-[#f1f3f5]">
+            {openSeo?'Hide':'Edit'} <ChevronDown size={14} className={openSeo?'rotate-180':''} aria-hidden/></button>}>
+          <div className="rounded-md border border-[#e9ecef] p-3">
+            <p className="truncate text-[11px] text-emerald-700">niqaha.com{slugPreview}</p>
+            <p className="mt-1 line-clamp-2 text-[14px] font-medium leading-5 text-[#1a0dab]">{draft.seoTitle||draft.title||'Your article title'}</p>
+            <p className="mt-1 line-clamp-3 text-[12px] leading-5 text-[#4d5156]">{draft.seoDescription||draft.excerpt||'Your summary appears here.'}</p>
+          </div>
+          {openSeo&&<div id="blog-seo" className="mt-4 space-y-4">
+            <Field id="blog-seo-title" label="SEO title" hint={<span className="flex justify-between gap-2"><span>Empty uses the article title.</span><Counter value={draft.seoTitle.length} max={180}/></span>}>
+              <input id="blog-seo-title" maxLength={180} value={draft.seoTitle} onChange={e=>update('seoTitle',e.target.value)} className={fieldClass}/>
+            </Field>
+            <Field id="blog-seo-description" label="SEO description" hint={<span className="flex justify-between gap-2"><span>Empty uses the summary.</span><Counter value={draft.seoDescription.length} max={350}/></span>}>
+              <textarea id="blog-seo-description" maxLength={350} rows={3} value={draft.seoDescription}
+                onChange={e=>update('seoDescription',e.target.value)} className={cn(fieldClass,'resize-y')}/>
+            </Field>
+            <Toggle id="blog-noindex" label="Hide from search engines" description="Adds noindex so Google won’t list this article."
+              checked={draft.noindex} onChange={value=>update('noindex',value)}/>
+            {live&&canEditSeo&&<Link href={('/dashboard/seo?path='+encodeURIComponent(publicBlogPath(post.slug))) as Route}
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-rose-700 hover:underline">Advanced SEO editor <ArrowUpRight size={13} aria-hidden/></Link>}
+          </div>}
+        </Panel>
+
+        <Panel title="Visibility">
+          <div className="space-y-3">
+            <Toggle id="blog-featured" label="Feature on the blog homepage" description="Shows this article in the highlighted spot."
+              checked={draft.featured} onChange={value=>update('featured',value)}/>
+            {post.status==='archived'&&<DashButton className="w-full" disabled={busy} onClick={()=>void perform('POST','restore')}>
+              <RefreshCw size={14}/> Restore as draft</DashButton>}
+            {live&&<DashButton className="w-full" disabled={busy} onClick={()=>{
+              if(window.confirm('Remove this article from the website? The saved article is kept.'))void perform('POST','unpublish');
+            }}><Lock size={14}/> Unpublish</DashButton>}
+            {post.status!=='archived'&&<DashButton tone="danger" className="w-full" disabled={busy} onClick={()=>{
+              if(window.confirm('Archive this article? It disappears from the website, but you can restore it later.'))void perform('DELETE');
+            }}><Trash2 size={14}/> Archive article</DashButton>}
+          </div>
+        </Panel>
+      </aside>
+    </div>
+
+    <div role="region" aria-label="Save and publish"
+      className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#1a1a2e] px-4 py-3 text-white shadow-lg">
+      <p className="text-[13px]" aria-live="polite">
+        {busy?'Working…':dirty?'You have unsaved changes.':live?'All changes are live.':post.status==='archived'?'This article is archived.':'Draft saved. Publish when it’s ready.'}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <DashButton tone="ghost-dark" disabled={busy||!dirty} onClick={()=>void perform('PATCH')}><Save size={14}/> Save draft</DashButton>
+        <DashButton tone="primary" disabled={busy||dirty||post.status==='archived'} onClick={()=>void perform('POST','publish')}
+          title={dirty?'Save your edits first':undefined}>
+          {busy?<Loader2 size={14} className="animate-spin"/>:<Send size={14}/>} {live?'Publish update':'Publish'}
+        </DashButton>
       </div>
     </div>
-  </main>;
+  </DashboardPage>;
 }

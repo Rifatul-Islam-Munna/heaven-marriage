@@ -1,9 +1,10 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 
 @Injectable()
 export class GeminiService {
+  private readonly logger = new Logger(GeminiService.name);
   constructor(private readonly config: ConfigService) {}
   enabled() {
     return !!(
@@ -60,8 +61,10 @@ export class GeminiService {
         abortSignal: AbortSignal.timeout(45000),
       });
       return schema.parse(result.output);
-    } catch {
+    } catch (error: any) {
       // Never expose provider errors, prompts, biodata or API credentials in logs/responses.
+      // Only the error class and HTTP status are logged, e.g. a 403 billing/permission problem.
+      this.logger.warn(`Gemini request failed: ${error?.name || 'Error'}${error?.statusCode ? ' (HTTP ' + error.statusCode + ')' : ''}`);
       throw new ServiceUnavailableException(
         'AI উত্তর দিতে পারেনি। আবার চেষ্টা করুন অথবা ফর্মটি নিজে পূরণ করুন।',
       );

@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 import LoginWithGoogle from "./GoogleLogin";
+import AuthDivider from "./AuthDivider";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -60,20 +61,27 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 p-4">
+    <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 px-3 py-6 sm:items-center sm:p-4">
       <Card className="w-full max-w-md border-pink-200">
-        <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16  rounded-full flex items-center justify-center ">
+        <CardHeader className="space-y-2 px-5 pb-2 text-center sm:space-y-3 sm:px-6">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full sm:size-16">
             <Image src={"/logo.png"} width={64} height={64} alt="logo" />
           </div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent sm:text-3xl">
             স্বাগতম
           </CardTitle>
-          <CardDescription className="text-base text-gray-600">
+          <CardDescription className="text-sm text-gray-600 sm:text-base">
             আপনার যাত্রা চালিয়ে যেতে লগইন করুন
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 sm:px-6">
+          <div className="space-y-2">
+            <p className="text-center text-sm font-medium text-gray-700">
+              এক ক্লিকে Google দিয়ে লগইন করুন
+            </p>
+            <LoginWithGoogle />
+          </div>
+          <AuthDivider label="অথবা মোবাইল / ইমেইল দিয়ে" />
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label
@@ -123,6 +131,7 @@ export default function SignIn() {
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  aria-label={showPassword ? "পাসওয়ার্ড লুকান" : "পাসওয়ার্ড দেখুন"}
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -132,10 +141,6 @@ export default function SignIn() {
                   )}
                 </Button>
               </div>
-            </div>
-
-            <div className="w-full mx-auto">
-              <LoginWithGoogle />
             </div>
 
             <Button

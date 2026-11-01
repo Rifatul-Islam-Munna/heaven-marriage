@@ -10,6 +10,10 @@ export type Question = {
   options?: { value: string; label: string }[];
   gender?: 'male' | 'female';
   hint?: string;
+  /** Set for admin-created questions; answers go to user.dynamicAnswers[dynamicId]. */
+  dynamicId?: string;
+  /** Multiple-choice dynamic question: the model returns comma-separated option values. */
+  multiple?: boolean;
 };
 const text = (
   path: string,

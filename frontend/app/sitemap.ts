@@ -11,10 +11,23 @@ const original=['/','/about','/biodata','/contact','/faq',
 const known=new Set(visualPageCatalog.filter(p=>!p.dynamic).map(p=>p.path));
 for(const policy of ['/policies/terms','/policies/privacy','/policies/refund'])known.add(policy);
 
+/** True when the admin switched premium off; on any error keep the page listed. */
+async function premiumHidden():Promise<boolean>{
+  const base=process.env.BASE_URL;
+  if(!base)return false;
+  try{
+    const r=await fetch(base.replace(/\/$/,'')+'/public/settings',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return false;
+    const s=await r.json() as {premium?:{visible?:boolean}};
+    return s.premium?.visible===false;
+  }catch{return false;}
+}
+
 export default async function sitemap():Promise<MetadataRoute.Sitemap>{
-  const [overrides,articles]=await Promise.all([getSitemapOverrides(),blogSitemap()]);
+  const [overrides,articles,hidePremium]=await Promise.all([getSitemapOverrides(),blogSitemap(),premiumHidden()]);
   const map=new Map(overrides.map(item=>[item.path,item]));
   const paths=new Set([...original,...overrides.filter(o=>o.settings.sitemap?.include===true).map(o=>o.path)]);
+  if(hidePremium)paths.delete('/premium');
   const result:MetadataRoute.Sitemap=[];
   for(const path of paths){
     if(!known.has(path)||isPrivateSeoPath(path)||path.includes('['))continue;

@@ -390,7 +390,7 @@ export class PlatformService implements OnModuleInit {
     const premium = kind === 'premium'
       ? resolvePremiumSettings((await this.db.collection('platform_settings').findOne({ key: 'public' }))?.premium)
       : null;
-    if (premium && !premium.enabled)
+    if (premium && (!premium.visible || !premium.enabled))
       throw new BadRequestException('Premium applications are currently unavailable');
     const c = {
       id: randomUUID(),

@@ -26,7 +26,7 @@ async function backend(method: "GET" | "POST", body?: unknown) {
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(55000),
     });
-    const data = await r.json();
+    const data = await r.json().catch(() => ({}));
     if (!r.ok)
       return {
         status: r.status,
@@ -35,7 +35,9 @@ async function backend(method: "GET" | "POST", body?: unknown) {
             ? data.message
             : Array.isArray(data.message)
               ? data.message.join(" ")
-              : "আবার চেষ্টা করুন।",
+              : r.status >= 500
+                ? "AI সহায়তা এই মুহূর্তে কাজ করছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন, অথবা ফর্মে নিজে উত্তর দিন।"
+                : "আবার চেষ্টা করুন।",
       };
     return { status: 200, data: data as ProfileSession };
   } catch {

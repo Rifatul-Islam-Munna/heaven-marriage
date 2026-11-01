@@ -248,6 +248,42 @@ describe('Authenticated Gemini profile assistant', () => {
     expect(model.generate).not.toHaveBeenCalled();
     expect((await users.findById(actor._id).lean()).age).toBeUndefined();
   });
+  it('asks admin-created questions and saves validated answers to dynamicAnswers', async () => {
+    const config = app.get(QuestionConfigService);
+    const colour = 'q_' + 'a'.repeat(32), hobbies = 'q_' + 'b'.repeat(32);
+    const base = { section: 0, gender: 'both', required: false, enabled: true, showPublic: true };
+    // Only these two questions stay enabled; every built-in field is archived.
+    await config.save('admin', { revision: (await config.get()).revision, questions: [
+      { ...base, id: colour, question: 'প্রিয় রং?', publicLabel: 'প্রিয় রং', type: 'select', order: 1,
+        options: [{ label: 'লাল', value: 'red' }, { label: 'নীল', value: 'blue' }] },
+      { ...base, id: hobbies, question: 'শখ?', publicLabel: 'শখ', type: 'multi_checkbox', order: 2,
+        options: [{ label: 'বই পড়া', value: 'reading' }, { label: 'ভ্রমণ', value: 'travel' }] },
+    ] });
+    try {
+      const initial = await get().expect(200);
+      expect(initial.body.currentField.path).toBe('dynamic:' + colour);
+      expect(initial.body.currentField.options).toEqual([{ value: 'red', label: 'লাল' }, { value: 'blue', label: 'নীল' }]);
+      // A choice that is not one of the admin's options is never saved.
+      model.generate.mockResolvedValueOnce({ status: 'answered', value: 'green', evidence: 'সবুজ', reply: 'ok' });
+      const bad = await send(body({ message: 'সবুজ', revision: initial.body.revision })).expect(201);
+      expect(bad.body.changed).toBeNull();
+      expect(bad.body.currentField.path).toBe('dynamic:' + colour);
+      // The model may return the label; the stored value is saved and the label shown.
+      model.generate.mockResolvedValueOnce({ status: 'answered', value: 'নীল', evidence: 'নীল', reply: 'ok' });
+      const r1 = await send(body({ message: 'আমার প্রিয় রং নীল', revision: bad.body.revision })).expect(201);
+      expect(r1.body.changed).toEqual({ path: 'dynamic:' + colour, label: 'প্রিয় রং', value: 'নীল' });
+      expect(r1.body.currentField.path).toBe('dynamic:' + hobbies);
+      model.generate.mockResolvedValueOnce({ status: 'answered', value: 'reading, travel', evidence: 'বই পড়া আর ভ্রমণ', reply: 'ok' });
+      const r2 = await send(body({ message: 'বই পড়া আর ভ্রমণ', revision: r1.body.revision })).expect(201);
+      expect(r2.body.changed.value).toBe('বই পড়া, ভ্রমণ');
+      expect(r2.body.done).toBe(true);
+      const saved: any = await users.findById(actor._id).lean();
+      expect(saved.dynamicAnswers).toEqual({ [colour]: 'blue', [hobbies]: ['reading', 'travel'] });
+      expect((await users.findById(victim._id).lean() as any).dynamicAnswers).toBeUndefined();
+    } finally {
+      await db.collection('profile_question_config').deleteMany({});
+    }
+  });
   it('rejects revoked sessions and suspended accounts', async () => {
     const stale = token(String(actor._id));
     await users.updateOne({ _id: actor._id }, { $set: { authVersion: 1 } });

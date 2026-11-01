@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 
 export type PremiumSettings = {
+  /** Master switch: off hides every premium surface from members and visitors. */
+  visible: boolean;
+  /** Accept new premium applications (only meaningful while visible). */
   enabled: boolean;
   title: string;
   summary: string;
@@ -14,6 +17,7 @@ export type PremiumSettings = {
 };
 
 export const defaultPremiumSettings: PremiumSettings = {
+  visible: true,
   enabled: true,
   title: 'Premium Marriage Assistance',
   summary: 'বায়োডাটা জমা দেওয়ার পর টিম আবেদন যাচাই করে যোগাযোগ করবে। পেমেন্ট নিশ্চিত হলে সেবা সক্রিয় হবে।',
@@ -53,6 +57,9 @@ export function parsePremiumSettings(value: unknown): PremiumSettings {
   };
   if (typeof input.enabled !== 'boolean')
     throw new BadRequestException('Premium visibility must be true or false');
+  // Older admin clients never sent `visible`; treat a missing value as shown.
+  if (input.visible !== undefined && typeof input.visible !== 'boolean')
+    throw new BadRequestException('Premium master switch must be true or false');
   if (!Number.isSafeInteger(input.fee) || (input.fee as number) < 1 || (input.fee as number) > 1000000)
     throw new BadRequestException('Premium fee must be between 1 and 1,000,000');
   if (!Array.isArray(input.steps) || input.steps.length < 1 || input.steps.length > 10 ||
@@ -62,6 +69,7 @@ export function parsePremiumSettings(value: unknown): PremiumSettings {
   if (contactPhone && !/^\+?[0-9]{8,15}$/.test(contactPhone))
     throw new BadRequestException('Use a valid contact phone number');
   return {
+    visible: input.visible !== false,
     enabled: input.enabled,
     title: text('title', 120),
     summary: text('summary', 2000),

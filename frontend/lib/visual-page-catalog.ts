@@ -61,6 +61,11 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
     "dynamic": false
   },
   {
+    "path": "/dashboard/delivery-test",
+    "label": "Dashboard / Delivery Test",
+    "dynamic": false
+  },
+  {
     "path": "/dashboard/edit-profile/[id]",
     "label": "Dashboard / Edit Profile / Dynamic page",
     "dynamic": true

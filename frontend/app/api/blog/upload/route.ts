@@ -42,9 +42,13 @@ export async function POST(req:NextRequest){
       signal:AbortSignal.timeout(30000),
     });
     if(!response.ok)return Response.json({message:'Image upload failed'},{status:response.status,headers:noStore});
-    const raw=await response.json();
+    // The image service replies with the bare URL as text (not JSON); accept both shapes.
+    const body=(await response.text()).trim();
+    let raw:unknown=body;
+    try{raw=JSON.parse(body);}catch{/* plain-text URL */}
+    const record=raw&&typeof raw==='object'?raw as {data?:unknown;url?:unknown}:{};
     const url=typeof raw==='string'?raw:
-      typeof raw?.data==='string'?raw.data:raw?.url;
+      typeof record.data==='string'?record.data:record.url;
     if(typeof url!=='string'||!/^https?:\/\/|^\//.test(url))
       return Response.json({message:'Storage returned no public image URL'},{status:502,headers:noStore});
     return Response.json({url},{headers:noStore});

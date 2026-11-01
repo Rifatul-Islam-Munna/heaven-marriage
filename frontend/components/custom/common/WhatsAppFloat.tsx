@@ -1,11 +1,12 @@
 "use client";
+
 import { Phone } from "lucide-react";
 import { FaFacebookMessenger } from "react-icons/fa";
-import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { contacts } from "@/lib/contact-config";
 import { normalizeMessengerUrl } from "@/lib/messenger-url";
+
 export default function WhatsAppFloat() {
   const path = usePathname();
   const { data } = useQueryWrapper<{ messengerUrl: string }>(
@@ -15,29 +16,33 @@ export default function WhatsAppFloat() {
   );
   const url = normalizeMessengerUrl(data?.messengerUrl ?? contacts.messenger);
   if (path.startsWith("/dashboard") || path.startsWith("/profile")) return null;
-  const label = url ? "Messenger-এ যোগাযোগ করুন" : "সরাসরি কল করুন";
+
   const onBiodataDetails = path.startsWith("/biodata/");
+  const label = url ? "Messenger-এ যোগাযোগ করুন" : "সরাসরি কল করুন";
+
   return (
-    <div className={onBiodataDetails ? "fixed bottom-28 right-3 z-30 lg:bottom-6 lg:right-6" : "fixed bottom-6 right-6 z-50"}>
-      <Button
-        asChild
-        className={onBiodataDetails ? "h-11 rounded-full bg-pink-600 px-3 text-white shadow-xl hover:bg-pink-700 lg:h-14 lg:px-4" : "h-14 rounded-full bg-pink-600 px-4 text-white shadow-xl hover:bg-pink-700"}
-      >
-        <a
-          href={url || "tel:" + contacts.general}
-          target={url ? "_blank" : undefined}
-          rel="noopener noreferrer"
-          aria-label={url ? "Niqaha.com Messenger" : "Call Niqaha.com"}
-          title={label}
-        >
-          {url ? (
-            <FaFacebookMessenger aria-hidden="true" />
-          ) : (
-            <Phone aria-hidden="true" />
-          )}
-          <span className={onBiodataDetails ? "hidden text-sm font-semibold lg:inline" : "text-sm font-semibold"}>{label}</span>
-        </a>
-      </Button>
-    </div>
+    <a
+      href={url || "tel:" + contacts.general}
+      target={url ? "_blank" : undefined}
+      rel={url ? "noopener noreferrer" : undefined}
+      aria-label={label}
+      title={label}
+      className={
+        "fixed right-16 z-40 inline-flex h-11 min-w-11 items-center justify-center rounded-full " +
+        "border border-white/70 bg-pink-600 px-3 text-white shadow-[0_6px_20px_rgba(190,24,93,0.24)] " +
+        "transition-colors hover:bg-pink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600 " +
+        "sm:right-16 sm:h-10 sm:min-w-10 sm:gap-2 sm:px-3.5 " +
+        (onBiodataDetails ? "bottom-28 sm:bottom-5" : "bottom-5")
+      }
+    >
+      {url ? (
+        <FaFacebookMessenger className="shrink-0 text-[19px] sm:text-[17px]" aria-hidden="true" />
+      ) : (
+        <Phone className="size-[18px] shrink-0" aria-hidden="true" />
+      )}
+      <span className="hidden whitespace-nowrap text-xs font-semibold leading-5 sm:inline">
+        {url ? "Messenger" : "কল করুন"}
+      </span>
+    </a>
   );
 }

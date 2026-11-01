@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { publicMetadata } from '@/lib/seo';
 import { seoMetadata } from '@/lib/seo-settings-server';
 import SeoStructuredData from '@/components/custom/seo/SeoStructuredData';
@@ -33,6 +34,8 @@ export async function generateMetadata() {
 
 export default async function Premium() {
   const premium = await loadPremiumSettings();
+  // Admin switched premium off entirely: the page disappears instead of advertising it.
+  if (!premium.visible) notFound();
   return (
     <main className="container mx-auto max-w-3xl px-4 py-12">
       <SeoStructuredData path="/premium" />

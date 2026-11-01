@@ -1,6 +1,7 @@
 "use client";
 
 import LoginWithGoogle from "./GoogleLogin";
+import AuthDivider from "./AuthDivider";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,21 +62,35 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 p-4">
+    <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 px-3 py-6 sm:items-center sm:p-4">
       <Card className="w-full max-w-md border-pink-200">
-        <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16  flex items-center justify-center ">
+        <CardHeader className="space-y-2 px-5 pb-2 text-center sm:space-y-3 sm:px-6">
+          <div className="mx-auto flex size-12 items-center justify-center sm:size-16">
             <Image src={"/logo.png"} width={64} height={64} alt="logo" />
           </div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent sm:text-3xl">
             অ্যাকাউন্ট তৈরি করুন
           </CardTitle>
-          <CardDescription className="text-base text-gray-600">
+          <CardDescription className="text-sm text-gray-600 sm:text-base">
             আপনার নিখুঁত জীবনসঙ্গী খুঁজে পেতে হালাল যাত্রা শুরু করুন
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex gap-3"><Button type="button" variant={mode==="phone"?"default":"outline"} onClick={()=>setMode("phone")}>মোবাইল OTP</Button><Button type="button" variant={mode==="email"?"default":"outline"} onClick={()=>setMode("email")}>Email OTP</Button></div>
+        <CardContent className="px-5 sm:px-6">
+          <div className="space-y-2">
+            <p className="text-center text-sm font-medium text-gray-700">
+              সবচেয়ে সহজ: Google দিয়ে এক ক্লিকে অ্যাকাউন্ট খুলুন
+            </p>
+            <LoginWithGoogle signup />
+          </div>
+          <AuthDivider label="অথবা মোবাইল / ইমেইল দিয়ে" />
+          <div role="radiogroup" aria-label="যাচাইয়ের মাধ্যম" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-pink-50 p-1">
+            {([["phone", "মোবাইল OTP"], ["email", "ইমেইল OTP"]] as const).map(([value, label]) => (
+              <button key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => setMode(value)}
+                className={`h-10 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-pink-600 ${mode === value ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-pink-700"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-gray-700 font-medium">
@@ -183,7 +198,6 @@ export default function SignUp() {
               </a>
             </p>
           </form>
-          <div className="mt-5 space-y-4"><p className="text-center text-sm text-gray-500">অথবা Google দিয়ে অ্যাকাউন্ট তৈরি করুন</p><LoginWithGoogle signup /></div>
         </CardContent>
       </Card>
     </div>
