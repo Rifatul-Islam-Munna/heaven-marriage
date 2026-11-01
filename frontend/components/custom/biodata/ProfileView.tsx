@@ -448,7 +448,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
               <span aria-hidden className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full border border-white/15" />
               <span aria-hidden className="pointer-events-none absolute -right-2 -top-6 size-36 rounded-full border border-white/10" />
               <div className="relative flex items-center justify-between gap-3">
-                <span className="text-[13px] font-bold text-white/95">নিখাহা · বায়োডাটা</span>
+                <span className="text-[13px] font-bold text-white/95">বায়োডাটা</span>
                 <button type="button" onClick={() => void share()} aria-label="বায়োডাটা শেয়ার করুন" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white">
                   <Share2 className="size-4" aria-hidden /> শেয়ার
                 </button>
