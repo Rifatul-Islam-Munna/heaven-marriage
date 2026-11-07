@@ -27,16 +27,16 @@ const hadithList = [
 
 export default function IslamicMarriageSection() {
   return (
-    <section className="w-full border-y bg-background py-12 md:py-16">
+    <section className="w-full border-y bg-background py-8 md:py-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header with Badge */}
-        <div className="mx-auto mb-10 max-w-4xl text-center">
+        <div className="mx-auto mb-6 max-w-4xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 text-pink-600">
             <BookOpen className="h-5 w-5" />
             <span className="text-sm font-medium">ইসলামী শিক্ষা</span>
           </div>
 
-          <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl md:text-5xl leading-tight">
+          <h2 className="font-heading text-2xl font-bold leading-tight text-foreground sm:text-3xl md:text-4xl">
             ইসলামে বিবাহের শুরুত্ব ও ফজিলত
           </h2>
 

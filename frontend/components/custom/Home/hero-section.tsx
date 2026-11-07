@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ChevronDown, Heart, Shield, Users } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { WebData } from "@/@types/user";
+import BiodataCreationCta from "./BiodataCreationCta";
 
 export default function HeroSection() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
@@ -41,7 +42,7 @@ export default function HeroSection() {
   const videoSrc = isMobile ? mobileVideoSrc : desktopVideoSrc;
 
   return (
-    <section className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
+    <section className="relative flex min-h-[580px] w-full items-center justify-center overflow-hidden bg-black md:min-h-[670px]">
       {/* Video Background */}
       <div className="absolute inset-0 z-0">
         {/* Loading Skeleton - Show until data is loaded AND video is ready */}
@@ -110,8 +111,8 @@ export default function HeroSection() {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-32 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-center space-y-8 text-center">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="flex flex-col items-center justify-center space-y-5 text-center sm:space-y-6">
           {/* Logo/Brand Mark */}
           <div
             className="animate-in fade-in zoom-in duration-700"
@@ -127,10 +128,10 @@ export default function HeroSection() {
             className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-4"
             style={{ animationDelay: "0.2s", animationFillMode: "both" }}
           >
-            <h1 className="font-heading text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
+            <h1 className="font-heading text-5xl font-bold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
               niqaha
             </h1>
-            <h2 className="font-heading text-5xl font-bold leading-tight tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
+            <h2 className="font-heading text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
               <span className="bg-gradient-to-r from-pink-400 via-pink-500 to-pink-600 bg-clip-text text-transparent">
                 Solutions
               </span>
@@ -139,7 +140,7 @@ export default function HeroSection() {
 
           {/* Subtitle */}
           <p
-            className="animate-in fade-in slide-in-from-bottom-4 duration-1000 mx-auto max-w-2xl text-xl font-medium leading-relaxed text-gray-200 sm:text-2xl md:text-3xl"
+            className="animate-in fade-in slide-in-from-bottom-4 duration-1000 mx-auto max-w-2xl text-base font-medium leading-relaxed text-gray-200 sm:text-lg md:text-xl"
             style={{ animationDelay: "0.4s", animationFillMode: "both" }}
           >
             বিশুদ্ধতা, বিশ্বস্ততা ও সুন্নাহ-সম্মত বিবাহের নির্ভরযোগ্য প্রতিষ্ঠান
@@ -147,55 +148,18 @@ export default function HeroSection() {
 
           {/* CTA Button */}
           <div
-            className="animate-in fade-in slide-in-from-bottom-4 duration-1000 pt-4"
+            className="animate-in fade-in slide-in-from-bottom-4 duration-1000 pt-1"
             style={{ animationDelay: "0.6s", animationFillMode: "both" }}
           >
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              {/* Primary */}
-              <Button
-                size="lg"
-                className="group  animate-bounce  relative h-14 w-full overflow-hidden rounded-full px-10 font-heading text-[17px] font-extrabold text-white sm:w-auto"
-                asChild
-              >
-                <Link
-                  href="/signup"
-                  className="flex items-center justify-center gap-2"
-                >
-                  {/* Glow + gradient layers */}
-                  <span className="pointer-events-none absolute inset-0">
-                    <span className="absolute -inset-24 bg-[radial-gradient(circle_at_30%_30%,rgba(236,72,153,0.8),transparent_55%)] opacity-60 blur-2xl" />
-                    <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-600" />
-                    <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-500 via-pink-500 to-rose-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  </span>
-
-                  {/* Glass edge */}
-                  <span className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/15" />
-
-                  {/* Content */}
-                  <span className="relative flex items-center gap-2">
-                    <span className="relative">
-                      {/* Pulse glow behind text */}
-                      <span className="absolute -inset-x-3 -inset-y-2 rounded-full bg-pink-400/25 blur-md animate-pulse" />
-
-                      {/* Text shimmer */}
-                      <span className="relative inline-block bg-gradient-to-r from-white via-pink-100 to-white bg-[length:220%_100%] bg-clip-text text-transparent animate-[shimmer_1.6s_linear_infinite]">
-                        বায়োডাটা তৈরি করুন
-                      </span>
-                    </span>
-
-                    <ArrowUpRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1" />
-                  </span>
-
-                  {/* Shine sweep */}
-                  <span className="pointer-events-none absolute -left-24 top-0 h-full w-24 rotate-12 bg-white/20 blur-md transition-all duration-500 group-hover:left-[110%]" />
-                </Link>
-              </Button>
+              {/* Primary: respects the signed-in member's existing biodata */}
+              <BiodataCreationCta style="hero" />
 
               {/* Secondary */}
               <Button
                 size="lg"
                 variant="outline"
-                className="group relative h-14 w-full rounded-full border-white/15 bg-white/5 px-10 font-heading text-[17px] font-extrabold text-white backdrop-blur sm:w-auto"
+                className="group relative min-h-12 w-full rounded-full border-white/20 bg-white/5 px-7 text-sm font-bold text-white backdrop-blur hover:bg-white/10 sm:w-auto"
                 asChild
               >
                 <Link

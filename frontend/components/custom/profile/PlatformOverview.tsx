@@ -72,6 +72,15 @@ export default function PlatformOverview() {
     successMessage: "Premium request submitted",
     onSuccess: () => refreshCases(),
   });
+  const checkout = useCommonMutationApi<{ paymentUrl: string }>({
+    url: "/platform/premium/checkout",
+    method: "POST",
+    successMessage: "bKash payment started",
+    onSuccess: (payment) => {
+      if (payment?.paymentUrl && /^https:\/\//.test(payment.paymentUrl))
+        window.location.assign(payment.paymentUrl);
+    },
+  });
   const pay = useCommonMutationApi({
     url: "/platform/premium-payment",
     method: "POST",
@@ -86,63 +95,7 @@ export default function PlatformOverview() {
   return (
     <div className="space-y-5 mb-6">
       <VerifyContact />
-      <Card className="shadow-none border-pink-100">
-        <CardHeader>
-          <CardTitle>আপনার বিবাহের যাত্রা</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3 text-sm">
-            {showPremium && <span>Account: {data.accountType}</span>}
-            <span>Verification: {data.verificationStatus}</span>
-            <span>Biodata: {data.biodataStatus}</span>
-            <span>Profile views: {data.profileViews}</span>
-          </div>
-          {data.statusReason && (
-            <p className="text-red-600">{data.statusReason}</p>
-          )}
-          <p>
-            বায়োডাটা সম্পন্ন: {data.completion.percentage}% · বাকি:{" "}
-            {100 - data.completion.percentage}%
-          </p>
-          <Progress value={data.completion.percentage} />
-          {data.completion.percentage < 100 && (
-            <>
-              <p className="text-sm text-gray-600">
-                আপনার বায়োডাটা আরও সম্পূর্ণ করুন, যাতে উপযুক্ত জীবনসঙ্গী খুঁজতে
-                সুবিধা হয়।
-              </p>
-              <Link
-                href="/profile/my-profile"
-                className="text-pink-600 underline"
-              >
-                পরবর্তী ধাপ: বাকি তথ্য পূরণ করুন
-              </Link>
-            </>
-          )}
-          <div className="flex flex-wrap gap-2 text-sm">
-            {[
-              { label: "অ্যাকাউন্ট তৈরি", done: true },
-              { label: "বায়োডাটা পূরণ", done: data.journey.completed },
-              { label: "জমা", done: data.journey.submitted },
-              { label: "যাচাই", done: data.verificationStatus === "approved" },
-              { label: "অনুমোদন", done: data.journey.approved },
-              { label: "যোগাযোগ", done: data.connections.used > 0 },
-            ].map((x) => (
-              <span
-                key={x.label}
-                className={
-                  x.done
-                    ? "rounded bg-green-50 text-green-700 px-3 py-2"
-                    : "rounded bg-pink-50 px-3 py-2"
-                }
-              >
-                {x.done ? "✓ " : ""}
-                {x.label}
-              </span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Lifecycle & completion are shown once in BiodataProgressPanel above. */}
       <Card className="shadow-none border-pink-100">
         <CardHeader>
           <CardTitle>My Connections</CardTitle>
@@ -200,12 +153,16 @@ export default function PlatformOverview() {
             {premium.detailsLabel}
           </Link>
           {data.accountType !== "premium" && (
-            <Button
-              disabled={apply.isPending || data.completion.percentage < 100}
-              onClick={() => apply.mutate({})}
-            >
-              {premium.requestLabel}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={checkout.isPending || data.completion.percentage < 100}
+                onClick={() => checkout.mutate({})}>
+                {checkout.isPending ? 'পেমেন্ট চালু হচ্ছে…' : `bKash-এ ${formatPremiumFee(premium.fee)} পেমেন্ট করুন`}
+              </Button>
+              <Button variant="outline" disabled={apply.isPending || data.completion.percentage < 100}
+                onClick={() => apply.mutate({})}>
+                {premium.requestLabel}
+              </Button>
+            </div>
           )}
           </>}
           {premiumCases.map((c) => (

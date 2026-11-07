@@ -41,7 +41,9 @@ import { useUser } from "@/lib/useUser";
 import { useRouter } from "next/navigation";
 import { User as UserType, UserInfo } from "@/@types/user";
 import { cn } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { currentBiodataStage, biodataStageLabels, deletionStatusLabels, type DeletionRequest } from "@/lib/biodata-status";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 
@@ -49,218 +51,25 @@ export function UserNav({ user }: { user: UserInfo | null }) {
   const { refetch } = useUser();
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletionReason, setDeletionReason] = useState("");
+  const queryClient = useQueryClient();
 
-  const { data: users, isLoading } = useQueryWrapper<UserType>(
+  const { data: users, refetch: refreshProfile } = useQueryWrapper<UserType>(
     ["get-my-profile-for-success"],
     "/user/get-my-profile",
   );
+  const { data: deletionRequest, refetch: refreshDeletion } = useQueryWrapper<DeletionRequest | null>(
+    ["biodata-deletion-request"], "/platform/deletion-request",
+    { enabled: user?.role === "user", staleTime: 15000 },
+  );
+  const awaitingDeletion = deletionRequest?.status === "pending" ||
+    deletionRequest?.status === "contacted";
 
-  const profileCompletion = useMemo(() => {
-    if (!users) return 0;
-
-    let totalFields = 0;
-    let filledFields = 0;
-
-    // Helper function to check if a field has value
-    const hasValue = (field: any): boolean => {
-      if (field === undefined || field === null || field === "") return false;
-      if (typeof field === "number" && field === 0) return false;
-      return true;
-    };
-
-    // Basic Information (8 fields)
-    const basicFields = [
-      users?.name,
-      users?.email,
-      users?.phoneNumber,
-      users?.gender,
-      users?.age,
-      users?.bloodGroup,
-      users?.weight,
-      users?.nationality,
-    ];
-    totalFields += basicFields.length;
-    filledFields += basicFields.filter(hasValue).length;
-
-    // Address (5 fields)
-    if (users?.address) {
-      const addressFields = [
-        users.address.presentAddress,
-        users.address.permanentAddress,
-        users.address.district,
-        users.address.upazila,
-        users.address.extraInfo,
-      ];
-      totalFields += addressFields.length;
-      filledFields += addressFields.filter(hasValue).length;
-    } else {
-      totalFields += 5;
-    }
-
-    // Education Information (9 fields)
-    if (users?.educationInfo) {
-      const eduFields = [
-        users.educationInfo.educationMethod,
-        users.educationInfo.highestEducation,
-        users.educationInfo.highestEducationBoard,
-        users.educationInfo.highestEducationGroup,
-        users.educationInfo.highestEducationPassingYear,
-        users.educationInfo.sSCPassingYear,
-        users.educationInfo.sSCPassingGroup,
-        users.educationInfo.hSCPassingYear,
-        users.educationInfo.hSCPassingGroup,
-      ];
-      totalFields += eduFields.length;
-      filledFields += eduFields.filter(hasValue).length;
-    } else {
-      totalFields += 9;
-    }
-
-    // Family Information (9 fields)
-    if (users?.familyInfo) {
-      const familyFields = [
-        users.familyInfo.fathersProfession,
-        users.familyInfo.mothersProfession,
-        users.familyInfo.brotherCount,
-        users.familyInfo.brotherInformation,
-        users.familyInfo.sisterCount,
-        users.familyInfo.sisterInformation,
-        users.familyInfo.familyFinancial,
-        users.familyInfo.familyAssetDetails,
-        users.familyInfo.familyReligiousCondition,
-      ];
-      totalFields += familyFields.length;
-      filledFields += familyFields.filter(hasValue).length;
-    } else {
-      totalFields += 9;
-    }
-
-    // Personal Information (17 fields)
-    if (users?.personalInformation) {
-      const personalFields = [
-        users.personalInformation.outsideClothes,
-        users.personalInformation.womenNiqbYear,
-        users.personalInformation.manBeard,
-        users.personalInformation.prayerFiverTimeFrom,
-        users.personalInformation.MissPrayerTime,
-        users.personalInformation.maharaNonMahram,
-        users.personalInformation.reciteQuran,
-        users.personalInformation.fiqhFollow,
-        users.personalInformation.digitalMedia,
-        users.personalInformation.mentalOrPhysicalIssue,
-        users.personalInformation.specialWorkOfDeen,
-        users.personalInformation.majarBeliveStatus,
-        users.personalInformation.islamicBookName,
-        users.personalInformation.islamicScholarsName,
-        users.personalInformation.extraInfoHobby,
-        users.personalInformation.height,
-        users.personalInformation.skinTone,
-      ];
-      totalFields += personalFields.length;
-      filledFields += personalFields.filter(hasValue).length;
-    } else {
-      totalFields += 17;
-    }
-
-    // Occupational (3 fields)
-    if (users?.occupational) {
-      const occupationalFields = [
-        users.occupational.profession,
-        users.occupational.workingDetails,
-        users.occupational.salary,
-      ];
-      totalFields += occupationalFields.length;
-      filledFields += occupationalFields.filter(hasValue).length;
-    } else {
-      totalFields += 3;
-    }
-
-    // Marriage Information - Women (3 fields)
-    if (users?.marriageInformationWomen) {
-      const marriageWomenFields = [
-        users.marriageInformationWomen.jobAfterMarriage,
-        users.marriageInformationWomen.studyAfterMarriage,
-        users.marriageInformationWomen.thoughtsOnMarriage,
-      ];
-      totalFields += marriageWomenFields.length;
-      filledFields += marriageWomenFields.filter(hasValue).length;
-    }
-
-    // Marriage Information - Men (6 fields)
-    if (users?.marriageInformationMan) {
-      const marriageMenFields = [
-        users.marriageInformationMan.wifeVailAfterMarriage,
-        users.marriageInformationMan.allowWifeStudyAfterMarriage,
-        users.marriageInformationMan.wifeJobAfterMarriage,
-        users.marriageInformationMan.livingPlaceAfterMarriage,
-        users.marriageInformationMan.expectedAnyGiftFromMarriage,
-        users.marriageInformationMan.thoughtsOnMarriage,
-      ];
-      totalFields += marriageMenFields.length;
-      filledFields += marriageMenFields.filter(hasValue).length;
-    }
-
-    // Expected Life Partner (10 fields)
-    if (users?.expectedLifePartner) {
-      const expectedPartnerFields = [
-        users.expectedLifePartner.age,
-        users.expectedLifePartner.complexion,
-        users.expectedLifePartner.height,
-        users.expectedLifePartner.education,
-        users.expectedLifePartner.district,
-        users.expectedLifePartner.upazila,
-        users.expectedLifePartner.maritalStatus,
-        users.expectedLifePartner.profession,
-        users.expectedLifePartner.financialCondition,
-        users.expectedLifePartner.expectedQuality,
-      ];
-      totalFields += expectedPartnerFields.length;
-      filledFields += expectedPartnerFields.filter(hasValue).length;
-    } else {
-      totalFields += 10;
-    }
-
-    // Pledge (3 fields - boolean fields)
-    if (users?.pledge) {
-      const pledgeFields = [
-        users.pledge.youGordianKnowsThis,
-        users.pledge.allTheInformationTrue,
-        users.pledge.anyMisInformationWeAreNotKnowing,
-      ];
-      totalFields += pledgeFields.length;
-      filledFields += pledgeFields.filter((field) => field === true).length;
-    } else {
-      totalFields += 3;
-    }
-
-    // Calculate actual percentage
-    const actualPercentage = (filledFields / totalFields) * 100;
-
-    // Adjust so 55% actual completion shows as 100%
-    const adjustedPercentage = Math.min(actualPercentage * (100 / 55), 100);
-
-    return Math.round(adjustedPercentage);
-  }, [users]);
-
-  const hasValue = (field: any): boolean => {
-    if (field === undefined || field === null || field === "") return false;
-    if (typeof field === "number" && field === 0) return false;
-    return true;
-  };
-
-  const hasCriticalFields = useMemo(() => {
-    if (!users) return false;
-
-    const hasAge = hasValue(users?.age);
-    const hasGender = hasValue(users?.gender);
-    const hasHeight = hasValue(users?.personalInformation?.height);
-
-    return hasAge && hasGender && hasHeight;
-  }, [users]);
-
-  // Profile is incomplete if missing critical fields OR less than 65% completion
-  // The backend computes completion from the current admin question schema.
-  const isProfileIncomplete = profileCompletion < 100;
+  // Backend dynamic-question completion is the only source of truth.
+  // Never inflate 55% to 100%, and never nudge submitted members to start again.
+  const profileCompletion = Math.max(0, Math.min(100, Number(users?.completion?.percentage) || 0));
+  const biodataStage = currentBiodataStage(users);
+  const isProfileIncomplete = profileCompletion < 100 && biodataStage === "draft";
 
   const getInitials = (name?: string) => {
     if (!name) return "U";
@@ -271,13 +80,17 @@ export function UserNav({ user }: { user: UserInfo | null }) {
       .toUpperCase()
       .slice(0, 2);
   };
-  const { mutate: deleteUser, isPending: isDeleting } = useCommonMutationApi({
-    method: "DELETE",
-    url: "/user/delete-my-account", // Adjust to your actual endpoint
-    mutationKey: ["delete-user"],
-    successMessage: "ব্যবহারকারী মুছে ফেলা হয়েছে",
+  const { mutate: requestDeletion, isPending: isDeleting } = useCommonMutationApi({
+    method: "POST",
+    url: "/platform/deletion-request",
+    mutationKey: ["request-biodata-deletion"],
+    successMessage: "বায়োডাটা মুছে ফেলার অনুরোধ অ্যাডমিনের কাছে পাঠানো হয়েছে।",
     onSuccess: () => {
-      handellogout();
+      setShowDeleteDialog(false);
+      setDeletionReason("");
+      void refreshDeletion();
+      void refreshProfile();
+      void queryClient.invalidateQueries({ queryKey: ["platform-summary"] });
     },
   });
 
@@ -291,7 +104,8 @@ export function UserNav({ user }: { user: UserInfo | null }) {
   };
 
   const handleDeleteAccount = () => {
-    deleteUser({});
+    if (isDeleting || awaitingDeletion || biodataStage === "deleted") return;
+    requestDeletion({ message: deletionReason.trim() });
   };
 
   const isAdmin = user?.role === "admin";
@@ -339,8 +153,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
                       "bg-blue-500 hover:bg-blue-600": !isProfileIncomplete,
                     })}
                   >
-                    {isProfileIncomplete ? "অসম্পূর্ণ" : "সম্পূর্ণ"} (
-                    {profileCompletion}%)
+                    {biodataStageLabels[biodataStage]} ({profileCompletion}%)
                   </Badge>
                 </div>
 
@@ -425,19 +238,23 @@ export function UserNav({ user }: { user: UserInfo | null }) {
               </Link>
             </DropdownMenuItem>
 
-            {/* Delete Biodata - Only for non-admin with Alert */}
-            {!isStaff && (
+            {/* A request is non-destructive until an administrator approves it. */}
+            {!isStaff && (awaitingDeletion || biodataStage === "deleted" ? (
+              <DropdownMenuItem asChild className="cursor-pointer py-3 text-orange-700">
+                <Link href="/profile#deletion-request">
+                  <Trash2 className="mr-3 h-5 w-5" />
+                  <span className="font-heading text-sm">মুছে ফেলার অনুরোধের অবস্থা দেখুন</span>
+                </Link>
+              </DropdownMenuItem>
+            ) : (
               <DropdownMenuItem
-                className="py-3 cursor-pointer text-orange-600 focus:text-orange-600"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setShowDeleteDialog(true);
-                }}
+                className="cursor-pointer py-3 text-orange-700 focus:text-orange-700"
+                onSelect={(event) => { event.preventDefault(); setShowDeleteDialog(true); }}
               >
                 <Trash2 className="mr-3 h-5 w-5" />
-                <span className="font-heading text-base">ডিলিট বায়োডাটা</span>
+                <span className="font-heading text-sm">Request Biodata Deletion</span>
               </DropdownMenuItem>
-            )}
+            ))}
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
@@ -458,21 +275,25 @@ export function UserNav({ user }: { user: UserInfo | null }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-heading text-xl">
-              বায়োডাটা ডিলিট করবেন?
+              বায়োডাটা মুছে ফেলার অনুরোধ পাঠাবেন?
             </AlertDialogTitle>
-            <AlertDialogDescription className="font-heading text-base">
-              আপনি কি নিশ্চিত যে আপনি আপনার বায়োডাটা ডিলিট করতে চান? এই কাজটি
-              পূর্বাবস্থায় ফেরানো যাবে না।
+            <AlertDialogDescription className="font-heading text-sm leading-6">
+              এটি শুধু একটি অনুরোধ। অ্যাডমিন Approve না করা পর্যন্ত বায়োডাটা মুছে যাবে না। Reject হলে সব তথ্য আগের মতোই থাকবে।
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label htmlFor="navbar-deletion-reason" className="text-sm font-semibold text-gray-800">কারণ (ঐচ্ছিক)</label>
+          <textarea id="navbar-deletion-reason" value={deletionReason}
+            onChange={(event) => setDeletionReason(event.target.value)}
+            maxLength={1000} rows={3} placeholder="আপনি কেন বায়োডাটা মুছে ফেলতে চান?"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-pink-500" />
           <AlertDialogFooter>
             <AlertDialogCancel className="font-heading">না</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteAccount}
+              onClick={(event) => { event.preventDefault(); handleDeleteAccount(); }}
               className="bg-orange-600 hover:bg-orange-700 font-heading"
               disabled={isDeleting}
             >
-              হ্যাঁ, ডিলিট করুন
+              {isDeleting ? "অনুরোধ পাঠানো হচ্ছে..." : "অনুরোধ পাঠান"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -85,7 +85,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden items-center gap-5 md:flex lg:gap-7">
+          <div className="hidden items-center gap-5 lg:flex lg:gap-7">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -98,7 +98,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Actions */}
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="hidden items-center gap-4 lg:flex">
             {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && !embedded && (
               <Link href={visualEditHref as Route} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100">
                 <PencilLine size={14} /> Edit this page
@@ -133,7 +133,7 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
             {/* Mobile Language Selector */}
             {/*  <Select value={currentLang} onValueChange={setCurrentLang}>
               <SelectTrigger className="w-[80px] border-none">
@@ -147,7 +147,7 @@ export default function Navbar() {
                 ))}
               </SelectContent>
             </Select> */}
-            <div className="flex  md:hidden">
+            <div className="flex lg:hidden">
               {(user?.role === "admin" || (user?.role === "manager" && user?.dashboardPermissions?.includes("visual-editor"))) && pathname !== "/dashboard/visual-editor" && !embedded && (
                 <Link href={visualEditHref as Route} aria-label="Edit this page" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-700"><PencilLine size={17}/></Link>
               )}
@@ -160,7 +160,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden"
+                  className="lg:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="h-6 w-6" />

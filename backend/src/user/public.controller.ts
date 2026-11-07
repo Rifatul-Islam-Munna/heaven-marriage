@@ -24,6 +24,8 @@ export class PublicController {
     );
     return {
       messengerUrl: s.messengerUrl || '',
+      tiktokUrl: typeof s.tiktokUrl === 'string' ? s.tiktokUrl : 'https://www.tiktok.com/@niqaha.com',
+      tradeLicenseNumber: s.tradeLicenseNumber || '',
       discoveryEnabled: s.discoveryEnabled !== false,
       premium: resolvePremiumSettings(s.premium),
       policies: Object.fromEntries(

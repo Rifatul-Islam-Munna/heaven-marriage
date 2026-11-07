@@ -51,6 +51,7 @@ export default function BiodataFilter() {
   const [upazilaName, setUpazilaName] = useState("");
   const [countryName, setCountryName] = useState("");
   const [query, setQuery] = useState("");
+  const [premiumOnly, setPremiumOnly] = useState(false);
 
   const [genderOpen, setGenderOpen] = useState(false);
   const [maritalOpen, setMaritalOpen] = useState(false);
@@ -78,6 +79,7 @@ export default function BiodataFilter() {
     if (upazilaName) params.set("upazilaId", upazilaName);
     if (countryName) params.set("country", countryName);
     if (query.trim()) params.set("query", query.trim());
+    if (premiumOnly) params.set("category", "premium");
 
     const searchString = params.toString();
     router.push(`/biodata${searchString ? `?${searchString}` : ""}` as Route);
@@ -90,6 +92,7 @@ export default function BiodataFilter() {
     setUpazilaName("");
     setCountryName("");
     setQuery("");
+    setPremiumOnly(false);
   };
 
   // Handle gender change - reset marital status if it's not available for new gender
@@ -125,18 +128,19 @@ export default function BiodataFilter() {
     districtName ||
     upazilaName ||
     countryName ||
-    query.trim();
+    query.trim() ||
+    premiumOnly;
 
   const selectedDistrict = districts.find((d) => d.name === districtName);
   const selectedUpazila = upazilas.find((u) => u.name === upazilaName);
   const selectedCountry = countries.find((c) => c.en === countryName);
 
   return (
-    <section className="w-full bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white py-8 md:py-12 lg:py-16">
+    <section className="w-full bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white py-8 md:py-10 lg:py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="mb-6 text-center md:mb-8">
+          <div className="mb-4 text-center md:mb-6">
             <h2 className="mb-2 font-heading text-2xl font-bold text-foreground md:text-3xl lg:text-4xl">
               আপনার জীবনসঙ্গী খুঁজুন
             </h2>
@@ -146,9 +150,9 @@ export default function BiodataFilter() {
           </div>
 
           {/* Filter Card */}
-          <div className="rounded-2xl border border-pink-100 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+          <div className="rounded-2xl border border-pink-100 bg-white p-4 shadow-sm sm:p-5 md:p-6">
             {/* Search Bar - Full Width at Top */}
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600">
                   <Search className="h-4 w-4" />
@@ -170,7 +174,7 @@ export default function BiodataFilter() {
             </div>
 
             {/* Filter Grid */}
-            <div className="grid gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
               {/* Gender Filter */}
               <div className="group">
                 <label className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -480,12 +484,18 @@ export default function BiodataFilter() {
               </div>
             </div>
 
+            <label className="mt-4 inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-900">
+              <input type="checkbox" checked={premiumOnly} onChange={(event) => setPremiumOnly(event.target.checked)}
+                className="size-4 accent-pink-600" />
+              শুধু প্রিমিয়াম সদস্য দেখুন
+            </label>
+
             {/* Action Buttons */}
-            <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center md:mt-8">
+            <div className="mt-4 flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center md:mt-5">
               <Button
                 onClick={handleSearch}
                 size="lg"
-                className="h-12 w-full rounded-full bg-gradient-to-r from-pink-600 to-pink-500 px-6 font-heading text-base font-semibold shadow-lg shadow-pink-500/30 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-pink-500/40 sm:h-13 sm:w-auto sm:px-8"
+                className="min-h-11 w-full rounded-full bg-gradient-to-r from-pink-600 to-pink-500 px-5 text-sm font-semibold shadow-sm transition-colors hover:from-pink-700 hover:to-rose-600 sm:w-auto"
               >
                 <Search className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 বায়োডাটা খুঁজুন
@@ -496,7 +506,7 @@ export default function BiodataFilter() {
                   onClick={handleReset}
                   variant="outline"
                   size="lg"
-                  className="h-12 w-full rounded-full border-2 border-gray-300 bg-white font-heading text-base font-semibold transition-all hover:border-pink-300 hover:bg-pink-50 sm:h-13 sm:w-auto"
+                  className="min-h-11 w-full rounded-full border border-gray-300 bg-white px-5 text-sm font-semibold transition-colors hover:border-pink-300 hover:bg-pink-50 sm:w-auto"
                 >
                   <X className="mr-2 h-4 w-4" />
                   রিসেট করুন
@@ -510,6 +520,12 @@ export default function BiodataFilter() {
                 <span className="text-xs font-medium text-muted-foreground sm:text-sm">
                   সক্রিয় ফিল্টার:
                 </span>
+                {premiumOnly && (
+                  <button type="button" onClick={() => setPremiumOnly(false)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1 text-xs font-medium text-pink-700">
+                    প্রিমিয়াম সদস্য <X className="size-3" aria-hidden />
+                  </button>
+                )}
                 {gender !== "all" && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
                     {genderOptions.find((o) => o.value === gender)?.label}

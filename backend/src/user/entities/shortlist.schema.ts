@@ -13,3 +13,7 @@ shortlistedUserId:  mongoose.Types.ObjectId[]
 }
 
 export const ShortlistSchema = SchemaFactory.createForClass(Shortlist);
+// Existing storage stays unchanged. Multikey index accelerates "Who Favourited Me".
+// Do not impose a new unique constraint on legacy data without migration.
+ShortlistSchema.index({ userId: 1 });
+ShortlistSchema.index({ shortlistedUserId: 1 });

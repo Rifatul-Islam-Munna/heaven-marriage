@@ -10,6 +10,7 @@ import { TiThMenu } from "react-icons/ti";
 import { useMemo } from "react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { User } from "@/@types/user";
+import { currentBiodataStage } from "@/lib/biodata-status";
 
 const SidebarHeader = () => {
   const { toggleSidebar } = useSidebar();
@@ -41,7 +42,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   // Use the backend's live admin-managed question completion calculation.
   const profileCompletion = Math.max(0, Math.min(100, Number(user?.completion?.percentage) || 0));
-  const isProfileIncomplete = profileCompletion < 100;
+  const stage = currentBiodataStage(user);
+  const isProfileIncomplete = profileCompletion < 100 && stage === "draft";
 
   // Create userObject with useMemo to avoid unnecessary recalculations
   const userObject = useMemo(
@@ -50,9 +52,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       name: user?.name || "ব্যবহারকারী",
       isProfileIncomplete: isProfileIncomplete,
       profileCompletion: profileCompletion,
+      biodataStage: stage,
       connections: user?.numberOfConnections,
     }),
-    [user, isProfileIncomplete, profileCompletion],
+    [user, isProfileIncomplete, profileCompletion, stage],
   );
 
   // Create data object with ProfileTop dynamically
@@ -69,16 +72,23 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               title: "আমার প্রোফাইল",
               url: "/profile",
             },
-            {
-              title: "প্রিয় তালিকা",
-              url: "/profile/short-list",
-            },
+            ...(user?.role === "user"
+              ? [{ title: "স্মার্ট ম্যাচিং", url: "/profile/matches" }]
+              : []),
             {
               title: "আমার সংযোগ",
               url: "/profile/numbers",
             },
           ],
         },
+        ...(user?.role === "user" ? [{
+          title: "ফেভারিট",
+          url: "/profile/short-list",
+          items: [
+            { title: "আমার ফেভারিট", url: "/profile/short-list", icon: "heart" },
+            { title: "আমাকে ফেভারিট করেছেন", url: "/profile/favourited-me", icon: "heart-handshake" },
+          ],
+        }] : []),
         {
           title: "সেটিংস",
           url: "/profile/settings",
@@ -92,7 +102,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       ],
       ProfileTop: userObject,
     }),
-    [userObject],
+    [userObject, user?.role],
   );
 
   return (

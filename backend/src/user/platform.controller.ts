@@ -56,11 +56,31 @@ export class PlatformController {
   @Get('connections') connections(@Req() r: ExpressRequest) {
     return this.service.connections(r.user.id);
   }
-  @Get('matches') matches(@Req() r: ExpressRequest) {
-    return this.service.matches(r.user.id);
+  // Smart matches are a self-service MEMBER feature, never an admin tool.
+  // AuthGuard loads the current DB role; RolesGuard rejects staff/admin roles.
+  @Get('matches')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  matches(@Req() r: ExpressRequest, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.service.matches(r.user.id, Number(page || 1), Number(limit || 12));
   }
   @Get('requests') requests(@Req() r: ExpressRequest) {
     return this.service.myCases(r.user.id);
+  }
+
+  @Get('deletion-request')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  deletionRequest(@Req() r: ExpressRequest) {
+    return this.service.myDeletionRequest(r.user.id);
+  }
+  @Post('deletion-request')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  @Throttle({ default: { limit: 3, ttl: 600000 } })
+  requestDeletion(@Req() r: ExpressRequest, @Body() p: { message?: string }) {
+    return this.service.requestBiodataDeletion(r.user.id, p);
   }
   @Post('request/:kind')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
@@ -74,6 +94,14 @@ export class PlatformController {
   @Post('visit/:id') visit(@Req() r: ExpressRequest, @Param('id') id: string) {
     return this.service.visit(r.user.id, id);
   }
+  @Post('premium/checkout')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  @Throttle({ default: { limit: 4, ttl: 600000 } })
+  premiumCheckout(@Req() r: ExpressRequest) {
+    return this.service.createPremiumPayment(r.user.id);
+  }
+
   @Post('premium-payment') async premiumPayment(
     @Req() r: ExpressRequest,
     @Body() p: any,
@@ -220,6 +248,8 @@ export class PlatformController {
       },
       ...resolvePolicySettings(saved),
       premium: resolvePremiumSettings(saved?.premium),
+      tiktokUrl: typeof saved?.tiktokUrl === 'string' ? saved.tiktokUrl : 'https://www.tiktok.com/@niqaha.com',
+      tradeLicenseNumber: typeof saved?.tradeLicenseNumber === 'string' ? saved.tradeLicenseNumber : '',
     };
   }
   @Patch('admin/settings')
@@ -228,6 +258,8 @@ export class PlatformController {
   async saveSettings(@Req() r: ExpressRequest, @Body() p: any) {
     const allowed = [
       'messengerUrl',
+      'tiktokUrl',
+      'tradeLicenseNumber',
       'discoveryEnabled',
       'terms',
       'privacy',
@@ -251,6 +283,38 @@ export class PlatformController {
           'Use a valid HTTPS Messenger URL (m.me/page or messenger.com/t/page).',
         );
       updates.messengerUrl = normalized;
+    }
+    if (p.tiktokUrl !== undefined) {
+      if (typeof p.tiktokUrl !== 'string')
+        throw new BadRequestException('TikTok URL must be text');
+      const raw = p.tiktokUrl.trim();
+      if (raw.length > 250)
+        throw new BadRequestException('TikTok URL is too long');
+      if (!raw) {
+        updates.tiktokUrl = '';
+      } else {
+        let candidate: URL;
+        try {
+          candidate = new URL(raw);
+        } catch {
+          throw new BadRequestException('Use an HTTPS TikTok profile URL');
+        }
+        if (
+          candidate.protocol !== 'https:' ||
+          !['www.tiktok.com', 'tiktok.com'].includes(candidate.hostname) ||
+          candidate.username || candidate.password || candidate.port ||
+          !/^\/@[A-Za-z0-9._]{2,40}\/?$/.test(candidate.pathname)
+        ) throw new BadRequestException('Use an HTTPS TikTok profile URL');
+        updates.tiktokUrl = 'https://www.tiktok.com' + candidate.pathname.replace(/\/$/, '');
+      }
+    }
+    if (p.tradeLicenseNumber !== undefined) {
+      if (typeof p.tradeLicenseNumber !== 'string')
+        throw new BadRequestException('Trade License Number must be text');
+      const number = p.tradeLicenseNumber.trim();
+      if (number.length > 80 || /[<>\x00-\x1F\x7F]/.test(number))
+        throw new BadRequestException('Invalid Trade License Number');
+      updates.tradeLicenseNumber = number;
     }
     const current = resolvePolicySettings(
       await this.db.collection('platform_settings').findOne({ key: 'public' }),
@@ -331,13 +395,6 @@ export class PlatformController {
   refund(@Req() r: ExpressRequest, @Param('id') id: string, @Body() p: any) {
     return this.service.refund(r.user.id, id, p);
   }
-  @Get('admin/matches/:id')
-  @UseGuards(RolesGuard)
-  @DashboardPermission('upgrades')
-  adminMatches(@Param('id') id: string) {
-    return this.service.matches(id);
-  }
-
   @Post('admin/verify-manual-payment/:id')
   @UseGuards(RolesGuard)
   @DashboardPermission('upgrades')

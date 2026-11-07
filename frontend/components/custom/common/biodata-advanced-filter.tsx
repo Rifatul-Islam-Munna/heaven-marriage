@@ -89,7 +89,7 @@ const genderOptions = [
 
 const categoryOptions = [
   { value: "general", label: "সাধারণ" },
-
+  { value: "premium", label: "প্রিমিয়াম" },
   { value: "verified", label: "ভেরিফাইড" },
 ];
 const OtherThing = [{ value: "masna", label: "মাসনা" }];

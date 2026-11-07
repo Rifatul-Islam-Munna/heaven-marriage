@@ -1,7 +1,11 @@
 import { IdentityService } from './identity.service';
 import { QuestionConfigService, sanitizeDynamicAnswers } from '../profile-questions/question-config.service';
 import { PlatformService } from './platform.service';
-import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter } from './profile-rules';
+import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter, publicProfile } from './profile-rules';
+import { favouritePagination, favouritesPipeline, type FavouriteDirection } from './favourites';
+import { biodataStage, hasSubmittedBiodata } from './biodata-lifecycle';
+import { dailyRotationExpression } from './discovery-selection';
+import { recordDiscoveryEvent } from './discovery-cycle';
 import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminSetPasswordDto, AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
@@ -115,6 +119,8 @@ async findUserAndUpdated() {
   async updatedFullUserInformation(updated:UpdateUserDto,userId:string) {
     const current:any=await this.userModel.findById(userId).lean();
     if(!current)throw new HttpException('Account unavailable',404);
+    if (current.biodataStatus === 'deleted')
+      throw new ForbiddenException('This biodata has been deleted after administrator approval.');
     const schema=await this.questions.get();
     const payload=editableProfile(updated);
     if((updated as any).dynamicAnswers!==undefined){
@@ -123,19 +129,36 @@ async findUserAndUpdated() {
     }
     // Account contact changes use separate verification; existing contact data stays intact.
     if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
-    if(typeof (updated as any).isPublished==='boolean')payload.isPublished=(updated as any).isPublished;
-    payload.draftStep=Math.max(0,Math.min(9,Number((updated as any).draftStep)||0));
+    if ((updated as any).draftStep !== undefined)
+      payload.draftStep=Math.max(0,Math.min(9,Number((updated as any).draftStep)||0));
     payload.draftSavedAt=new Date();
-    if((updated as any).submit===true) {
+    const alreadySubmitted = hasSubmittedBiodata(current);
+    const needsReviewSubmission = !alreadySubmitted ||
+      (current.verificationStatus === 'rejected' && !current.isPublishFromAdmin);
+    if((updated as any).submit===true && needsReviewSubmission) {
       const state=profileUpdatePreview(current,payload);
       const status=completion(state,schema.questions);
       if(status.percentage<100)throw new HttpException({message:'Required questions are unanswered',missing:status.remaining},400);
       payload.biodataStatus='submitted';
+      payload.submittedAt=new Date();
       payload.isPublishFromAdmin=false;
       payload.verificationStatus='pending';
     }
-    const data=await this.userModel.findByIdAndUpdate(userId,{$set:profileUpdateSet(payload)},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
-    return {message:(updated as any).submit?'Biodata submitted for review':'Draft saved',data,completion:completion(data,schema.questions)};
+    // Editing a previously submitted/published biodata does not reset its review
+    // status or demand an entirely new submission. Only admins publish profiles.
+    const filter:any = { _id: userId, biodataStatus: { $ne: 'deleted' } };
+    if ((updated as any).submit === true && needsReviewSubmission) {
+      filter.isPublishFromAdmin = { $ne: true };
+      filter.verificationStatus = current.verificationStatus;
+      filter.biodataStatus = current.biodataStatus;
+    }
+    const data=await this.userModel.findOneAndUpdate(filter,{$set:profileUpdateSet(payload)},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
+    if (!data) throw new HttpException('Biodata state changed. Refresh and retry.', 409);
+    return {message:(updated as any).submit
+      ? !needsReviewSubmission ? 'Biodata already submitted; edits saved' : 'Biodata submitted for review'
+      : 'Biodata changes saved',
+      data,completion:completion(data,schema.questions),
+      biodataStage:biodataStage(data,completion(data,schema.questions).percentage)};
   }
 
   async loginUser(payload:LoginDto){return this.identity.login(payload);}
@@ -231,6 +254,7 @@ async findUserAndUpdated() {
 }); */
   const firstMatch: any = {
     ...visibleFilter,
+    role: UserType.USER,
     $and: [
      /*  { isPublished: { $eq: true } },
       { isPublished: { $ne: null } }, */
@@ -366,7 +390,10 @@ if (heightMin !== undefined || heightMax !== undefined) {
   }
 
  if(category?.includes('verified'))matchConditions.verificationStatus='approved';
- if(category?.includes('general'))matchConditions.isSubscriber={$ne:true};
+ const premiumOnly = category?.includes('premium');
+ const generalOnly = category?.includes('general');
+ if (premiumOnly && !generalOnly) matchConditions.isSubscriber = true;
+ else if (generalOnly && !premiumOnly) matchConditions.isSubscriber = { $ne: true };
 
   // Add $match stage if conditions exist
   if (Object.keys(matchConditions).length > 0) {
@@ -383,18 +410,11 @@ if (heightMin !== undefined || heightMax !== undefined) {
 
   console.log('Total documents after filters:', total);
 
-  // 4. Add sorting
-  // ✅ NEW CODE - Add random field
-pipeline.push({
-  $addFields: {
-    randomSort: { $rand: {} }  // Generates random 0-1 for each document
-  }
-});
-
-// ✅ NEW CODE - Sort by random field
-pipeline.push({
-  $sort: { randomSort: 1 }
-});
+  // A stable daily rotation gives published members fair exposure.
+  // $rand reshuffled for every page request and caused skipped/duplicate cards.
+  // Deterministic order lasts through pagination, then rotates next UTC day.
+  pipeline.push({ $addFields: { dailyRotation: dailyRotationExpression() } });
+  pipeline.push({ $sort: { dailyRotation: 1, _id: 1 } });
 
 
   // 5. Add pagination
@@ -447,92 +467,94 @@ pipeline.push({
   };
 }
 
- async addToShortList(payload:CreateShortlistDto,userId:string) {
-  if(!payload.shortlistedUserId)throw new HttpException("Profile ID is required",400);
-  await this.platform.profile(payload.shortlistedUserId,userId);
-  const r=await this.shortlistModel.updateOne({userId},{$addToSet:{shortlistedUserId:payload.shortlistedUserId}},{upsert:true});
-  const created=r.modifiedCount>0||r.upsertedCount>0;
-  if(created)await this.userModel.updateOne({_id:payload.shortlistedUserId},{$inc:{profileInterests:1}});
-  return {success:true,created};
+ async addToShortList(payload: CreateShortlistDto, userId: string) {
+  const target = payload.shortlistedUserId;
+  if (!target || !Types.ObjectId.isValid(target))
+    throw new HttpException('Valid biodata ID is required', 400);
+  if (String(target) === String(userId))
+    throw new HttpException('You cannot favourite your own biodata', 400);
+  // Reuse existing publication/contact authorization; it must be possible to view
+  // the biodata publicly before it can be added to favourites.
+  await this.platform.profile(target, userId);
+  const owner = new Types.ObjectId(userId);
+  const targetId = new Types.ObjectId(target);
+  let list = await this.shortlistModel.findOne({ userId: owner }).select('_id').lean();
+  if (!list) {
+    // New list documents use a deterministic _id (the account ObjectId).
+    // MongoDB's built-in _id uniqueness prevents concurrent first saves
+    // from creating duplicate list documents; legacy records are untouched.
+    try {
+      await this.shortlistModel.updateOne(
+        { _id: owner, userId: owner },
+        { $setOnInsert: { shortlistedUserId: [] } },
+        { upsert: true },
+      );
+    } catch (error) {
+      const createdByAnotherRequest = await this.shortlistModel
+        .findOne({ _id: owner, userId: owner }).select('_id').lean();
+      if (!createdByAnotherRequest) throw error;
+    }
+    list = await this.shortlistModel.findOne({ userId: owner }).select('_id').lean();
+  }
+  if (!list) throw new HttpException('Could not initialize favourites', 500);
+  // With the $ne predicate only the request that actually adds this member
+  // matches. Timestamp-only changes cannot inflate interest counters.
+  const result = await this.shortlistModel.updateOne(
+    { _id: list._id, shortlistedUserId: { $ne: targetId } },
+    { $addToSet: { shortlistedUserId: targetId } },
+  );
+  const created = result.matchedCount > 0;
+  if (created) {
+    await this.userModel.updateOne({ _id: target }, { $inc: { profileInterests: 1 } });
+    await recordDiscoveryEvent(this.userModel.db, target, 'favourites')
+      .catch((error) => this.logger.warn('Could not update discovery favourite score: ' + String(error)));
+  }
+  return { success: true, created };
  }
  async removeFromShortList(payload: CreateShortlistDto, userId: string) {
-  const findAndUpdate = await this.shortlistModel.findOneAndUpdate(
-    { userId: userId },
-    { $pull: { shortlistedUserId: payload.shortlistedUserId } }, // ✅ Use $pull instead
-    { new: true }
-  ).exec();
-   
-  return findAndUpdate;
+  const target = payload.shortlistedUserId;
+  if (!target || !Types.ObjectId.isValid(target))
+    throw new HttpException('Valid biodata ID is required', 400);
+  // Clear all matching legacy list documents, not just the first one.
+  const result = await this.shortlistModel.updateMany(
+    { userId: new Types.ObjectId(userId), shortlistedUserId: new Types.ObjectId(target) },
+    { $pull: { shortlistedUserId: new Types.ObjectId(target) } },
+  );
+  const removed = result.modifiedCount > 0;
+  if (removed) {
+    await this.userModel.updateOne(
+      { _id: target, profileInterests: { $gt: 0 } },
+      { $inc: { profileInterests: -1 } },
+    );
+    await recordDiscoveryEvent(this.userModel.db, target, 'favourites', -1)
+      .catch((error) => this.logger.warn('Could not decrease discovery favourite score: ' + String(error)));
+  }
+  return { success: true, removed };
 }
 async getShortlist(userId: string, paginationDto: PaginationDto) {
-  const { page = 1, limit = 10 } = paginationDto;
-  const skip = (page - 1) * limit;
-  this.logger.debug("user-id",userId)
-  const result = await this.shortlistModel.aggregate([
-    // Match the user's shortlist
-    { $match: { userId: new Types.ObjectId(userId) } },
-    
-    // Unwind the shortlisted user IDs array
-    { $unwind: '$shortlistedUserId' },
-    
-    // Lookup/join with User collection
-    {
-      $lookup: {
-        from: 'users', // Your User collection name (lowercase, pluralized)
-        localField: 'shortlistedUserId',
-        foreignField: '_id',
-        as: 'userDetails'
-      }
-    },
-    
-    // Unwind the user details
-    { $unwind: '$userDetails' },
-    
-    // Replace root with user details
-    { $replaceRoot: { newRoot: '$userDetails' } },
-    
-    { $match: visibleFilter },
-    // Project only the fields you need
-    {
-      $project: {
-        _id: 1,
-        isSubscriber:1,
-        verificationStatus:1,
-        age: 1,
-        gender: 1,
-        maritalStatus: 1,
-        userId: 1,
-        role: 1,
-        createdAt: 1,
-        'address.district': 1,
-        'address.upazila': 1,
-        'educationInfo.educationMethod': 1,
-        'educationInfo.highestEducation': 1,
-        'personalInformation.height': 1,
-        'personalInformation.skinTone': 1,
-        'personalInformation.fiqhFollow': 1,
-        'occupational.profession': 1,
-        'familyInfo.familyFinancial': 1,
-      }
-    },
-    
-    // Facet for pagination
-    {
-      $facet: {
-        metadata: [{ $count: 'totalItems' }],
-        data: [{ $skip: skip }, { $limit: limit }]
-      }
-    }
-  ]).exec();
-  
-
-  const totalItems = result[0]?.metadata[0]?.totalItems || 0;
-  const data = result[0]?.data || [];
-
-  return {data, page, limit, totalItems};
+  return this.listFavourites('given', userId, paginationDto);
 }
 
+async getWhoFavouritedMe(userId: string, paginationDto: PaginationDto) {
+  return this.listFavourites('received', userId, paginationDto);
+}
 
+/** Read only the logged-in member's outgoing/incoming favourites. */
+private async listFavourites(direction: FavouriteDirection, userId: string, paginationDto: PaginationDto) {
+  const { page, limit } = favouritePagination(paginationDto);
+  const [results, schema] = await Promise.all([
+    this.shortlistModel.aggregate(favouritesPipeline(direction, userId, page, limit)).exec(),
+    this.questions.get(),
+  ]);
+  const totalItems = results[0]?.metadata?.[0]?.totalItems || 0;
+  const data = (results[0]?.data || []).map((profile: any) => {
+    // Never serialize email, phone, name, identity, or arbitrary private answers.
+    const safe = publicProfile(profile);
+    this.questions.applyPublicVisibility(safe, schema);
+    return safe;
+  });
+  return { data, page, limit, totalItems };
+}
 
 async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.profile(id.id,actor,role);}
 
@@ -552,7 +574,10 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
-    return {...findOne,completion:completion(findOne,(await this.questions.get()).questions)};
+    const profileCompletion = completion(findOne,(await this.questions.get()).questions);
+    return {...findOne, completion: profileCompletion,
+      biodataStage: biodataStage(findOne, profileCompletion.percentage),
+      alreadySubmitted: hasSubmittedBiodata(findOne)};
   }
 
  async update( updateUserDto: UpdateUserDto,actor:string,actorRole:string=UserType.ADMIN) {
@@ -562,7 +587,11 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     const {id,password, _v,updatedAt,createdAt,...raw} = updateUserDto
     const rest:any=editableProfile(raw);
     for(const k of ['isPublishFromAdmin','isPublished','verificationStatus','statusReason'])if(raw[k]!==undefined)rest[k]=raw[k];
-    if(rest.isPublishFromAdmin===true)rest.verificationStatus='approved';
+    if(rest.isPublishFromAdmin===true) {
+      rest.verificationStatus='approved';
+      rest.biodataStatus='approved';
+      rest.isPublished=true;
+    }
     if(rest.isPublishFromAdmin===false)rest.verificationStatus='rejected';
     const findOne = await this.identity.adminUpdateProfile(actor,id,rest,raw);
     if(!findOne) {
@@ -671,6 +700,7 @@ async userDeleteAdmin(id:string) {
 
 async createPayment(pkgId:string,id:string){return this.platform.createPayment(id,pkgId);}
 async executePayment(paymentId:string){return this.platform.executePayment(paymentId);}
+async executePremiumPayment(paymentId:string){return this.platform.executePremiumPayment(paymentId);}
 
 
 async createRequestNumber(payload:RequestNumberDto,userId:string){return this.platform.unlock(userId,payload.requestUserId);}

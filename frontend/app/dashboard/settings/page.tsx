@@ -1,5 +1,6 @@
 "use client";
 import MessengerSettingsCard from "@/components/custom/dashboard/MessengerSettingsCard";
+import FooterIdentitySettingsCard from "@/components/custom/dashboard/FooterIdentitySettingsCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -74,11 +75,12 @@ const Setting = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-heading font-bold mb-2">সেটিংস</h1>
         <p className="text-muted-foreground font-heading">
-          আপনার পাসওয়ার্ড পরিবর্তন করুন
+          যোগাযোগ, ফুটারের তথ্য এবং অ্যাকাউন্ট সেটিংস পরিচালনা করুন
         </p>
       </div>
 
       <MessengerSettingsCard />
+      <FooterIdentitySettingsCard />
       <Card>
         <CardHeader>
           <CardTitle className="font-heading flex items-center gap-2">

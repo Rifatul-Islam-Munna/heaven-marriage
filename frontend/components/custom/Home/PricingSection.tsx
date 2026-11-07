@@ -52,9 +52,9 @@ const PricingSection = () => {
 
   if (isLoading) {
     return (
-      <section className="py-12 md:py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-12">
+      <section className="px-4 py-8 md:py-12">
+        <div className="container mx-auto max-w-5xl">
+          <div className="mb-7 text-center">
             <div className="h-8 bg-gray-200 rounded-lg w-64 mx-auto mb-4 animate-pulse"></div>
             <div className="h-4 bg-gray-200 rounded-lg w-96 mx-auto animate-pulse"></div>
           </div>
@@ -70,15 +70,15 @@ const PricingSection = () => {
   return (
     <section
       id="pricing"
-      className="py-12 md:py-20 px-4 bg-gradient-to-b from-pink-50/50 to-white"
+      className="bg-gradient-to-b from-pink-50/50 to-white px-4 py-9 md:py-12"
     >
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto max-w-5xl">
         {/* Header */}
-        <div className="text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+        <div className="mb-7 text-center md:mb-9">
+          <h2 className="mb-2 text-2xl font-bold text-gray-900 md:text-3xl">
             আমাদের প্রাইসিং প্ল্যান
           </h2>
-          <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="mx-auto max-w-2xl text-sm text-gray-600 md:text-base">
             আপনার জীবনসঙ্গী খুঁজে পেতে সঠিক প্যাকেজ বেছে নিন
           </p>
         </div>
@@ -87,10 +87,10 @@ const PricingSection = () => {
         <div
           className={`grid grid-cols-1 ${
             pricings.length === 2
-              ? "md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto"
+              ? "mx-auto max-w-3xl gap-4 md:grid-cols-2 md:gap-5"
               : pricings.length === 3
-                ? "md:grid-cols-3 gap-6 md:gap-6 lg:gap-8"
-                : "md:grid-cols-2 lg:grid-cols-4 gap-6"
+                ? "gap-4 md:grid-cols-3 md:gap-5"
+                : "gap-4 md:grid-cols-2 lg:grid-cols-4"
           }`}
         >
           {pricings.map((pricing, index) => {
@@ -121,31 +121,31 @@ const PricingSection = () => {
               >
                 {/* Popular Badge */}
                 {isPopular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-pink-500 to-pink-600 text-white px-6 py-2 rounded-full text-sm font-semibold">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="rounded-full bg-gradient-to-r from-pink-500 to-pink-600 px-4 py-1 text-xs font-semibold text-white">
                       জনপ্রিয়
                     </span>
                   </div>
                 )}
 
-                <div className="p-6 md:p-8">
+                <div className="p-4 md:p-5">
                   {/* Title */}
-                  <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 text-center">
+                  <h3 className="mb-2 text-center text-xl font-bold text-gray-900 md:text-2xl">
                     {pricing.title}
                   </h3>
 
                   {/* Number of Connections Badge */}
-                  <div className="text-center mb-6">
-                    <span className="inline-block bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold">
+                  <div className="mb-3 text-center">
+                    <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
                       {toBanglaNumber(pricing.numberOfConnections)} টি কানেকশন
                     </span>
                   </div>
 
                   {/* Pricing */}
-                  <div className="text-center mb-8">
+                  <div className="mb-4 text-center">
                     {hasDiscount && (
                       <div className="mb-2">
-                        <span className="text-lg text-gray-400 line-through">
+                        <span className="text-sm text-gray-400 line-through">
                           ৳{toBanglaNumber(pricing.originalPrice)}
                         </span>
                         <span className="ml-2 bg-pink-100 text-pink-600 text-xs font-semibold px-3 py-1 rounded-full">
@@ -154,17 +154,17 @@ const PricingSection = () => {
                       </div>
                     )}
                     <div className="flex items-center justify-center gap-1">
-                      <span className="text-4xl md:text-5xl font-bold text-gray-900">
+                      <span className="text-3xl font-bold text-gray-900 md:text-4xl">
                         ৳{toBanglaNumber(finalPrice)}
                       </span>
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-600 mb-3">একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।</p><PolicyLinks />
+                  <p className="mb-2 text-xs leading-5 text-gray-600">একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।</p><PolicyLinks />
                   {/* CTA Button */}
                   <Button
                     onClick={() => mutate({ id: pricing._id })}
-                    className={`w-full py-6 text-base md:text-lg font-semibold rounded-xl transition-colors duration-200 ${
+                    className={`min-h-10 w-full rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors duration-200 ${
                       isPopular
                         ? "bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white"
                         : "bg-pink-50 hover:bg-pink-100 text-pink-600 border-2 border-pink-200"
@@ -177,10 +177,10 @@ const PricingSection = () => {
                   {/* Features from description */}
                   {features.length > 0 && (
                     <>
-                      <div className="my-8 border-t-2 border-gray-100"></div>
-                      <div className="space-y-4">
+                      <div className="my-4 border-t border-gray-100"></div>
+                      <div className="space-y-2">
                         {features.map((feature, idx) => (
-                          <div key={idx} className="flex items-start gap-3">
+                          <div key={idx} className="flex items-start gap-2">
                             <div
                               className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${
                                 isPopular ? "bg-pink-100" : "bg-gray-100"
@@ -192,7 +192,7 @@ const PricingSection = () => {
                                 }`}
                               />
                             </div>
-                            <span className="text-sm md:text-base text-gray-700 flex-1">
+                            <span className="flex-1 text-sm leading-5 text-gray-700">
                               {feature}
                             </span>
                           </div>
@@ -208,11 +208,11 @@ const PricingSection = () => {
 
         {/* See More Button */}
 
-        <div className="text-center mt-12">
+        <div className="mt-6 text-center">
           <Link href="/pricing">
             <Button
               variant="outline"
-              className="px-8 py-6 text-base md:text-lg font-semibold rounded-xl border-2 border-pink-300 text-pink-600 hover:bg-pink-50 hover:border-pink-400 transition-colors duration-200"
+              className="min-h-10 rounded-xl border border-pink-200 px-6 py-2.5 text-sm font-semibold text-pink-600 transition-colors hover:border-pink-400 hover:bg-pink-50"
             >
               আরও দেখুন
             </Button>

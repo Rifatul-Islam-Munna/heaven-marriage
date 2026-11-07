@@ -157,14 +157,18 @@ function CaseStatusDialog({ target, onClose, onDone }: {
   const [reference, setReference] = useState(target?.item.transactionReference || '');
   const [notes, setNotes] = useState(target?.item.adminNotes || '');
   const [busy, setBusy] = useState(false);
+  const [confirmedDeletion, setConfirmedDeletion] = useState(false);
   const needsReference = !!target && ['paid', 'refunded'].includes(target.status);
-  const canSubmit = !busy && !!reason.trim() && (!needsReference || !!reference.trim());
-  const danger = target?.status === 'rejected' || target?.status === 'refunded';
+  const deletionApproval = target?.item.kind === 'deletion' && target.status === 'approved';
+  const canSubmit = !busy && !!reason.trim() && (!needsReference || !!reference.trim())
+    && (!deletionApproval || confirmedDeletion);
+  const danger = target?.status === 'rejected' || target?.status === 'refunded' || deletionApproval;
   const submit = async () => {
     if (!target || !canSubmit) return;
     setBusy(true);
     const [data, error] = await PatchRequestAxios('/platform/admin/cases/' + target.item.id, {
       status: target.status, reason: reason.trim(),
+      confirmDeletion: deletionApproval ? confirmedDeletion : undefined,
       transactionReference: needsReference ? reference.trim() : undefined,
       adminNotes: notes.trim() || target.item.adminNotes,
     });
@@ -176,7 +180,9 @@ function CaseStatusDialog({ target, onClose, onDone }: {
     <DialogContent className="sm:max-w-lg">
       <DialogHeader>
         <DialogTitle>Move to “{target ? humanize(target.status) : ''}”</DialogTitle>
-        <DialogDescription>{target ? humanize(target.item.kind) : ''} request. The reason is saved in the audit history.</DialogDescription>
+        <DialogDescription>{deletionApproval
+          ? 'This permanently removes the member biodata answers and hides the profile. Their login and request history remain intact. Approval requires your explicit confirmation.'
+          : target ? humanize(target.item.kind) + ' request. The reason is saved in the audit history.' : ''}</DialogDescription>
       </DialogHeader>
       <form className="space-y-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
         <div>
@@ -193,6 +199,11 @@ function CaseStatusDialog({ target, onClose, onDone }: {
           <label htmlFor="case-notes" className={labelClass}>Follow-up notes</label>
           <textarea id="case-notes" rows={2} dir="auto" value={notes} onChange={event => setNotes(event.target.value)} className={cn(fieldClass, 'resize-y')} />
         </div>
+        {deletionApproval && <label className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">
+          <input type="checkbox" checked={confirmedDeletion} onChange={event => setConfirmedDeletion(event.target.checked)}
+            className="mt-1 size-4 shrink-0 accent-rose-600" />
+          I confirm this biodata should be removed following administrator approval.
+        </label>}
         <div className="flex justify-end gap-2">
           <DashButton onClick={onClose}>Cancel</DashButton>
           <DashButton type="submit" tone={danger ? 'danger' : 'primary'} disabled={!canSubmit}>
@@ -284,8 +295,9 @@ function VerifyPaymentDialog({ target, onClose, onDone }: { target: Payment | nu
   </Dialog>;
 }
 
-function RequestsTab({ cases, loading, onChanged, onLookup }: {
+function RequestsTab({ cases, loading, onChanged, onLookup, canReviewDeletion }: {
   cases?: Case[]; loading: boolean; onChanged: () => void; onLookup: (userId: string) => void;
+  canReviewDeletion: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<'open' | 'closed' | 'all'>('open');
@@ -309,7 +321,9 @@ function RequestsTab({ cases, loading, onChanged, onLookup }: {
       <SearchBox value={query} onChange={setQuery} placeholder="Search requests" />
       <select aria-label="Request type" value={kind} onChange={event => setKind(event.target.value)} className={cn(fieldClass, 'w-auto py-1.5 text-[13px]')}>
         <option value="all">All types</option>
-        {kinds.map(item => <option key={item} value={item}>{humanize(item)}</option>)}
+        {kinds.map(item => <option key={item} value={item}>
+          {item === 'deletion' ? 'Biodata deletion' : humanize(item)}
+        </option>)}
       </select>
       <Segmented size="sm" label="Request status" value={scope} onChange={setScope} options={[
         { value: 'open', label: `Open (${openCount})` }, { value: 'closed', label: `Closed (${list.length - openCount})` }, { value: 'all', label: 'All' },
@@ -320,14 +334,16 @@ function RequestsTab({ cases, loading, onChanged, onLookup }: {
       {scope === 'open' && list.length > 0 && !query && kind === 'all' && <span className="mt-1 block text-emerald-700">Every request has been handled.</span>}
     </Empty> : <ul className="divide-y divide-[#f0f0f0]">
       {visible.map(item => {
-        const next = TRANSITIONS[item.status] || [];
+        const next = item.kind === 'deletion'
+          ? (canReviewDeletion && ['pending', 'contacted'].includes(item.status) ? ['approved', 'rejected'] : [])
+          : TRANSITIONS[item.status] || [];
         const long = item.message.length > 240;
         const open = expanded === item.id;
         return <li key={item.id} className="px-4 py-3">
           <div className="flex flex-wrap items-start gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <StatusPill tone="neutral">{humanize(item.kind)}</StatusPill>
+                <StatusPill tone="neutral">{item.kind === 'deletion' ? 'Biodata deletion' : humanize(item.kind)}</StatusPill>
                 <StatusBadge status={item.status} />
                 {item.kind === 'premium' && typeof item.fee === 'number' &&
                   <span className="text-[11px] text-[#6c757d]">Fee {formatPremiumFee(item.fee)}</span>}
@@ -896,6 +912,7 @@ function AuditTab({ audit, loading }: { audit?: Audit[]; loading: boolean }) {
 
 export default function ServicesManager() {
   const queryClient = useQueryClient();
+  const staffSession = useQueryWrapper<{ role: string }>(['staff-access-me'], '/staff-access/me');
   const paymentsQuery = useQueryWrapper<Payment[]>(['admin-payments'], '/platform/admin/payments');
   const statsQuery = useQueryWrapper<Record<string, number>>(['upgrade-stats'], '/platform/admin/summary');
   const casesQuery = useQueryWrapper<Case[]>(['admin-service-cases'], '/platform/admin/cases');
@@ -995,7 +1012,8 @@ export default function ServicesManager() {
 
     {/* Tabs stay mounted so unsaved settings survive switching sections. */}
     <div role="tabpanel" id="panel-requests" aria-labelledby="tab-requests" hidden={tab !== 'requests'}>
-      <RequestsTab cases={cases} loading={casesQuery.isLoading} onChanged={refreshActivity} onLookup={lookupFromRequest} />
+      <RequestsTab cases={cases} loading={casesQuery.isLoading} onChanged={refreshActivity} onLookup={lookupFromRequest}
+        canReviewDeletion={staffSession.data?.role === 'admin'} />
     </div>
     <div role="tabpanel" id="panel-payments" aria-labelledby="tab-payments" hidden={tab !== 'payments'}>
       <PaymentsTab payments={payments} loading={paymentsQuery.isLoading} onChanged={refreshActivity} askConfirm={setConfirm} />

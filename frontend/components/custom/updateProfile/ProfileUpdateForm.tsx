@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { currentBiodataStage, isSubmittedBiodata, type BiodataStatusSource } from "@/lib/biodata-status";
 import {
   ArrowLeft, AlertCircle, Briefcase, Check, ChevronRight, Flame, Gem, GraduationCap, HeartHandshake, House, ListChecks,
   Loader2, MapPin, MessageCircle, PartyPopper, Pencil, RefreshCw, Search, ShieldCheck, Sparkles, Trophy, User, X,
@@ -174,6 +176,7 @@ export default function ProfileUpdateForm() {
   const [schema, setSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
   const [schemaReady, setSchemaReady] = useState(false);
   const [view, setView] = useState<View>("journey");
+  const queryClient = useQueryClient();
   const [qi, setQi] = useState(0);
   const [streak, setStreak] = useState(0);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
@@ -194,7 +197,11 @@ export default function ProfileUpdateForm() {
   const { mutate, isPending } = useCommonMutationApi({
     method: "PATCH", url: "/user/update-user", mutationKey: ["update-user"],
     successMessage: "আলহামদুলিল্লাহ! আপনার বায়োডাটা জমা হয়েছে।",
-    onSuccess: () => router.push("/profile"),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["get-my-profile-for-success"] });
+      void queryClient.invalidateQueries({ queryKey: ["platform-summary"] });
+      router.push("/profile");
+    },
   });
   useEffect(() => {
     if (data && !initialized.current) {
@@ -203,6 +210,7 @@ export default function ProfileUpdateForm() {
       const step = Math.max(0, Math.min(9, Number((data as { draftStep?: number }).draftStep) || 0));
       savedStep.current = step;
       setCurrentStep(step);
+      if (isSubmittedBiodata(data as BiodataStatusSource)) setView("review");
       initialized.current = true;
     }
   }, [data, initializeForm, setCurrentStep]);
@@ -227,6 +235,8 @@ export default function ProfileUpdateForm() {
       if (!result?.data) throw new Error(error?.message || "সার্ভারে সেভ নিশ্চিত করা যায়নি।");
       saved.current = applyBiodataDraft(saved.current, changes);
       savedStep.current = step;
+      void queryClient.invalidateQueries({ queryKey: ["get-my-profile-for-success"] });
+      void queryClient.invalidateQueries({ queryKey: ["platform-summary"] });
       const latest = useProfileStore.getState();
       const remaining = diffBiodataDraft(saved.current, latest.getFormData() as Record<string, unknown>);
       if (!hasBiodataChanges(remaining) && latest.currentStep === savedStep.current) setSaveState("saved");
@@ -290,7 +300,12 @@ export default function ProfileUpdateForm() {
   const levelQuestions = level?.questions ?? [];
   const question = levelQuestions[Math.min(qi, Math.max(0, levelQuestions.length - 1))];
   const answeredCount = flow.filter(q => answered(q)).length;
-  const percent = flow.length ? Math.round((answeredCount / flow.length) * 100) : 0;
+  // The same active, required, gender-applicable questions used by the
+  // NestJS completion calculation (including locked registration fields).
+  const requiredQuestions = schema.questions.filter(q => q.required && questionApplies(q, gender));
+  const percent = requiredQuestions.length
+    ? Math.round((requiredQuestions.filter(q => answered(q)).length / requiredQuestions.length) * 100)
+    : 100;
   const levelComplete = (l: { questions: ProfileQuestion[] }) => l.questions.some(q => answered(q)) && l.questions.every(q => !q.required || answered(q));
   const completedLevels = levels.filter(levelComplete).length;
   const connectionBalance = (data as { numberOfConnections?: number } | undefined)?.numberOfConnections;
@@ -366,6 +381,11 @@ export default function ProfileUpdateForm() {
   useEffect(() => { nextRef.current = next; });
   const autoAdvance = () => window.setTimeout(() => nextRef.current(false), 350);
   const submit = async () => {
+    const stage = currentBiodataStage(data as BiodataStatusSource);
+    if (stage === "deleted" || stage === "under_review" || stage === "published") {
+      toast.info("বায়োডাটা ইতোমধ্যে জমা হয়েছে। এখন তথ্য Edit/Update করতে পারবেন।");
+      return;
+    }
     if (requiredMissing.length) { setView("finish"); toast.error("কয়েকটি আবশ্যিক প্রশ্ন বাকি আছে"); return; }
     try { await queueSave(); }
     catch { toast.error("উত্তর সংরক্ষণ করা যায়নি। নিচে ‘আবার চেষ্টা করুন’ চাপ দিন।"); return; }
@@ -403,6 +423,16 @@ export default function ProfileUpdateForm() {
       </button>
     </div>
   );
+
+  const savedStage = currentBiodataStage(data as BiodataStatusSource);
+  const submittedBefore = isSubmittedBiodata(data as BiodataStatusSource);
+  if (savedStage === "deleted") return shell(
+    <div className="mx-auto flex min-h-[55vh] max-w-lg flex-col items-center justify-center gap-3 rounded-2xl bg-white p-6 text-center">
+      <ShieldCheck className="size-10 text-pink-600" aria-hidden />
+      <h1 className="text-xl font-bold text-gray-900">বায়োডাটা মুছে ফেলা হয়েছে</h1>
+      <p className="text-sm leading-6 text-gray-600">অ্যাডমিনের অনুমোদনের পর আপনার বায়োডাটা সরানো হয়েছে। অনুরোধের অবস্থা দেখতে প্রোফাইলে যান।</p>
+      <Link href="/profile#deletion-request" className="rounded-lg bg-pink-600 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-700">অনুরোধের অবস্থা দেখুন</Link>
+    </div>);
 
   if (view === "play" && question) {
     const value = readQuestionAnswer(formData, question);
@@ -482,11 +512,15 @@ export default function ProfileUpdateForm() {
   }
 
   if (view === "finish") return shell(<div className="relative mx-auto max-w-lg overflow-hidden rounded-3xl bg-white p-6 text-center shadow-[0_10px_30px_rgba(219,39,119,0.1)] sm:p-10">
-    {!requiredMissing.length && <Confetti />}
+    {!requiredMissing.length && !submittedBefore && <Confetti />}
     <div className="qb-pop mx-auto flex size-24 items-center justify-center rounded-full bg-amber-400 text-white shadow-lg shadow-amber-400/40">
       {requiredMissing.length ? <ListChecks className="h-11 w-11" /> : <PartyPopper className="h-11 w-11" />}
     </div>
-    {requiredMissing.length ? <>
+    {submittedBefore && savedStage !== "rejected" ? <>
+      <h1 className="mt-5 text-2xl font-extrabold text-gray-900">আপনার বায়োডাটা ইতোমধ্যে জমা হয়েছে</h1>
+      <p className="mt-2 text-sm leading-6 text-gray-600">আবার Submit করার প্রয়োজন নেই। পূর্বের তথ্য এডিট করতে পারবেন এবং প্রোফাইলে Under Review / Published অবস্থা দেখতে পারবেন।</p>
+      <Link href="/profile" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-pink-600 px-6 text-sm font-bold text-white hover:bg-pink-700">আমার প্রোফাইল দেখুন</Link>
+    </> : requiredMissing.length ? <>
       <h1 className="mt-5 text-2xl font-extrabold text-gray-900">প্রায় শেষ!</h1>
       <p className="mt-2 text-gray-600">জমা দেওয়ার আগে আর {bn(requiredMissing.length)}টি আবশ্যিক প্রশ্ন বাকি।</p>
       <ul className="mt-5 space-y-2 text-left">
@@ -502,8 +536,8 @@ export default function ProfileUpdateForm() {
         })}
       </ul>
     </> : <>
-      <h1 className="mt-5 text-2xl font-extrabold text-gray-900">মাশাআল্লাহ, আপনার বায়োডাটা তৈরি!</h1>
-      <p className="mt-2 text-gray-600">{bn(answeredCount)}টি প্রশ্নের উত্তর দিয়েছেন এবং {bn(completedLevels)}টি ব্যাজ অর্জন করেছেন। এবার জমা দিন, যাচাইয়ের পর প্রকাশ করা হবে।</p>
+      <h1 className="mt-5 text-2xl font-extrabold text-gray-900">{savedStage === "rejected" ? "সংশোধিত বায়োডাটা আবার জমা দিন" : "মাশাআল্লাহ, আপনার বায়োডাটা তৈরি!"}</h1>
+      <p className="mt-2 text-gray-600">{savedStage === "rejected" ? "আগের উত্তরগুলো সংরক্ষিত আছে। প্রয়োজনীয় সংশোধন করে পুনরায় Submit করুন।" : `${bn(answeredCount)}টি প্রশ্নের উত্তর দিয়েছেন এবং ${bn(completedLevels)}টি ব্যাজ অর্জন করেছেন। এবার জমা দিন, যাচাইয়ের পর প্রকাশ করা হবে।`}</p>
       <button type="button" onClick={() => void submit()} disabled={isPending}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-pink-600/25 hover:bg-pink-700 disabled:opacity-60">
         {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} বায়োডাটা জমা দিন
@@ -516,6 +550,18 @@ export default function ProfileUpdateForm() {
   </div>);
 
   if (view === "review") return shell(<div className="mx-auto max-w-3xl space-y-4">
+    {submittedBefore && <div className="rounded-2xl border border-pink-200 bg-white p-5 shadow-sm">
+      <h1 className="font-bold text-pink-800">{savedStage === "published" ? "Published · আপনার বায়োডাটা প্রকাশিত" :
+        savedStage === "rejected" ? "সংশোধন প্রয়োজন" : "Submitted · Under Review"}</h1>
+      <p className="mt-1 text-sm leading-6 text-gray-600">একবার জমা দেওয়া বায়োডাটার উত্তরগুলো এখানে আছে। উত্তর এডিট করলে তা স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে; নতুন করে শুরু করতে হবে না।</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Link href="/profile" className="inline-flex min-h-10 items-center rounded-lg bg-pink-600 px-4 py-2 text-sm font-semibold text-white">প্রোফাইল ও স্ট্যাটাস দেখুন</Link>
+        {savedStage === "rejected" && <button type="button" onClick={() => setView("finish")}
+          className="inline-flex min-h-10 items-center rounded-lg border border-pink-300 px-4 py-2 text-sm font-semibold text-pink-700 hover:bg-pink-50">
+          সংশোধন শেষ হলে আবার Submit করুন
+        </button>}
+      </div>
+    </div>}
     <div className="flex items-center gap-3">
       <button type="button" onClick={() => setView("journey")} aria-label="ফিরে যান" className="flex size-10 items-center justify-center rounded-full bg-white shadow-sm hover:bg-pink-50"><ArrowLeft className="h-5 w-5" /></button>
       <div><h1 className="text-xl font-bold text-gray-900">আপনার উত্তরগুলো</h1><p className="text-sm text-gray-500">যেকোনো উত্তরে ট্যাপ করে বদলাতে পারবেন</p></div>

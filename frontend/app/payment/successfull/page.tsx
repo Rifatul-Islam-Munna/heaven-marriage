@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle, ArrowRight, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { setUserData } from "@/actions/auth";
 
 const PaymentSuccessPage = () => {
   const router = useRouter();
+  const [isPremium, setIsPremium] = useState(false);
+  useEffect(() => setIsPremium(new URLSearchParams(window.location.search).get('purpose') === 'premium'), []);
   const { data, isLoading } = useQueryWrapper<User>(
     ["get-my-profile-for-success"],
     "/user/get-my-profile",
@@ -59,8 +61,7 @@ const PaymentSuccessPage = () => {
             পেমেন্ট সফল হয়েছে!
           </h1>
           <p className="text-base md:text-lg text-gray-600 mb-8">
-            আপনার পেমেন্ট সফলভাবে সম্পন্ন হয়েছে। এখন আপনি আপনার প্যাকেজ ব্যবহার
-            করতে পারবেন।
+            {isPremium ? 'আপনার প্রিমিয়াম সদস্যপদ সক্রিয় হয়েছে।' : 'আপনার পেমেন্ট সফলভাবে সম্পন্ন হয়েছে। এখন আপনি আপনার প্যাকেজ ব্যবহার করতে পারবেন।'}
           </p>
 
           {/* Success Details */}
@@ -70,7 +71,7 @@ const PaymentSuccessPage = () => {
               <span className="font-semibold">লেনদেন সম্পন্ন হয়েছে</span>
             </div>
             <p className="text-sm text-green-600 mt-2">
-              আপনার কানেকশন যুক্ত করা হয়েছে
+              {isPremium ? 'আপনি এখন প্রিমিয়াম সদস্য' : 'আপনার কানেকশন যুক্ত করা হয়েছে'}
             </p>
           </div>
 

@@ -89,21 +89,21 @@ const benefits = [
 
 export default function HMSBenefitsSection() {
   return (
-    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/20 to-background py-16 md:py-24">
+    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/20 to-background py-9 md:py-12">
       {/* Decorative Elements - All Pink */}
       <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-pink-200/20 blur-3xl" />
       <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-pink-300/20 blur-3xl" />
 
       <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mx-auto mb-12 max-w-4xl text-center">
+        <div className="mx-auto mb-7 max-w-4xl text-center">
           {/* Badge with Icon */}
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-pink-100 px-4 py-2 text-sm font-medium text-pink-700">
             <Heart className="h-4 w-4 fill-pink-600 text-pink-600" />
             <span>আমাদের মাধ্যমে বিবাহ করলে আপনি যা যা সুবিধা পাবেন</span>
           </div>
 
-          <h2 className="font-heading text-4xl font-bold leading-tight text-foreground sm:text-5xl md:text-6xl">
+          <h2 className="font-heading text-2xl font-bold leading-tight text-foreground sm:text-3xl md:text-4xl">
             কেনো <span className="text-pink-600">Niqaha</span>
             -এর মাধ্যমে বিবাহ করবেন?
           </h2>
@@ -114,7 +114,7 @@ export default function HMSBenefitsSection() {
         </div>
 
         {/* Benefits Grid */}
-        <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto grid max-w-7xl gap-3 md:grid-cols-2 lg:grid-cols-3">
           {benefits.map((benefit, index) => {
             const Icon = benefit.icon;
             return (
@@ -122,7 +122,7 @@ export default function HMSBenefitsSection() {
                 key={index}
                 className="group border border-border/5 bg-card/80 shadow-none backdrop-blur-sm transition-all hover:border-pink-500/50  hover:shadow-pink-500/10"
               >
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="space-y-3">
                     {/* Icon + Title */}
                     <div className="flex items-start gap-3">
@@ -148,7 +148,7 @@ export default function HMSBenefitsSection() {
         </div>
 
         {/* CTA Section - All Pink */}
-        <div className="mt-12 text-center">
+        <div className="mt-6 text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-pink-50 px-6 py-3 text-sm font-medium text-pink-700">
             <CheckCircle2 className="h-5 w-5 text-pink-600" />
             <span>সম্পূর্ণ শরিয়াহ সম্মত ও নিরাপদ প্ল্যাটফর্ম</span>

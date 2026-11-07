@@ -56,7 +56,7 @@ export default function TrackingConsent() {
         <section
           role="region"
           aria-labelledby="cookie-consent-title"
-          className="fixed bottom-4 left-1/2 z-[60] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 overflow-y-auto rounded-2xl border border-primary/20 bg-background p-4 shadow-xl sm:p-5"
+          className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] left-1/2 z-[60] max-h-[calc(100dvh-100px)] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 overflow-y-auto rounded-2xl border border-primary/20 bg-background p-4 shadow-xl sm:p-5 lg:bottom-4 lg:max-h-[calc(100dvh-2rem)]"
         >
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">

@@ -45,12 +45,14 @@ export class UserController {
     return this.userService.loginWithGoogle(createUserDto.id);
   }
   @Post('add-to-shortlist')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserType.USER)
   AddToShortList(@Body() createUserDto: CreateShortlistDto,@Req() req:ExpressRequest) {
     return this.userService.addToShortList(createUserDto,req?.user?.id);
   }
   @Post('remove-from-shortlist')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserType.USER)
   RemoveFromShortList(@Body() createUserDto: CreateShortlistDto,@Req() req:ExpressRequest) {
     return this.userService.removeFromShortList(createUserDto,req?.user?.id);
   }
@@ -85,11 +87,19 @@ export class UserController {
     return this.userService.findAll(query);
   }
   @Get("get-shortlist-user")
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserType.USER)
   async getMyShortList(@Req() req:ExpressRequest,@Query() query: PaginationDto) {
-    return this.userService.getShortlist(req?.user?.id,query);
+    return this.userService.getShortlist(req.user.id,query);
   }
 
+  // The reverse of My Favourites: only users who saved the caller's biodata.
+  @Get("get-who-favourited-me")
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserType.USER)
+  async getWhoFavouritedMe(@Req() req:ExpressRequest,@Query() query: PaginationDto) {
+    return this.userService.getWhoFavouritedMe(req.user.id, query);
+  }
 
   @Get('get-one-user')
   @UseGuards(OptionalAuthGuard)
@@ -123,6 +133,28 @@ export class UserController {
   }
 
 
+
+  @Throttle({default:{limit:30,ttl:60000}})
+  @Get('premium-payment-callback')
+  async premiumPaymentCallback(
+    @Query('paymentID') paymentID: string,
+    @Query('status') status: string,
+    @Res() res: Response,
+  ) {
+    const base = process.env.FRONTEND_URL;
+    if (!base) throw new BadRequestException('Frontend URL is not configured');
+    const redirectBase = base.replace(/\/$/, '');
+    if (status !== 'success' || !paymentID)
+      return res.redirect(redirectBase + '/payment/failed?purpose=premium');
+    try {
+      const result = await this.userService.executePremiumPayment(paymentID);
+      return res.redirect(redirectBase + (result.success
+        ? '/payment/successfull?purpose=premium'
+        : '/payment/failed?purpose=premium'));
+    } catch {
+      return res.redirect(redirectBase + '/payment/failed?purpose=premium');
+    }
+  }
 
   @Throttle({default:{limit:60,ttl:60}})
   @Get("execute-payment-callback")
@@ -178,8 +210,10 @@ export class UserController {
     return this.userService.toggleSubscription( updateUserDto.id,req.user.id,req.user.role);
   }
 
+  // Backward-compatible endpoint: it only creates an admin-reviewed request.
   @Delete('delete-my-account')
-    @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserType.USER)
   remove(@Req() req:ExpressRequest) {
     return this.userService.removeUser(req?.user?.id);
   }

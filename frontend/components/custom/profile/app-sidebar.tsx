@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, Gem } from "lucide-react";
+import { AlertCircle, Gem, Heart, HeartHandshake } from "lucide-react";
 
 export function AppSidebar({
   data,
@@ -30,6 +30,7 @@ export function AppSidebar({
       items: {
         title: string;
         url: string;
+        icon?: string;
       }[];
     }[];
     ProfileTop?: {
@@ -37,6 +38,7 @@ export function AppSidebar({
       name: string;
       isProfileIncomplete: boolean;
       profileCompletion: number;
+      biodataStage?: string;
       connections?: number;
     };
   };
@@ -115,7 +117,11 @@ export function AppSidebar({
                     </svg>
                   </div>
                   <p className="text-xs text-green-800 dark:text-green-200 font-medium">
-                    প্রোফাইল সম্পূর্ণ হয়েছে!
+                    {data.ProfileTop.biodataStage === "under_review" ? "বায়োডাটা জমা হয়েছে · পর্যালোচনাধীন" :
+                      data.ProfileTop.biodataStage === "published" ? "Published · বায়োডাটা প্রকাশিত" :
+                      data.ProfileTop.biodataStage === "deleted" ? "বায়োডাটা সরানো হয়েছে" :
+                      data.ProfileTop.biodataStage === "rejected" ? "সংশোধন প্রয়োজন" :
+                      data.ProfileTop.biodataStage === "ready" ? "জমা দেওয়ার জন্য প্রস্তুত" : "প্রোফাইল সম্পূর্ণ হয়েছে!"}
                   </p>
                 </div>
               )}
@@ -134,7 +140,11 @@ export function AppSidebar({
                 {item.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={pathName === item.url}>
-                      <Link href={item.url as Route} onClick={() => { if (isMobile) setOpenMobile(false); }} className="font-medium">{item.title}</Link>
+                      <Link href={item.url as Route} onClick={() => { if (isMobile) setOpenMobile(false); }} className="font-medium">
+                        {item.icon === "heart" && <Heart className="size-4 text-pink-600" aria-hidden="true" />}
+                        {item.icon === "heart-handshake" && <HeartHandshake className="size-4 text-pink-600" aria-hidden="true" />}
+                        <span>{item.title}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

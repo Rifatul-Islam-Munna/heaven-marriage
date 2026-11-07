@@ -181,6 +181,16 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
     "dynamic": false
   },
   {
+    "path": "/profile/favourited-me",
+    "label": "Profile / Favourited Me",
+    "dynamic": false
+  },
+  {
+    "path": "/profile/matches",
+    "label": "Profile / Matches",
+    "dynamic": false
+  },
+  {
     "path": "/profile/my-profile",
     "label": "Profile / My Profile",
     "dynamic": false

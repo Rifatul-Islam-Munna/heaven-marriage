@@ -80,14 +80,14 @@ export default function AboutSection() {
   const homeLeftImage = webData?.home?.images?.left?.trim();
   const homeRightImage = webData?.home?.images?.right?.trim();
   return (
-    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/30 to-background pt-20 pb-10 md:pt-32 md:pb-12">
+    <section className="relative w-full overflow-hidden bg-gradient-to-b from-background via-pink-50/30 to-background pt-10 pb-9 md:pt-14 md:pb-10">
       {/* Decorative Elements */}
       <div className="absolute left-0 top-20 h-72 w-72 rounded-full bg-pink-100/50 blur-3xl" />
       <div className="absolute bottom-20 right-0 h-72 w-72 rounded-full bg-purple-100/50 blur-3xl" />
 
       <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="mx-auto mb-12 max-w-4xl px-4 text-center sm:mb-16 sm:px-6">
+        <div className="mx-auto mb-7 max-w-4xl px-4 text-center sm:mb-8 sm:px-6">
           {/* Decorative Header */}
           <div className="mb-4 flex items-center justify-center gap-2 sm:mb-6 sm:gap-3">
             <div className="h-px w-8 bg-gradient-to-r from-transparent to-pink-500 sm:w-12" />
@@ -96,12 +96,12 @@ export default function AboutSection() {
           </div>
 
           {/* Main Heading */}
-          <h2 className="font-heading text-3xl font-bold leading-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
+          <h2 className="font-heading text-2xl font-bold leading-tight text-foreground sm:text-3xl md:text-4xl">
             মুহতারাম ও মুহতারামা!
           </h2>
 
           {/* Description - Split for better mobile readability */}
-          <div className="mt-6 space-y-3 sm:mt-8 sm:space-y-4">
+          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2">
             <p className="mx-auto max-w-3xl text-[15px] leading-[1.9] text-muted-foreground sm:text-base sm:leading-[1.8] md:text-lg md:leading-relaxed lg:text-xl">
               Niqaha কোনো সাধারণ ঘটকালি প্রতিষ্ঠান নয়। এটি ইসলামী শরিয়াহ-সম্মত
               দাওয়াতী প্ল্যাটফর্ম, যেখানে বিবাহ, তালাক ও দাম্পত্য জীবনের শরয়ী
@@ -119,16 +119,16 @@ export default function AboutSection() {
         </div>
 
         {/* Image Grid */}
-        <div className="mx-auto mb-20 grid max-w-6xl gap-6 md:grid-cols-2">
+        <div className="mx-auto mb-9 grid max-w-6xl gap-4 md:grid-cols-2">
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
-            <div className="relative aspect-[4/3] overflow-hidden">
+            <div className="relative aspect-[16/9] overflow-hidden">
               {homeLeftImage && (
                 <Image
                   src={homeLeftImage}
                   alt="Wedding ceremony"
-                  width={1000}
-                  height={1000}
-                  className="object-conatin transition-transform duration-500 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 767px) 100vw, 50vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
@@ -141,14 +141,14 @@ export default function AboutSection() {
           </Card>
 
           <Card className="group overflow-hidden border-none p-0 shadow-lg transition-all hover:shadow-xl">
-            <div className="relative aspect-[4/3] overflow-hidden">
+            <div className="relative aspect-[16/9] overflow-hidden">
               {homeRightImage && (
                 <Image
                   src={homeRightImage}
                   alt="Islamic marriage"
-                  width={1000}
-                  height={1000}
-                  className="object-contain transition-transform duration-500 group-hover:scale-105"
+                  fill
+                  sizes="(max-width: 767px) 100vw, 50vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
@@ -163,8 +163,8 @@ export default function AboutSection() {
 
         {/* Activities Section */}
         <div className="mx-auto max-w-6xl">
-          <div className="mb-12 text-center">
-            <h3 className="font-heading text-3xl font-bold text-foreground sm:text-4xl md:text-5xl">
+          <div className="mb-7 text-center">
+            <h3 className="font-heading text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">
               আমাদের কার্যক্রম
             </h3>
             <p className="mt-4 text-lg text-muted-foreground">
@@ -172,7 +172,7 @@ export default function AboutSection() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {activities.map((activity, index) => {
               const Icon = activity.icon;
               return (
@@ -180,7 +180,7 @@ export default function AboutSection() {
                   key={index}
                   className="group border border-border/2 bg-card/50 backdrop-blur-sm transition-all hover:border-pink-500/50  shadow-none "
                 >
-                  <CardContent className="flex gap-4 p-6">
+                  <CardContent className="flex gap-3 p-4">
                     <div className="flex-shrink-0">
                       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-pink-500/10 transition-colors group-hover:bg-pink-500/20">
                         <Icon className="h-6 w-6 text-pink-600" />

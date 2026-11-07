@@ -8,6 +8,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/custom/Navbar/Navbar";
+import MobileBottomNav from "@/components/custom/Navbar/MobileBottomNav";
 import Footer from "@/components/custom/common/footer";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import QueryClint from "@/lib/QueryClint";
@@ -72,6 +73,7 @@ export default function RootLayout({
             <Navbar />
             {children}
             <Footer />
+            <MobileBottomNav />
             <Suspense><VisualContentRuntime /></Suspense>
           </NuqsAdapter>
         </QueryClint>

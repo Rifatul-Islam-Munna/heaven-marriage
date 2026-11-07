@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { seoMetadata } from '@/lib/seo-settings-server';
 import SeoStructuredData from '@/components/custom/seo/SeoStructuredData';
 import Script from "next/script";
+import { Suspense } from "react";
 
 import AboutSection from "@/components/custom/Home/about-sections";
 import BiodataFilter from "@/components/custom/Home/biodata-filter";
@@ -13,6 +14,8 @@ import HMSBenefitsSection from "@/components/custom/Home/hms-benefits-section";
 import IslamicMarriageSection from "@/components/custom/Home/islamic-marriage-section";
 import MarriageBenefitsSection from "@/components/custom/Home/marriage-benefits-section";
 import PricingSection from "@/components/custom/Home/PricingSection";
+import ProfileDiscovery from "@/components/custom/Home/ProfileDiscovery";
+import LatestBlogsSection from "@/components/custom/Home/LatestBlogsSection";
 
 const SITE_NAME = "Niqaha";
 const SITE_URL = "https://niqaha.com";
@@ -81,8 +84,10 @@ export default function PageBn() {
       {/* Ideally your HeroSection should show Bangla H1 + intro text on /bn */}
       <HeroSection />
       <BiodataFilter />
+      <ProfileDiscovery />
       <CreateBiodataSection />
       <PricingSection />
+      <Suspense fallback={null}><LatestBlogsSection /></Suspense>
       <AboutSection />
       <IslamicMarriageSection />
       <EarlyMarriageSection />

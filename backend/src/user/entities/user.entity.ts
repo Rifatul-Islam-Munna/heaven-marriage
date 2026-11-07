@@ -78,6 +78,8 @@ export class User {
     @Prop({default:false}) isEmailVerified:boolean;
     @Prop({default:0}) authVersion:number;
     @Prop({default:'draft'}) biodataStatus:string;
+    @Prop() submittedAt?:Date;
+    @Prop() deletedAt?:Date;
     @Prop({default:'pending'}) verificationStatus:string;
     @Prop() statusReason:string;
     @Prop() fatherName:string;

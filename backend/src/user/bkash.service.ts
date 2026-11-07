@@ -28,8 +28,13 @@ export class BkashService implements OnModuleInit {
     this.BKASH_BASE_URL = this.configService.get<string>('BKASH_BASE_URL') as string;
   }
 
+  isConfigured(): boolean {
+    return Boolean(this.BKASH_APP_KEY && this.BKASH_APP_SECRET && this.BKASH_USERNAME &&
+      this.BKASH_PASSWORD && this.BKASH_BASE_URL && this.configService.get('BACKEND_URL'));
+  }
+
   async onModuleInit() {
-    await this.getAccessToken();
+    if (this.isConfigured()) await this.getAccessToken();
   }
 
   private async getAccessToken(): Promise<void> {
@@ -129,11 +134,14 @@ export class BkashService implements OnModuleInit {
   async createPayment(
     amount: number,
     userId: string,
- 
+    purpose: 'connections' | 'premium' = 'connections',
   ): Promise<{ paymentUrl: string; paymentId: string }> {
+    if (!this.isConfigured()) throw new Error('bKash merchant credentials or backend URL are not configured');
     await this.ensureAccessToken();
+    if (!this.accessToken) throw new Error('bKash authentication unavailable');
 
-    const callbackURL = `${this.configService.get('BACKEND_URL')}/user/execute-payment-callback`;
+    const callbackPath = purpose === 'premium' ? '/user/premium-payment-callback' : '/user/execute-payment-callback';
+    const callbackURL = `${String(this.configService.get('BACKEND_URL')).replace(/\/$/, '')}${callbackPath}`;
 
     try {
       const response: AxiosResponse = await lastValueFrom(

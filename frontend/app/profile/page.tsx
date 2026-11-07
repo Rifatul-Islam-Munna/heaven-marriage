@@ -1,22 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle, BadgeCheck, Bookmark, Check, ChevronRight, Copy, Eye, EyeOff, IdCard, Loader2, Mail, Pencil, Phone,
-  Settings, ShieldCheck, Sparkles, Trash2, User as UserIcon, Users,
+  Settings, ShieldCheck, Sparkles, Trash2, User as UserIcon, Users, Heart, HeartHandshake,
 } from "lucide-react";
 import { toast } from "sonner";
 import PlatformOverview from "@/components/custom/profile/PlatformOverview";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import BiodataProgressPanel from "@/components/custom/profile/BiodataProgressPanel";
+import BiodataDeletionPanel from "@/components/custom/profile/BiodataDeletionPanel";
+import { currentBiodataStage } from "@/lib/biodata-status";
 import { UserType, User as ProfileUser } from "@/@types/user";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 
 export interface UserInfo {
   _id: string;
@@ -43,18 +41,6 @@ function Pill({ tone, children }: { tone: "green" | "gray" | "red" | "pink"; chi
   return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${tones[tone]}`}>{children}</span>;
 }
 
-function ProgressRing({ value }: { value: number }) {
-  const radius = 26, circumference = 2 * Math.PI * radius;
-  return <div className="relative size-16 shrink-0" role="img" aria-label={`${value}% সম্পূর্ণ`}>
-    <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
-      <circle cx="32" cy="32" r={radius} fill="none" strokeWidth="6" className="stroke-amber-100" />
-      <circle cx="32" cy="32" r={radius} fill="none" strokeWidth="6" strokeLinecap="round" className="stroke-amber-500 transition-all"
-        strokeDasharray={circumference} strokeDashoffset={circumference * (1 - value / 100)} />
-    </svg>
-    <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-700">{value}%</span>
-  </div>;
-}
-
 function InfoItem({ icon, label, value, action }: { icon: React.ReactNode; label: string; value: React.ReactNode; action?: React.ReactNode }) {
   return <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4">
     <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">{icon}</span>
@@ -67,23 +53,17 @@ function InfoItem({ icon, label, value, action }: { icon: React.ReactNode; label
 }
 
 const quickLinks = [
+  { href: "/profile/matches", label: "Find My Matches", hint: "আপনার প্রত্যাশা অনুযায়ী বায়োডাটা ও মিলের কারণ দেখুন", icon: Sparkles },
   { href: "/profile/ai-profile", label: "AI দিয়ে বায়োডাটা", hint: "প্রশ্নের উত্তর দিয়ে দ্রুত পূরণ করুন", icon: Sparkles },
-  { href: "/profile/short-list", label: "প্রিয় তালিকা", hint: "পছন্দের বায়োডাটাগুলো", icon: Bookmark },
+  { href: "/profile/short-list", label: "My Favourites", hint: "আমি যাদের Favourite করেছি", icon: Heart },
+  { href: "/profile/favourited-me", label: "Who Favourited Me", hint: "যারা আমার বায়োডাটা Favourite করেছেন", icon: HeartHandshake },
   { href: "/profile/numbers", label: "আমার সংযোগ", hint: "যাদের যোগাযোগ নম্বর পেয়েছেন", icon: Users },
   { href: "/profile/settings", label: "প্রোফাইল সেটিংস", hint: "পাসওয়ার্ড, ফোন ও ইমেইল", icon: Settings },
 ] as const;
 
 const User = () => {
   const router = useRouter();
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const { data: user, isLoading, refetch } = useQueryWrapper<ProfileUser>(["get-my-profile-for-success"], "/user/get-my-profile");
-  const { mutate: deleteUser, isPending: isDeleting } = useCommonMutationApi({
-    method: "DELETE",
-    url: "/user/delete-my-account",
-    mutationKey: ["delete-user"],
-    successMessage: "মুছে ফেলার অনুরোধ জমা হয়েছে। অ্যাডমিন পর্যালোচনা করবেন।",
-    onSuccess: () => { refetch(); },
-  });
 
   if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center bg-gray-50">
     <div className="flex flex-col items-center gap-3 text-gray-600"><Loader2 className="h-9 w-9 animate-spin text-pink-500" /> তথ্য লোড হচ্ছে...</div>
@@ -97,8 +77,7 @@ const User = () => {
     </div>
   </div>;
 
-  const completion = Math.max(0, Math.min(100, Math.round(user.completion?.percentage ?? 0)));
-  const deletionRequested = (user as unknown as { deletionRequested?: boolean }).deletionRequested === true;
+  const stage = currentBiodataStage(user);
   const staffRole = user.role && ROLE_LABEL[String(user.role)];
   const avatar = user.gender ? (String(user.gender).toLowerCase() === "male" ? "/male.png" : "/female.png") : null;
   const copyId = () => {
@@ -124,11 +103,11 @@ const User = () => {
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button type="button" onClick={() => router.push("/profile/my-profile")}
+            {stage !== "deleted" && <button type="button" onClick={() => router.push("/profile/my-profile")}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-pink-700">
               <Pencil className="h-4 w-4" /> বায়োডাটা এডিট করুন
-            </button>
-            {user.userId && <button type="button" onClick={() => router.push(`/biodata/${user.userId}`)}
+            </button>}
+            {stage === "published" && user.userId && <button type="button" onClick={() => router.push(`/biodata/${user.userId}`)}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
               <Eye className="h-4 w-4" /> অন্যরা যেমন দেখে
             </button>}
@@ -137,33 +116,17 @@ const User = () => {
         <div className="flex flex-wrap gap-2 border-t border-gray-100 px-5 py-3 sm:px-6">
           {user.isOtpVerified ? <Pill tone="green"><BadgeCheck className="h-3.5 w-3.5" /> অ্যাকাউন্ট যাচাইকৃত</Pill>
             : <Pill tone="red"><AlertCircle className="h-3.5 w-3.5" /> অ্যাকাউন্ট যাচাই করা হয়নি</Pill>}
-          {user.isPublished ? <Pill tone="green"><Eye className="h-3.5 w-3.5" /> বায়োডাটা প্রকাশিত</Pill>
-            : <Pill tone="gray"><EyeOff className="h-3.5 w-3.5" /> বায়োডাটা এখনো প্রকাশিত নয়</Pill>}
+          {stage === "published" ? <Pill tone="green"><Eye className="h-3.5 w-3.5" /> Published · প্রকাশিত</Pill>
+            : stage === "under_review" ? <Pill tone="pink"><ShieldCheck className="h-3.5 w-3.5" /> Under Review · যাচাই হচ্ছে</Pill>
+              : stage === "rejected" ? <Pill tone="red"><AlertCircle className="h-3.5 w-3.5" /> সংশোধন প্রয়োজন</Pill>
+                : stage === "deleted" ? <Pill tone="red"><Trash2 className="h-3.5 w-3.5" /> বায়োডাটা সরানো হয়েছে</Pill>
+                  : <Pill tone="gray"><EyeOff className="h-3.5 w-3.5" /> খসড়া</Pill>}
           {staffRole && <Pill tone="pink"><ShieldCheck className="h-3.5 w-3.5" /> {staffRole}</Pill>}
-          {deletionRequested && <Pill tone="red"><Trash2 className="h-3.5 w-3.5" /> মুছে ফেলার অনুরোধ পর্যালোচনায়</Pill>}
+
         </div>
       </section>
 
-      {completion < 100 ? <section className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center">
-        <ProgressRing value={completion} />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-gray-900">বায়োডাটা সম্পূর্ণ করুন</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-700">আপনার বায়োডাটা {completion}% সম্পূর্ণ। সব তথ্য দিলে প্রকাশের জন্য জমা দিতে পারবেন এবং উপযুক্ত প্রস্তাব পাওয়ার সম্ভাবনা বাড়বে।</p>
-        </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          <button type="button" onClick={() => router.push("/profile/my-profile")}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600">
-            এখনই সম্পূর্ণ করুন <ChevronRight className="h-4 w-4" />
-          </button>
-          <Link href="/profile/ai-profile" className="text-center text-xs font-medium text-amber-800 underline">অথবা AI দিয়ে দ্রুত পূরণ করুন</Link>
-        </div>
-      </section> : <section className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><Check className="h-5 w-5" /></span>
-        <div>
-          <h2 className="font-semibold text-gray-900">আপনার বায়োডাটা সম্পূর্ণ</h2>
-          <p className="text-sm text-gray-700">তথ্য পরিবর্তন হলে যেকোনো সময় এডিট করতে পারবেন।</p>
-        </div>
-      </section>}
+      {!staffRole && <BiodataProgressPanel profile={user} />}
 
       <PlatformOverview />
 
@@ -186,10 +149,10 @@ const User = () => {
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">দ্রুত যান</h2>
           <ul className="space-y-1">
-            {quickLinks.map(item => {
+            {quickLinks.filter(item => user.role === UserType.USER || !["/profile/matches", "/profile/short-list", "/profile/favourited-me"].includes(item.href)).map(item => {
               const Icon = item.icon;
               return <li key={item.href}>
-                <Link href={item.href} className="group flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-pink-50">
+                <Link href={item.href as Route} className="group flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-pink-50">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 group-hover:bg-white group-hover:text-pink-600"><Icon className="h-4.5 w-4.5" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-gray-900">{item.label}</span>
@@ -203,30 +166,9 @@ const User = () => {
         </section>
       </div>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-red-100 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-semibold text-gray-900">অ্যাকাউন্ট মুছে ফেলা</h2>
-          <p className="mt-1 text-sm text-gray-600">{deletionRequested ? "আপনার অনুরোধ জমা আছে। অ্যাডমিন পর্যালোচনা করে ব্যবস্থা নেবেন।" : "অনুরোধ পাঠালে অ্যাডমিন পর্যালোচনা করে আপনার অ্যাকাউন্ট ও বায়োডাটা মুছে দেবেন।"}</p>
-        </div>
-        <button type="button" onClick={() => setShowDeleteAlert(true)} disabled={isDeleting || deletionRequested}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
-          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} {deletionRequested ? "অনুরোধ পাঠানো হয়েছে" : "মুছে ফেলার অনুরোধ"}
-        </button>
-      </section>
+      {user.role === UserType.USER && <BiodataDeletionPanel deleted={stage === "deleted"} />}
     </div>
 
-    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-red-600">অ্যাকাউন্ট মুছে ফেলার অনুরোধ পাঠাবেন?</AlertDialogTitle>
-          <AlertDialogDescription>অ্যাডমিন অনুমোদন দিলে আপনার অ্যাকাউন্ট ও সমস্ত তথ্য স্থায়ীভাবে মুছে যাবে, যা আর ফেরানো যাবে না।</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>বাতিল</AlertDialogCancel>
-          <AlertDialogAction onClick={() => { deleteUser({}); setShowDeleteAlert(false); }} className="bg-red-600 hover:bg-red-700">হ্যাঁ, অনুরোধ পাঠান</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>;
 };
 

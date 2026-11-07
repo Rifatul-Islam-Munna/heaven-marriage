@@ -1,22 +1,28 @@
-import { rankMatches } from './matching';
+import { scoreMatch, compareMatches, countMatchPreferences, MATCH_FIELD_PATHS } from './matching';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Logger,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
-import { User, UserDocument } from './entities/user.entity';
+import { User, UserDocument, UserType } from './entities/user.entity';
 import { BkashService } from './bkash.service';
 import { MessagingService } from './messaging.service';
-import { completion, publicProfile, visibleFilter } from './profile-rules';
+import { completion, publicProfile, visibleFilter, PROFILE_FIELDS } from './profile-rules';
+import { biodataStage, hasSubmittedBiodata } from './biodata-lifecycle';
 import { QuestionConfigService } from '../profile-questions/question-config.service';
 import { resolvePremiumSettings } from './premium-settings';
+import { dailyRotationExpression, selectDiscovery } from './discovery-selection';
+import { discoveryCycle, recordDiscoveryEvent } from './discovery-cycle';
 
 @Injectable()
 export class PlatformService implements OnModuleInit {
+  private readonly logger = new Logger(PlatformService.name);
   constructor(
     @InjectConnection() private db: Connection,
     @InjectModel(User.name) private users: Model<UserDocument>,
@@ -25,6 +31,10 @@ export class PlatformService implements OnModuleInit {
     private questionConfig: QuestionConfigService,
   ) {}
   async onModuleInit() {
+    await this.db.collection('premium_orders').createIndex(
+      { paymentId: 1 }, { unique: true, partialFilterExpression: { paymentId: { $type: 'string' } } },
+    );
+    await this.db.collection('premium_orders').createIndex({ userId: 1, createdAt: -1 });
     await this.db
       .collection('connection_orders')
       .createIndex(
@@ -40,6 +50,14 @@ export class PlatformService implements OnModuleInit {
     await this.db
       .collection('profile_visits')
       .createIndex({ profileId: 1, visitor: 1, day: 1 }, { unique: true });
+    await this.db.collection('service_cases')
+      .createIndex({ userId: 1, kind: 1, createdAt: -1 });
+    await this.db.collection('discovery_engagement')
+      .createIndex({ cycle: 1, score: -1, _id: 1 });
+    await this.db.collection('discovery_engagement')
+      .createIndex({ profileId: 1, cycle: 1 });
+    await this.db.collection('discovery_engagement')
+      .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   }
   private oid(id: string) {
     if (!Types.ObjectId.isValid(id))
@@ -170,6 +188,8 @@ export class PlatformService implements OnModuleInit {
           { _id: target },
           { $inc: { profileContactRequests: 1 } },
         );
+        await recordDiscoveryEvent(this.db, target, 'connections')
+          .catch((error) => this.logger.warn('Could not update discovery connection score: ' + String(error)));
         await this.audit(actor, 'connection.unlock', target);
         return {
           message: 'Identity and contact unlocked',
@@ -260,6 +280,97 @@ export class PlatformService implements OnModuleInit {
       payments,
     };
   }
+  /** A premium checkout never uses connection_orders or grants connection credits. */
+  async createPremiumPayment(actor: string) {
+    const settings = resolvePremiumSettings(
+      (await this.db.collection('platform_settings').findOne({ key: 'public' }))?.premium,
+    );
+    if (!settings.visible || !settings.enabled)
+      throw new BadRequestException('Premium registration is currently unavailable');
+    if (!this.bkash.isConfigured())
+      throw new BadRequestException('Online bKash checkout is not configured yet');
+    const member = await this.users.findById(actor).lean();
+    if (!member || member.role !== UserType.USER)
+      throw new ForbiddenException('Only members can purchase premium');
+    if (member.isSubscriber) throw new BadRequestException('You are already a premium member');
+    const config = await this.questionConfig.get();
+    if (completion(member, config.questions).percentage < 100)
+      throw new BadRequestException('Complete your biodata before buying premium');
+    const cases = this.db.collection('service_cases');
+    const existing = await cases.findOne({
+      userId: actor, kind: 'premium',
+      status: { $in: ['pending', 'contacted', 'payment_pending', 'paid', 'active'] },
+    });
+    const caseId = existing?.id ?? (await this.createCase(actor, 'premium', {})).id;
+    const amount = settings.fee;
+    if (!Number.isSafeInteger(amount) || amount < 1)
+      throw new BadRequestException('Invalid premium fee');
+    const id = randomUUID();
+    await this.db.collection('premium_orders').insertOne({
+      id, userId: actor, caseId, amount, currency: 'BDT',
+      status: 'pending', createdAt: new Date(),
+    });
+    try {
+      const payment = await this.bkash.createPayment(amount, id, 'premium');
+      if (!payment.paymentId || !payment.paymentUrl)
+        throw new Error('Missing bKash checkout URL');
+      await this.db.collection('premium_orders').updateOne(
+        { id }, { $set: { paymentId: payment.paymentId } },
+      );
+      return payment;
+    } catch {
+      await this.db.collection('premium_orders').updateOne(
+        { id }, { $set: { status: 'failed' } },
+      );
+      throw new BadRequestException('Unable to start bKash premium checkout. Try again later.');
+    }
+  }
+
+  /** Verify with bKash itself, not with browser-supplied status. */
+  async executePremiumPayment(paymentId: string) {
+    if (!paymentId || paymentId.length > 150) return { success: false };
+    const orders = this.db.collection('premium_orders');
+    const order = await orders.findOne({ paymentId });
+    if (!order || order.status === 'refunded') return { success: false };
+    if (order.status === 'paid') return { success: true };
+    let result: any;
+    try {
+      result = await this.bkash.executePayment(paymentId);
+      if (result?.transactionStatus !== 'Completed')
+        result = await this.bkash.queryPayment(paymentId);
+    } catch {
+      try { result = await this.bkash.queryPayment(paymentId); }
+      catch { return { success: false }; }
+    }
+    if (result?.paymentID !== paymentId ||
+      result?.transactionStatus !== 'Completed' ||
+      Number(result.amount) !== order.amount ||
+      result.currency !== 'BDT' ||
+      (result.payerReference !== order.id &&
+        result.merchantInvoiceNumber !== order.id))
+      return { success: false };
+
+    const update = await this.users.collection.updateOne(
+      { _id: this.oid(order.userId), creditedPaymentIds: { $ne: paymentId }, role: UserType.USER },
+      { $set: { isSubscriber: true }, $addToSet: { creditedPaymentIds: paymentId } as any },
+    );
+    const member = await this.users.collection.findOne(
+      { _id: this.oid(order.userId), creditedPaymentIds: paymentId },
+    );
+    if (!member) return { success: false };
+    await orders.updateOne({ paymentId, status: 'pending' },
+      { $set: { status: 'paid', transactionId: String(result.trxID || ''), paidAt: new Date() } });
+    await this.db.collection('service_cases').updateOne(
+      { id: order.caseId, userId: order.userId, kind: 'premium',
+        status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] } },
+      { $set: { status: 'active', method: 'bkash',
+        transactionReference: String(result.trxID || paymentId),
+        paymentId, fee: order.amount, updatedAt: new Date() } },
+    );
+    if (update.modifiedCount) await this.audit(order.userId, 'premium.bkash.activated', order.id);
+    return { success: true };
+  }
+
   async createPayment(actor: string, pkgId: string) {
     const p = await this.db
       .collection('pricings')
@@ -364,9 +475,58 @@ export class PlatformService implements OnModuleInit {
     );
     return { success: true };
   }
+  /** Existing service_cases collection; member account remains usable after approval. */
+  async myDeletionRequest(actor: string) {
+    return this.db.collection('service_cases').findOne(
+      { userId: actor, kind: 'deletion' },
+      { projection: { _id: 0, id: 1, kind: 1, status: 1,
+          createdAt: 1, updatedAt: 1, reviewedAt: 1, decisionReason: 1 },
+        sort: { createdAt: -1 } },
+    );
+  }
+
+  async requestBiodataDeletion(actor: string, payload: any = {}) {
+    const member: any = await this.users.findById(actor)
+      .select('role biodataStatus deletionRequested').lean();
+    if (!member || member.role !== UserType.USER)
+      throw new ForbiddenException('Only members can request biodata deletion');
+    const existing = await this.myDeletionRequest(actor);
+    if (member.biodataStatus === 'deleted') {
+      if (existing?.status === 'approved') return existing;
+      throw new BadRequestException('This biodata was already removed');
+    }
+    if (existing && ['pending', 'contacted'].includes(existing.status)) return existing;
+    const reserved = await this.users.updateOne(
+      { _id: this.oid(actor), role: UserType.USER, deletionRequested: { $ne: true },
+        biodataStatus: { $ne: 'deleted' } },
+      { $set: { deletionRequested: true } },
+    );
+    if (!reserved.modifiedCount) {
+      const pending = await this.myDeletionRequest(actor);
+      if (pending && ['pending', 'contacted'].includes(pending.status)) return pending;
+      throw new BadRequestException('A deletion request is being processed. Refresh its status.');
+    }
+    const c = { id: randomUUID(), userId: actor, kind: 'deletion',
+      message: String(payload?.message || '').trim().slice(0, 1000),
+      status: 'pending', createdAt: new Date(), updatedAt: new Date() };
+    try {
+      await this.db.collection('service_cases').insertOne(c);
+    } catch (error) {
+      await this.users.updateOne(
+        { _id: this.oid(actor), biodataStatus: { $ne: 'deleted' } },
+        { $set: { deletionRequested: false } },
+      );
+      throw error;
+    }
+    await this.audit(actor, 'deletion.request', c.id);
+    return { id: c.id, kind: c.kind, status: c.status, createdAt: c.createdAt,
+      updatedAt: c.updatedAt };
+  }
+
   async createCase(actor: string, kind: string, p: any) {
     if (!['premium', 'report', 'deletion', 'support'].includes(kind))
       throw new BadRequestException('Invalid request type');
+    if (kind === 'deletion') return this.requestBiodataDeletion(actor, p);
     if (kind === 'report' && !p.targetId)
       throw new BadRequestException('Profile is required');
     if (kind === 'premium') {
@@ -423,10 +583,81 @@ export class PlatformService implements OnModuleInit {
       .limit(200)
       .toArray();
   }
+  /** Admin-only decision. A request alone NEVER removes profile data. */
+  private async reviewBiodataDeletion(actor: string, c: any, payload: any) {
+    const admin: any = await this.users.findById(actor).select('role').lean();
+    if (admin?.role !== UserType.ADMIN)
+      throw new ForbiddenException('Only administrators can approve or reject deletion');
+    if (!['pending', 'contacted'].includes(c.status) ||
+        !['approved', 'rejected'].includes(payload.status))
+      throw new BadRequestException('Deletion request is no longer awaiting a decision');
+    const reason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
+    if (reason.length < 5)
+      throw new BadRequestException('A review reason of at least five characters is required');
+    if (payload.status === 'approved' && payload.confirmDeletion !== true)
+      throw new BadRequestException('Explicit approval confirmation is required');
+    if (payload.status === 'approved') {
+      const member: any = await this.users.findById(c.userId)
+        .select('role biodataStatus').lean();
+      if (!member || member.role !== UserType.USER)
+        throw new NotFoundException('Member no longer exists');
+    }
+    const cases = this.db.collection('service_cases');
+    const reviewedAt = new Date();
+    const updated = await cases.findOneAndUpdate(
+      { id: c.id, status: c.status },
+      { $set: {
+        status: payload.status, decisionReason: reason,
+        reviewedBy: actor, reviewedAt, updatedAt: reviewedAt,
+        adminNotes: String(payload.adminNotes || c.adminNotes || '').slice(0, 4000),
+      } },
+      { returnDocument: 'after' },
+    );
+    if (!updated) throw new BadRequestException('Request changed. Refresh and retry.');
+    try {
+      if (payload.status === 'approved') {
+        // Preserve authentication, contact, payments and the user's audit trail;
+        // remove biodata answers only AFTER an administrator approves.
+        const clear = Object.fromEntries(
+          PROFILE_FIELDS.filter((key) => key !== 'name').map((key) => [key, '']),
+        );
+        const result = await this.users.updateOne(
+          { _id: this.oid(c.userId), role: UserType.USER },
+          { $set: {
+              isPublished: false, isPublishFromAdmin: false,
+              biodataStatus: 'deleted', deletionRequested: true,
+              verificationStatus: 'pending', statusReason: '',
+              deletedAt: reviewedAt, draftStep: 0,
+            },
+            $unset: clear,
+          },
+        );
+        if (!result.matchedCount) throw new NotFoundException('Member unavailable');
+      } else {
+        await this.users.updateOne(
+          { _id: this.oid(c.userId), role: UserType.USER },
+          { $set: { deletionRequested: false } },
+        );
+      }
+    } catch (error) {
+      // A failed biodata update must not leave a falsely completed decision.
+      await cases.updateOne(
+        { id: c.id, status: payload.status, reviewedBy: actor },
+        { $set: { status: c.status, updatedAt: new Date() },
+          $unset: { decisionReason: '', reviewedAt: '', reviewedBy: '' } },
+      );
+      throw error;
+    }
+    await this.audit(actor, 'deletion.' + payload.status, c.id, reason);
+    return updated;
+  }
+
   async caseAction(actor: string, id: string, p: any) {
     const cases = this.db.collection('service_cases'),
       c = await cases.findOne({ id });
     if (!c) throw new NotFoundException('Request unavailable');
+    if (c.kind === 'deletion' && p?.status)
+      return this.reviewBiodataDeletion(actor, c, p);
     const allowed: any = {
       pending: ['contacted', 'rejected'],
       contacted: ['payment_pending', 'approved', 'rejected', 'active'],
@@ -492,18 +723,7 @@ export class PlatformService implements OnModuleInit {
           $set: { isPublishFromAdmin: false, verificationStatus: 'suspended' },
         },
       );
-    if (c.kind === 'deletion' && p.status === 'approved')
-      await this.users.updateOne(
-        { _id: c.userId },
-        {
-          $set: {
-            isPublished: false,
-            isPublishFromAdmin: false,
-            verificationStatus: 'suspended',
-            deletionRequested: true,
-          },
-        },
-      );
+
     return updated;
   }
   async remind(actor: string, userId: string, p: any) {
@@ -559,61 +779,132 @@ export class PlatformService implements OnModuleInit {
         { $setOnInsert: { createdAt: new Date() } },
         { upsert: true },
       );
-    if (r.upsertedCount)
+    if (r.upsertedCount) {
       await this.users.updateOne(
         { _id: target },
         { $inc: { profileViews: 1 } },
       );
+      await recordDiscoveryEvent(this.db, target, 'views')
+        .catch((error) => this.logger.warn('Could not update discovery view score: ' + String(error)));
+    }
     return { success: true };
   }
-  async matches(actor: string) {
-    const u: any = await this.users.findById(actor).lean();
-    if (!u || u.verificationStatus==="suspended" || !u.gender)
-      return {
-        profiles: [],
-        message: 'Complete your biodata to receive suggestions',
-      };
-    const candidates: any[] = await this.users
-      .find({
-        ...visibleFilter,
-        gender: u.gender === 'male' ? 'female' : 'male',
-        _id: { $ne: actor },
-      })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean();
-    const settings = await this.db
-      .collection('platform_settings')
-      .findOne({ key: 'public' });
-    const scored = rankMatches(u, candidates, settings || {});
+  async matches(actor: string, page = 1, limit = 12) {
+    const currentPage = Number.isFinite(page) ? Math.max(1, Math.min(100, Math.floor(page))) : 1;
+    const pageSize = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.floor(limit))) : 12;
+    const u: any = await this.users.findById(actor)
+      .select('gender role verificationStatus expectedLifePartner').lean();
+    if (!u || u.verificationStatus === 'suspended' || u.role !== 'user' ||
+        !['male', 'female'].includes(u.gender))
+      return { profiles: [], page: currentPage, limit: pageSize, total: 0,
+        preferenceCount: 0, message: 'আপনার বায়োডাটায় লিঙ্গের তথ্য পূরণ করুন।' };
+    const preferenceCount = countMatchPreferences(u);
+    if (!preferenceCount)
+      return { profiles: [], page: currentPage, limit: pageSize, total: 0,
+        preferenceCount: 0, message: 'প্রত্যাশিত জীবনসঙ্গীর তথ্য পূরণ করলে ম্যাচ দেখা যাবে।' };
+    const settings = await this.db.collection('platform_settings').findOne({ key: 'public' });
+    if (settings?.discoveryEnabled === false)
+      return { profiles: [], page: currentPage, limit: pageSize, total: 0,
+        preferenceCount, message: 'ম্যাচিং সুবিধা বর্তমানে বন্ধ আছে।' };
+    const schema = await this.questionConfig.get();
+    const allowed = new Set(
+      schema.questions.filter((q) => q.enabled && q.showPublic &&
+        (q.gender === 'both' || q.gender === (u.gender === 'male' ? 'female' : 'male')))
+        .map((q) => q.path),
+    );
+    // Non-public answers are never used for a score or an explanation.
+    const projection = ['_id', 'userId', 'createdAt', 'age', 'gender',
+      'maritalStatus', 'isPublished', 'isPublishFromAdmin', 'isSubscriber',
+      'verificationStatus', ...MATCH_FIELD_PATHS]
+      .filter((field) => !MATCH_FIELD_PATHS.includes(field) || allowed.has(field))
+      .join(' ');
+    const opposite = u.gender === 'male' ? 'female' : 'male';
+    const query = this.users.find({
+      ...visibleFilter, role: UserType.USER, gender: opposite,
+      _id: { $ne: u._id },
+    }).select(projection).sort({ _id: -1 }).lean().cursor();
+    const all: ReturnType<typeof scoreMatch>[] = [];
+    for await (const candidate of query) {
+      const safe = publicProfile(candidate);
+      this.questionConfig.applyPublicVisibility(safe, schema);
+      const scored = scoreMatch(u, safe, settings || {});
+      if (scored.score !== null && scored.score >=
+          Math.max(0, Number(settings?.minMatchScore ?? 0) || 0)) all.push(scored);
+    }
+    all.sort(compareMatches);
     return {
-      profiles: scored,
-      message: 'Suggestions are based on stated preferences, not a guarantee.',
+      profiles: all.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+      page: currentPage, limit: pageSize, total: all.length, preferenceCount,
+      message: 'এই স্কোর আপনার উল্লেখ করা শর্তগুলোর হিসাব; সম্পর্কের নিশ্চয়তা নয়।',
     };
   }
   async discovery() {
-    const [popular, recent] = await Promise.all([
-      this.users.aggregate([
-        { $match: visibleFilter },
-        {
-          $addFields: {
-            rank: {
-              $add: [
-                { $ifNull: ['$profileViews', 0] },
-                { $multiply: [3, { $ifNull: ['$profileInterests', 0] }] },
-                { $multiply: [5, { $ifNull: ['$profileContactRequests', 0] }] },
-              ],
-            },
+    const today = new Date();
+    const { cycle } = discoveryCycle(today);
+    const eligible = { ...visibleFilter, role: UserType.USER };
+    const [ranked, newest, underexposed] = await Promise.all([
+      // A real 15-day leaderboard: historical/lifetime totals never affect rank.
+      this.db.collection('discovery_engagement').aggregate([
+        { $match: { cycle, score: { $gt: 0 } } },
+        { $sort: { score: -1, _id: 1 } },
+        { $lookup: {
+            from: this.users.collection.name,
+            localField: 'profileId', foreignField: '_id', as: 'member',
           },
         },
-        { $sort: { rank: -1, createdAt: -1 } },
-        { $limit: 6 },
+        { $unwind: '$member' },
+        { $replaceRoot: { newRoot: { $mergeObjects: [
+          '$member',
+          { cycleEngagement: {
+            views: { $ifNull: ['$views', 0] },
+            favourites: { $ifNull: ['$favourites', 0] },
+            connections: { $ifNull: ['$connections', 0] },
+          } },
+        ] } } },
+        { $match: eligible },
+        { $limit: 32 },
+      ]).toArray(),
+      this.users.find(eligible).sort({ createdAt: -1, _id: -1 }).limit(32).lean(),
+      // Low-engagement members rotate every day, independently of lifetime fame.
+      this.users.aggregate([
+        { $match: eligible },
+        { $lookup: {
+          from: 'discovery_engagement',
+          let: { memberId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [
+              { $eq: ['$profileId', '$$memberId'] },
+              { $eq: ['$cycle', cycle] },
+            ] } } },
+            { $project: { score: 1, _id: 0 } },
+          ],
+          as: 'periodEngagement',
+        } },
+        { $addFields: {
+          cycleScore: { $ifNull: [{ $arrayElemAt: ['$periodEngagement.score', 0] }, 0] },
+        } },
+        { $match: { cycleScore: { $lte: 10 } } },
+        { $addFields: { dailyRotation: dailyRotationExpression(today) } },
+        { $sort: { dailyRotation: 1, _id: 1 } },
+        { $limit: 32 },
       ]),
-      this.users.find(visibleFilter).sort({ createdAt: -1 }).limit(6).lean(),
     ]);
+    const selection = selectDiscovery(ranked, newest, underexposed, today);
+    // The badge and its displayed numbers both refer to the CURRENT cycle.
+    // Personal lifetime engagement totals remain untouched in user accounts.
+    const safe = (u: any) => ({
+      ...publicProfile(u),
+      discoverySource: u.discoverySource,
+      ...(u.rankingPosition ? { rankingPosition: u.rankingPosition } : {}),
+      engagement: {
+        views: Math.max(0, Number(u.cycleEngagement?.views) || 0),
+        favourites: Math.max(0, Number(u.cycleEngagement?.favourites) || 0),
+        connections: Math.max(0, Number(u.cycleEngagement?.connections) || 0),
+      },
+    });
     return {
-      popular: popular.map((x) => publicProfile(x)),
-      recent: recent.map((x) => publicProfile(x)),
+      popular: selection.popular.map(safe),
+      recent: selection.recent.map(safe),
     };
   }
   async summary(actor: string) {
@@ -621,8 +912,12 @@ export class PlatformService implements OnModuleInit {
     if (!u) throw new NotFoundException('Account unavailable');
     const config=await this.questionConfig.get();
     const profileCompletion=completion(u,config.questions);
+    const stage=biodataStage(u,profileCompletion.percentage);
     return {
       completion: profileCompletion,
+      biodataStage: stage,
+      alreadySubmitted: hasSubmittedBiodata(u),
+      submittedAt: u.submittedAt || null,
       accountType: u.isSubscriber ? 'premium' : 'general',
       verificationStatus:
         u.verificationStatus || (u.isPublishFromAdmin ? 'approved' : 'pending'),
@@ -632,9 +927,10 @@ export class PlatformService implements OnModuleInit {
       journey: {
         created: true,
         completed: profileCompletion.percentage === 100,
-        submitted: ['submitted', 'approved'].includes(u.biodataStatus),
-        approved: u.isPublishFromAdmin,
-        published: u.isPublished,
+        submitted: hasSubmittedBiodata(u),
+        underReview: stage === 'under_review',
+        approved: stage === 'published',
+        published: stage === 'published',
       },
       connections: await this.connections(actor),
     };
