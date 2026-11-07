@@ -6,7 +6,8 @@ export interface BiodataStatusSource {
   isPublishFromAdmin?: boolean;
   verificationStatus?: string;
   alreadySubmitted?: boolean;
-  completion?: { percentage?: number };
+  completion?: { percentage?: number; requiredCount?:number; answeredCount?:number;schemaRevision?:number };
+  completionPercentage?:number;completionRequiredCount?:number;completionAnsweredCount?:number;
   submittedAt?: string | Date | null;
 }
 export type DeletionRequestStatus = "pending" | "contacted" | "approved" | "rejected";
@@ -20,7 +21,7 @@ export interface DeletionRequest {
   decisionReason?: string;
 }
 export function profileCompletion(source?: BiodataStatusSource | null): number {
-  const value = Number(source?.completion?.percentage ?? 0);
+  const value = Number(source?.completion?.percentage ?? source?.completionPercentage ?? 0);
   return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;
 }
 export function currentBiodataStage(source?: BiodataStatusSource | null): BiodataStage {

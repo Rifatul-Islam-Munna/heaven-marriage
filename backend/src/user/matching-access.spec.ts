@@ -43,7 +43,16 @@ describe('Smart matching: members only', () => {
     expect(() => guard.canActivate(context(role))).toThrow(ForbiddenException);
   });
 
-  it('exposes no admin method for matching another member', () => {
-    expect((PlatformController.prototype as any).adminMatches).toBeUndefined();
+  it('provides a separate staff-permission-protected admin match endpoint', () => {
+    const handler=PlatformController.prototype.adminMatches;
+    expect(handler).toBeDefined();
+    const guards=Reflect.getMetadata(GUARDS_METADATA,handler);
+    expect(guards).toContain(RolesGuard);
+    const metadata=Reflect.getMetadata('dashboardPermission',handler);
+    expect(metadata).toEqual(['users']);
+    expect(() => guard.canActivate({
+      getClass:()=>PlatformController,getHandler:()=>handler,
+      switchToHttp:()=>({getRequest:()=>({user:{id:'member',role:UserType.USER}})}),
+    } as unknown as ExecutionContext)).toThrow(ForbiddenException);
   });
 });

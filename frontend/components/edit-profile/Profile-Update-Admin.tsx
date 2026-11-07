@@ -10,12 +10,19 @@ import {
   MessageCircle,
   Send,
   Trash2,
+  Mail,
+  ShieldCheck,
+  ClipboardList,
+  Save,
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
 import { defaultQuestions, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import {
@@ -50,6 +57,9 @@ import { ExpectedPartnerStep } from "../custom/updateProfile/ExpectedPartnerStep
 import { CustomQuestionsStep } from "../custom/updateProfile/CustomQuestionsStep";
 import { PledgeStep } from "../custom/updateProfile/PledgeStep";
 import { User } from "@/@types/user";
+import {getAdminBiodataProgress} from "@/lib/admin-biodata-progress";
+import AdminBiodataSectionOverview from './AdminBiodataSectionOverview';
+import {diffBiodataDraft,hasBiodataChanges} from "@/lib/biodata-draft";
 import AdminPasswordCard from "./AdminPasswordCard";
 import {
   BIODATA_WHATSAPP_GROUPS,
@@ -76,6 +86,15 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const getFormData = useProfileStore((state) => state.getFormData);
   const initializeForm = useProfileStore((state) => state.initializeForm);
   const [questionSchema,setQuestionSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
+  const [editMode,setEditMode] = useState<'biodata'|'account'>('biodata');
+  const [contactEmail,setContactEmail]=useState('');
+  const [contactPhone,setContactPhone]=useState('');
+  const formRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLElement>(null);
+  const initialBiodataRef = useRef<Record<string,unknown> | null>(null);
+  const loadedMemberRef=useRef<string>('');
+  const goToFormRef=useRef(false);
+  const goToAccountRef=useRef(false);
   useEffect(()=>{
     const controller=new AbortController();
     void fetch("/api/profile-questions",{signal:controller.signal})
@@ -92,18 +111,44 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const contacts = useProfileStore(state => state.formData);
-  const activeSteps=useMemo(()=>{
-    const indices=steps.map((_,index)=>index).filter(index=>
-      questionSchema.questions.some(q=>q.section===index&&q.enabled&&
-        (q.gender==='both'||q.gender===contacts.gender)));
-    return indices.length?indices:[0];
-  },[questionSchema,contacts.gender]);
+  const sectionProgress=useMemo(()=>getAdminBiodataProgress(questionSchema,contacts),[questionSchema,contacts]);
+  const activeSteps=useMemo(()=>sectionProgress.map(section=>section.id),[sectionProgress]);
   const stepPosition=Math.max(0,activeSteps.indexOf(currentStep));
+  const activeProgress=sectionProgress.find(section=>section.id===currentStep);
+  const biodataDirty=!!initialBiodataRef.current && hasBiodataChanges(
+    diffBiodataDraft(initialBiodataRef.current,contacts as Record<string,unknown>));
+  const scrollToSection = () => {
+    if(typeof window==='undefined')return;
+    const smooth=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.requestAnimationFrame(()=>formRef.current?.scrollIntoView({behavior:smooth?'smooth':'instant',block:'start'}));
+  };
+  const openSection=(index:number)=>{
+    setEditMode('biodata');
+    goToFormRef.current=true;
+    setCurrentStep(index);
+    scrollToSection();
+  };
+  useEffect(()=>{
+    if(editMode==='biodata'&&goToFormRef.current) {
+      goToFormRef.current=false;
+      scrollToSection();
+    }
+  },[currentStep,editMode]);
+  const openAccount=()=>{
+    goToAccountRef.current=true;
+    setEditMode('account');
+  };
+  useEffect(()=>{
+    if(editMode==='account' && goToAccountRef.current){
+      goToAccountRef.current=false;
+      const smooth=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.requestAnimationFrame(()=>accountRef.current?.scrollIntoView({behavior:smooth?'smooth':'instant',block:'start'}));
+    }
+  },[editMode]);
   useEffect(()=>{
     if(!activeSteps.includes(currentStep))
       setCurrentStep(activeSteps.find(index=>index>currentStep)??activeSteps[activeSteps.length-1]);
   },[activeSteps,currentStep,setCurrentStep]);
-  const updateField = useProfileStore(state => state.updateField);
   const { mutate: saveContacts, isPending: isSavingContacts } = useCommonMutationApi({
     method: "PATCH", url: "/user/update-user-admin", mutationKey: ["admin-user-contacts", id],
     successMessage: "ফোন ও ইমেইল সংরক্ষিত হয়েছে",
@@ -111,10 +156,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   });
 
   const handleNext = () => {
-    if (activeSteps[stepPosition+1]!==undefined) {
-      setCurrentStep(activeSteps[stepPosition+1]);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    if (activeSteps[stepPosition+1]!==undefined) openSection(activeSteps[stepPosition+1]);
   };
 
   const { data, isLoading, refetch } = useQueryWrapper<User>(
@@ -130,9 +172,10 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     method: "PATCH",
     url: "/user/update-user-admin",
     mutationKey: ["update-user"],
-    successMessage: "User Updated",
+    successMessage: "বায়োডাটার পরিবর্তন সংরক্ষিত হয়েছে",
     onSuccess: () => {
-      return router.push("/dashboard");
+      initialBiodataRef.current=useProfileStore.getState().getFormData() as Record<string,unknown>;
+      void refetch();
     },
   });
 
@@ -162,29 +205,37 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   });
 
   useEffect(() => {
-    if (data) {
+    if (!data) return;
+    const memberId=String(data._id||id);
+    const current=useProfileStore.getState().getFormData() as Record<string,unknown>;
+    const pending=initialBiodataRef.current && hasBiodataChanges(
+      diffBiodataDraft(initialBiodataRef.current,current));
+    // Contact, visibility and other server refreshes must never erase an unsaved biodata draft.
+    // Loading a different member always replaces the old draft.
+    if(!pending || loadedMemberRef.current!==memberId) {
       initializeForm(data);
+      initialBiodataRef.current=useProfileStore.getState().getFormData() as Record<string,unknown>;
+      loadedMemberRef.current=memberId;
     }
-  }, [data, initializeForm]);
+    setContactEmail(data.email || '');
+    setContactPhone(data.phoneNumber || '');
+  }, [data, id, initializeForm]);
 
   const handlePrevious = () => {
-    if (activeSteps[stepPosition-1]!==undefined) {
-      setCurrentStep(activeSteps[stepPosition-1]);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    if (activeSteps[stepPosition-1]!==undefined) openSection(activeSteps[stepPosition-1]);
   };
 
-  const handleSubmit = async () => {
-    const formData = getFormData();
-    // Administrator edits do not have legacy mandatory profile fields.
-    const submitData = {
-      id,
-      ...formData,
-      email: formData.email?.trim() || null,
-      phoneNumber: formData.phoneNumber?.trim() || null,
-    };
-
-    mutate(submitData);
+  const handleSubmit = () => {
+    if(!data || !initialBiodataRef.current)return;
+    // Account credentials are edited only in the separate Account & Security section.
+    // Patch changed biodata fields instead of sending stale account / payment fields.
+    const changes=diffBiodataDraft(initialBiodataRef.current,
+      getFormData() as Record<string,unknown>);
+    if(!hasBiodataChanges(changes)) {
+      toast.info('কোনো নতুন Biodata পরিবর্তন নেই');
+      return;
+    }
+    mutate({id,...changes});
   };
 
   // Handle hide/unhide confirmation
@@ -284,18 +335,47 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen w-full bg-gray-50 py-4 sm:py-6 lg:py-8">
-      <div className="w-full container mx-auto px-3 sm:px-4 lg:px-6">
-        <Card className="mb-6 border-pink-200">
+      <div className="w-full container mx-auto space-y-4 px-3 sm:px-4 lg:px-6">
+        <div className="rounded-xl border border-pink-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-pink-700">Member management / Edit profile</p>
+              <h1 className="mt-1 break-words text-xl font-bold text-slate-900 sm:text-2xl">{data?.name || (isLoading?'Loading member…':'Member biodata')}</h1>
+              <p className="mt-1 text-xs text-slate-600">Biodata ID: <span className="font-mono">{data?.userId || '—'}</span> · {data?.isPublishFromAdmin ? 'Published' : 'Not published'}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-600">বায়োডাটা ও Account security আলাদা রাখা হয়েছে। সেকশন নির্বাচন করলে আর পেজের একদম উপরে যাবে না।</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant={editMode==='biodata'?'default':'outline'}
+                onClick={()=>setEditMode('biodata')}
+                className={editMode==='biodata'?'bg-pink-600 hover:bg-pink-700':''}>
+                <ClipboardList className="mr-1 size-4"/> Biodata sections
+              </Button>
+              <Button type="button" variant={editMode==='account'?'default':'outline'}
+                onClick={openAccount}
+                className={editMode==='account'?'bg-slate-800 hover:bg-slate-900':''}>
+                <ShieldCheck className="mr-1 size-4"/> Account & security
+              </Button>
+            </div>
+          </div>
+        </div>
+        {isLoading && <div role="status" className="rounded-lg border bg-white p-8 text-center text-sm text-slate-600">Member profile loading…</div>}
+        {!isLoading && !data && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-800">Member profile could not be loaded. <Button type="button" variant="outline" onClick={()=>void refetch()}>Retry</Button></div>}
+        {editMode==='account' && !!data && <section ref={accountRef} id="admin-account-security" aria-label="Account & security" className="scroll-mt-24 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><ShieldCheck className="size-5 text-pink-600"/> Account & security</h2>
+            <p className="mt-1 text-sm text-gray-600">Login phone, login email, password এবং account actions এখানে আলাদাভাবে পরিচালনা করুন। এগুলো Biodata questions থেকে আলাদা।</p>
+          </div>
+        <Card className="mb-4 border-pink-200">
           <CardHeader><CardTitle className="text-lg text-pink-700">অ্যাকাউন্টের ফোন ও ইমেইল</CardTitle></CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={e => {
               e.preventDefault();
-              if (!contacts.email?.trim() && !contacts.phoneNumber?.trim()) { toast.error("অন্তত একটি ফোন নম্বর বা ইমেইল রাখুন"); return; }
-              saveContacts({ id, email: contacts.email?.trim() || null, phoneNumber: contacts.phoneNumber?.trim() || null });
+              if (!contactEmail.trim() && !contactPhone.trim()) { toast.error("অন্তত একটি ফোন নম্বর বা ইমেইল রাখুন"); return; }
+              saveContacts({ id, email: contactEmail.trim() || null, phoneNumber: contactPhone.trim() || null });
             }}>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2"><Label htmlFor="admin-contact-phone">মোবাইল নম্বর</Label><Input id="admin-contact-phone" type="tel" autoComplete="off" value={contacts.phoneNumber || ""} disabled={isLoading || isSavingContacts} onChange={e => updateField("phoneNumber",e.target.value)} placeholder="+8801712345678" /></div>
-                <div className="space-y-2"><Label htmlFor="admin-contact-email">ইমেইল</Label><Input id="admin-contact-email" type="email" autoComplete="off" value={contacts.email || ""} disabled={isLoading || isSavingContacts} onChange={e => updateField("email",e.target.value)} placeholder="name@example.com" /></div>
+                <div className="space-y-2"><Label htmlFor="admin-contact-phone">মোবাইল নম্বর</Label><Input id="admin-contact-phone" type="tel" autoComplete="off" value={contactPhone} disabled={isLoading || isSavingContacts} onChange={e => setContactPhone(e.target.value)} placeholder="+8801712345678" /></div>
+                <div className="space-y-2"><Label htmlFor="admin-contact-email">ইমেইল</Label><Input id="admin-contact-email" type="email" autoComplete="off" value={contactEmail} disabled={isLoading || isSavingContacts} onChange={e => setContactEmail(e.target.value)} placeholder="name@example.com" /></div>
               </div>
               <p className="text-xs text-gray-500">পরিবর্তিত ফোন/ইমেইল পুনরায় যাচাই করতে হবে। ব্যবহারকারীর পুরোনো সেশন ও OTP বাতিল হবে। অসম্পূর্ণ বায়োডাটার ক্ষেত্রেও এখান থেকে সংরক্ষণ করা যাবে।</p>
               <Button type="submit" disabled={isLoading || !data || isSavingContacts} className="bg-pink-600 hover:bg-pink-700">{isSavingContacts ? "সংরক্ষণ হচ্ছে..." : "ফোন ও ইমেইল সংরক্ষণ করুন"}</Button>
@@ -348,6 +428,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             মুছে ফেলুন
           </Button>
         </div>
+        </section>}
 
         <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
           <DialogContent className="sm:max-w-2xl">
@@ -393,67 +474,12 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
           </DialogContent>
         </Dialog>
 
-        {/* Progress Steps */}
-        <div className="mb-6 sm:mb-8">
-          {/* Mobile: Simple Progress Bar */}
-          <div className="block sm:hidden mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                ধাপ {stepPosition + 1} / {activeSteps.length}
-              </span>
-              <span className="text-sm font-semibold text-gray-800">
-                {steps[currentStep]}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-pink-600 h-2 rounded-full transition-all duration-300"
-                style={{
-                  width: `${((stepPosition + 1) / activeSteps.length) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
+        {editMode==='biodata' && !!data && <>
+          <AdminBiodataSectionOverview sections={sectionProgress} selected={currentStep}
+            loading={isLoading} onSelect={openSection}/>
+          <section ref={formRef} id="biodata-editor-panel" aria-label="Selected biodata section"
+            className="scroll-mt-24 space-y-4">
 
-          {/* Desktop: Detailed Steps */}
-          <div className="hidden sm:flex items-center justify-between">
-            {activeSteps.map((index,position) => (
-              <div key={index} className="flex-1 flex items-center">
-                <div className="flex flex-col items-center flex-1">
-                  <div
-                    onClick={() => {
-                      setCurrentStep(index);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all duration-200 ${
-                      index < currentStep
-                        ? "bg-green-500 text-white"
-                        : index === currentStep
-                          ? "bg-pink-600 text-white ring-4 ring-pink-100"
-                          : "bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {index < currentStep ? (
-                      <Check className="w-4 h-4 md:w-5 md:h-5" />
-                    ) : (
-                      index + 1
-                    )}
-                  </div>
-                  <p className="text-[10px] md:text-xs mt-2 text-center max-w-[60px] md:max-w-[80px] line-clamp-2 text-gray-600">
-                    {steps[index]}
-                  </p>
-                </div>
-                {position < activeSteps.length - 1 && (
-                  <div
-                    className={`h-1 flex-1 mx-1 md:mx-2 transition-all duration-200 -mt-6 ${
-                      index < currentStep ? "bg-green-500" : "bg-gray-200"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Form Content */}
         <Card className="w-full shadow-none py-0 border-0 sm:border border-gray-50">
@@ -470,36 +496,31 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
           </CardContent>
         </Card>
 
-        {/* Navigation Buttons */}
-        <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mt-4 sm:mt-6">
-          <Button
-            onClick={handlePrevious}
-            disabled={stepPosition === 0}
-            variant="outline"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 h-11 sm:h-10"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            পূর্ববর্তী
-          </Button>
-
-          {stepPosition === activeSteps.length - 1 ? (
-            <Button
-              onClick={handleSubmit}
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white h-11 sm:h-10"
-              disabled={isPending}
-            >
-              সম্পন্ন করুন
+        <div className="sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:p-4">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-slate-900">{activeProgress?.title || steps[currentStep]}</p>
+            <p className={biodataDirty?'text-[12px] font-medium text-amber-700':'text-[12px] text-emerald-700'}>
+              {biodataDirty?'Unsaved changes · সংরক্ষণ করতে Save চাপুন':'সব পরিবর্তন সংরক্ষিত'}
+            </p>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <Button type="button" onClick={handlePrevious} disabled={stepPosition===0}
+              variant="outline" className="min-h-10 flex-1 sm:flex-none">
+              <ChevronLeft className="mr-1 size-4"/> Previous
             </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700 text-white flex items-center justify-center gap-2 h-11 sm:h-10"
-            >
-              পরবর্তী
-              <ChevronRight className="w-4 h-4" />
+            <Button type="button" onClick={handleSubmit} disabled={isLoading||isPending||!biodataDirty}
+              className="min-h-10 flex-1 bg-pink-600 font-semibold text-white hover:bg-pink-700 sm:flex-none">
+              {isPending?<RefreshCw className="mr-1 size-4 animate-spin"/>:<Save className="mr-1 size-4"/>}
+              {isPending?'Saving...':'Save biodata'}
             </Button>
-          )}
+            <Button type="button" onClick={handleNext} disabled={stepPosition>=activeSteps.length-1}
+              variant="outline" className="min-h-10 flex-1 sm:flex-none">
+              Next <ChevronRight className="ml-1 size-4"/>
+            </Button>
+          </div>
         </div>
+          </section>
+        </>}
       </div>
 
       {/* Hide/Unhide Confirmation Dialog */}

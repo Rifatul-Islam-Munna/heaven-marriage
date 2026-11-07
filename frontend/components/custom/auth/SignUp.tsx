@@ -14,10 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Heart } from "lucide-react";
+
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+
 export default function SignUp() {
   const router = useRouter();
   const [mode,setMode]=useState<"phone"|"email">("phone");
@@ -63,7 +64,8 @@ export default function SignUp() {
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 px-3 py-6 sm:items-center sm:p-4">
-      <Card className="w-full max-w-md border-pink-200">
+      <div className="w-full max-w-md space-y-3">
+      <Card className="w-full border-pink-200">
         <CardHeader className="space-y-2 px-5 pb-2 text-center sm:space-y-3 sm:px-6">
           <div className="mx-auto flex size-12 items-center justify-center sm:size-16">
             <Image src={"/logo.png"} width={64} height={64} alt="logo" />
@@ -200,6 +202,7 @@ export default function SignUp() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

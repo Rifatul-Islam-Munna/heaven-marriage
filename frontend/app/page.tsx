@@ -14,6 +14,7 @@ import HMSBenefitsSection from "@/components/custom/Home/hms-benefits-section";
 import IslamicMarriageSection from "@/components/custom/Home/islamic-marriage-section";
 import MarriageBenefitsSection from "@/components/custom/Home/marriage-benefits-section";
 import PricingSection from "@/components/custom/Home/PricingSection";
+import PremiumOfferCard from "@/components/custom/profile/PremiumOfferCard";
 import ProfileDiscovery from "@/components/custom/Home/ProfileDiscovery";
 import LatestBlogsSection from "@/components/custom/Home/LatestBlogsSection";
 
@@ -84,9 +85,13 @@ export default function PageBn() {
       {/* Ideally your HeroSection should show Bangla H1 + intro text on /bn */}
       <HeroSection />
       <BiodataFilter />
-      <ProfileDiscovery />
-      <CreateBiodataSection />
+
+      {/* Immediately under "আপনার জীবনসঙ্গী খুঁজুন": premium, pricing, then free biodata. */}
+      <section className="container mx-auto max-w-6xl px-4 py-8 sm:px-6"><PremiumOfferCard source="home" /></section>
       <PricingSection />
+      <CreateBiodataSection />
+
+      <ProfileDiscovery />
       <Suspense fallback={null}><LatestBlogsSection /></Suspense>
       <AboutSection />
       <IslamicMarriageSection />

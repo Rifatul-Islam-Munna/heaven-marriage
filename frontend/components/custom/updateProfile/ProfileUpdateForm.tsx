@@ -16,12 +16,14 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, questionUsesSeparateStorage, readQuestionAnswer,
+  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
+import type {LocationResponse} from '@/lib/location-options';
 import AiBiodataAssistant from "./AiBiodataAssistant";
 import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
+import {previewBiodataCompletion} from '@/lib/profile-completion';
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
 type Answer = string | number | boolean | string[];
@@ -175,8 +177,11 @@ export default function ProfileUpdateForm() {
   const [saveError, setSaveError] = useState("");
   const [schema, setSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
   const [schemaReady, setSchemaReady] = useState(false);
+  const [schemaUnavailable,setSchemaUnavailable]=useState(false);
+  const [schemaAttempt,setSchemaAttempt]=useState(0);
   const [view, setView] = useState<View>("journey");
   const queryClient = useQueryClient();
+  const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
   const [qi, setQi] = useState(0);
   const [streak, setStreak] = useState(0);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
@@ -186,12 +191,20 @@ export default function ProfileUpdateForm() {
   useEffect(() => {
     const controller = new AbortController();
     void fetch("/api/profile-questions", { signal: controller.signal, cache: "no-store" })
-      .then(r => r.ok ? r.json() : Promise.reject(Error()))
-      .then((next: ProfileQuestionSchema) => { if (Array.isArray(next?.questions)) setSchema(next); })
-      .catch(() => { /* The built-in questions stay as the fallback. */ })
-      .finally(() => { if (!controller.signal.aborted) setSchemaReady(true); });
+      .then(r => {
+        // A cached fallback cannot be treated as the current Admin-required schema.
+        if(!r.ok||r.headers.get("X-Profile-Schema-Fallback")==="true")
+          throw Error("Live Question Builder configuration unavailable");
+        return r.json();
+      })
+      .then((next: ProfileQuestionSchema) => {
+        if(!Array.isArray(next?.questions))throw Error("Invalid Question Builder configuration");
+        if(!controller.signal.aborted){setSchema(next);setSchemaUnavailable(false);}
+      })
+      .catch(()=>{if(!controller.signal.aborted)setSchemaUnavailable(true);})
+      .finally(()=>{if(!controller.signal.aborted)setSchemaReady(true);});
     return () => controller.abort();
-  }, []);
+  }, [schemaAttempt]);
 
   const { data, isLoading, isError: profileLoadError, refetch: reloadProfile } = useQueryWrapper(["get-my-profile"], "/user/get-my-profile");
   const { mutate, isPending } = useCommonMutationApi({
@@ -210,7 +223,8 @@ export default function ProfileUpdateForm() {
       const step = Math.max(0, Math.min(9, Number((data as { draftStep?: number }).draftStep) || 0));
       savedStep.current = step;
       setCurrentStep(step);
-      if (isSubmittedBiodata(data as BiodataStatusSource)) setView("review");
+      // Keep the gamified journey map as the default even for published biodata.
+      // Members can still open their saved answers from the journey map.
       initialized.current = true;
     }
   }, [data, initializeForm, setCurrentStep]);
@@ -229,12 +243,20 @@ export default function ProfileUpdateForm() {
     setSaveState("saving");
     setSaveError("");
     try {
-      const [result, error] = await PatchRequestAxios<{ message: string; data: unknown }>(
-        "/user/update-user", { ...changes, draftStep: step },
-      );
+      const [result, error] = await PatchRequestAxios<{
+        message:string;data:Record<string,unknown>;
+        completion:{percentage:number;requiredCount:number;answeredCount:number;remaining:string[];nextStep:number;schemaRevision:number};
+        biodataStage:string;
+      }>("/user/update-user",{...changes,draftStep:step});
       if (!result?.data) throw new Error(error?.message || "সার্ভারে সেভ নিশ্চিত করা যায়নি।");
       saved.current = applyBiodataDraft(saved.current, changes);
       savedStep.current = step;
+      // The saved profile receives the exact server-calculated completion,
+      // matching Admin Member Management (not a stale local estimate).
+      queryClient.setQueryData(["get-my-profile"],(previous:Record<string,unknown>|undefined)=>({
+        ...(previous||{}),...result.data,completion:result.completion,
+        biodataStage:result.biodataStage,
+      }));
       void queryClient.invalidateQueries({ queryKey: ["get-my-profile-for-success"] });
       void queryClient.invalidateQueries({ queryKey: ["platform-summary"] });
       const latest = useProfileStore.getState();
@@ -285,8 +307,8 @@ export default function ProfileUpdateForm() {
   }, []);
 
   const gender = formData.gender as string | undefined;
-  const flow = useMemo(() => schema.questions.filter(q => !q.locked && questionApplies(q, gender))
-    .sort((a, b) => a.section - b.section || a.order - b.order), [schema, gender]);
+  const flow = useMemo(() => schema.questions.filter(q => !q.locked && questionApplies(q, gender) && locationQuestionApplies(q,formData))
+    .sort((a, b) => a.section - b.section || a.order - b.order), [schema, gender, formData]);
   const levels = useMemo(() => schema.sections
     .map(section => ({ section, questions: flow.filter(q => q.section === section.id) }))
     .filter(level => level.questions.length), [schema.sections, flow]);
@@ -300,16 +322,17 @@ export default function ProfileUpdateForm() {
   const levelQuestions = level?.questions ?? [];
   const question = levelQuestions[Math.min(qi, Math.max(0, levelQuestions.length - 1))];
   const answeredCount = flow.filter(q => answered(q)).length;
-  // The same active, required, gender-applicable questions used by the
-  // NestJS completion calculation (including locked registration fields).
-  const requiredQuestions = schema.questions.filter(q => q.required && questionApplies(q, gender));
-  const percent = requiredQuestions.length
-    ? Math.round((requiredQuestions.filter(q => answered(q)).length / requiredQuestions.length) * 100)
-    : 100;
+  // Mirrors the live Dynamic Question Builder rules in backend profile-rules.ts.
+  // Includes locked required fields and counts optional fields as optional.
+  const requiredProgress=useMemo(
+    ()=>previewBiodataCompletion(formData as Record<string,any>,schema),
+    [formData,schema],
+  );
+  const percent=requiredProgress.percentage;
   const levelComplete = (l: { questions: ProfileQuestion[] }) => l.questions.some(q => answered(q)) && l.questions.every(q => !q.required || answered(q));
   const completedLevels = levels.filter(levelComplete).length;
   const connectionBalance = (data as { numberOfConnections?: number } | undefined)?.numberOfConnections;
-  const requiredMissing = flow.filter(q => q.required && !answered(q));
+  const requiredMissing=requiredProgress.remaining;
   const name = typeof formData.name === "string" ? formData.name.split(" ")[0] : "";
 
   useEffect(() => {
@@ -318,7 +341,7 @@ export default function ProfileUpdateForm() {
     return () => window.clearTimeout(timer);
   }, [cheer]);
 
-  const optionsFor = (q: ProfileQuestion) => profileQuestionOptions(q, gender, formData);
+  const optionsFor = (q: ProfileQuestion) => profileQuestionOptions(q, gender, formData, locations?.entries);
   const displayAnswer = (q: ProfileQuestion) => {
     const value = readQuestionAnswer(formData, q);
     if (!isAnswered(q, value)) return "";
@@ -337,7 +360,19 @@ export default function ProfileUpdateForm() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateNestedField(parent as any, field, normalized);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (q.path === "address.district") updateNestedField("address" as any, "upazila", "");
+      if (q.path === "address.district") {
+        updateNestedField("address" as any, "upazila", "");
+        updateNestedField("address" as any, "cityCorporation", "");
+        updateNestedField("address" as any, "area", "");
+      }
+      if (q.path === "address.cityCorporation") {
+        updateNestedField("address" as any, "upazila", "");
+        updateNestedField("address" as any, "area", "");
+      }
+      if (q.path === "address.upazila") {
+        updateNestedField("address" as any, "cityCorporation", "");
+        updateNestedField("address" as any, "area", "");
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } else updateField(q.path as any, normalized as any);
   };
@@ -406,7 +441,7 @@ export default function ProfileUpdateForm() {
       </>
         : saveState === "saved" ? <><Check className="h-3.5 w-3.5 text-emerald-600" /> সংরক্ষিত</> : null}
   </span>;
-  const shell = (children: ReactNode) => <div className="min-h-[calc(100vh-4rem)] w-full bg-[#fff7f9] px-4 py-5 sm:py-8">
+  const shell = (children: ReactNode) => <div className="min-h-[calc(100vh-4rem)] w-full bg-[#fff7f9] px-3 py-4 sm:px-4 sm:py-8">
     <style>{CSS}</style>{children}
   </div>;
 
@@ -423,6 +458,18 @@ export default function ProfileUpdateForm() {
       </button>
     </div>
   );
+
+  if(schemaUnavailable)return shell(<div className="mx-auto flex min-h-[55vh] max-w-lg flex-col items-center justify-center gap-4 rounded-2xl border border-amber-200 bg-white p-7 text-center">
+    <AlertCircle className="size-9 text-amber-600"/>
+    <h1 className="text-xl font-bold text-gray-900">সর্বশেষ Required প্রশ্ন লোড করা যায়নি</h1>
+    <p className="text-sm leading-6 text-gray-600">
+      Admin যে Dynamic Question Builder প্রশ্নগুলো চালু রেখেছেন, সেগুলো ছাড়া সঠিক সম্পূর্ণতার হার দেখানো যাবে না। আপনার আগের উত্তর সংরক্ষিত আছে।
+    </p>
+    <button type="button" onClick={()=>{setSchemaReady(false);setSchemaAttempt(n=>n+1);}}
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-pink-600 px-5 text-sm font-semibold text-white hover:bg-pink-700">
+      <RefreshCw className="size-4"/> আবার চেষ্টা করুন
+    </button>
+  </div>);
 
   const savedStage = currentBiodataStage(data as BiodataStatusSource);
   const submittedBefore = isSubmittedBiodata(data as BiodataStatusSource);
@@ -599,6 +646,14 @@ export default function ProfileUpdateForm() {
           <p className="text-sm font-semibold text-pink-700">{name ? `স্বাগতম, ${name}!` : "স্বাগতম!"}</p>
           <h1 className="mt-1 text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl">{percent >= 100 ? "আপনার বায়োডাটা সম্পূর্ণ" : started ? "আপনার বায়োডাটা যাত্রা চলছে" : "চলুন বায়োডাটা তৈরি শুরু করি"}</h1>
           <p className="mt-1.5 text-sm text-gray-600">একবারে একটি প্রশ্ন। প্রতিটি উত্তরে বায়োডাটা এগোবে এবং প্রতিটি লেভেলে নতুন ব্যাজ পাবেন। উত্তরগুলো স্বয়ংক্রিয়ভাবে সংরক্ষিত হয়।</p>
+          <p className="mt-2 text-[13px] font-semibold text-slate-700" aria-live="polite">
+            {requiredProgress.requiredCount>0
+              ? `আবশ্যিক প্রশ্নের উত্তর: ${bn(requiredProgress.answeredCount)} / ${bn(requiredProgress.requiredCount)}`
+              : !gender ? 'বায়োডাটা শুরু করলে আবশ্যিক প্রশ্ন গণনা হবে' : 'বর্তমানে কোনো আবশ্যিক প্রশ্ন নেই'}
+          </p>
+          <p className="mt-1 text-[11px] leading-5 text-gray-500">
+            আপনার জন্য প্রযোজ্য Required প্রশ্ন অনুযায়ী অগ্রগতি। Save হলে একই হিসাব Admin-এও দেখা যাবে।
+          </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700 hover:bg-amber-100"><Gem className="h-4 w-4" />{bn(connectionBalance)} বাকি কানেকশন</Link>}
             <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-sm font-bold text-pink-700"><Trophy className="h-4 w-4" />{bn(completedLevels)}/{bn(levels.length)} ব্যাজ</span>

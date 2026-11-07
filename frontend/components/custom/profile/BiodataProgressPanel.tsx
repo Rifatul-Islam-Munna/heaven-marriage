@@ -41,6 +41,19 @@ export default function BiodataProgressPanel({ profile }: { profile?: BiodataSta
         </div>
       </div>
       <Progress className="mt-4 h-2.5" value={percentage} aria-label="বায়োডাটা সম্পূর্ণ হওয়ার শতাংশ" />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800">
+          {typeof profile?.completion?.requiredCount==='number'
+            ? profile.completion.requiredCount>0
+              ? `আবশ্যিক উত্তর: ${profile.completion.answeredCount??0} / ${profile.completion.requiredCount}`
+              : !profile?.completionPercentage?'বায়োডাটা পূরণ শুরু করুন':'বর্তমানে কোনো আবশ্যিক প্রশ্ন নেই'
+            : 'Dynamic Question Builder-এর Required প্রশ্ন অনুযায়ী'}
+        </p>
+        <span className="rounded-full bg-pink-50 px-2.5 py-1 text-[11px] font-medium text-pink-800">
+          Required প্রশ্নের ভিত্তিতে
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] leading-5 text-gray-500">Optional প্রশ্ন না পূরণ করলেও এই শতাংশ কমবে না। Admin নতুন আবশ্যিক প্রশ্ন যোগ করলে হিসাব স্বয়ংক্রিয়ভাবে বদলাবে।</p>
       <p className="mt-3 text-sm leading-6 text-gray-700">{message}</p>
 
       <ol className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="জমা থেকে প্রকাশের ধাপ">

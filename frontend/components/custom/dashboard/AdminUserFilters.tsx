@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  countries,
   marriedStatus,
   educationMediumOptions,
   religiousEducationOptions,
@@ -16,7 +15,10 @@ import {
   professionOptions,
   economicStatusOptions,
 } from "@/staticData/all-data";
+import { countries } from "@/staticData/countries";
 import { districts } from "@/staticData/districts";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import {defaultCityCorporations,defaultCityAreas,type LocationResponse} from "@/lib/location-options";
 import { upazilas } from "@/staticData/upazilas";
 import { cn } from "@/lib/utils";
 import { DashButton, fieldClass, labelClass } from "./dashboard-kit";
@@ -68,16 +70,18 @@ export const ADVANCED_KEYS = [
   ...groups.map((v) => v.key),
   ...multiGroups.map((v) => v.key),
   ...rangePairs.flatMap((v) => [v.min, v.max]),
-  "districtId", "upazilaId", "country", "registeredFrom", "registeredTo", "sort", "limit", "category",
+  "districtId", "upazilaId", "cityCorporation", "area", "country", "registeredFrom", "registeredTo", "sort", "limit", "category",
 ];
 /** Filters that change which members are listed (page size and order don't). */
 const NARROWING_KEYS = ADVANCED_KEYS.filter((key) => key !== "limit" && key !== "sort");
+export const PROMOTED_FILTER_KEYS=['accountType','verificationStatus','maritalStatus','districtId'] as const;
 const LABELS: Record<string, string> = {
   ...Object.fromEntries([...groups, ...multiGroups].map((g) => [g.key, g.label])),
   ageMin: "সর্বনিম্ন বয়স", ageMax: "সর্বোচ্চ বয়স", heightMin: "সর্বনিম্ন উচ্চতা", heightMax: "সর্বোচ্চ উচ্চতা",
   connectionsMin: "সর্বনিম্ন কানেকশন", connectionsMax: "সর্বোচ্চ কানেকশন",
-  districtId: "জেলা", upazilaId: "উপজেলা", country: "দেশ", registeredFrom: "নিবন্ধন শুরু", registeredTo: "নিবন্ধন শেষ",
+  districtId: "জেলা", upazilaId: "উপজেলা", cityCorporation: "সিটি কর্পোরেশন", area: "এলাকা", country: "বসবাসের দেশ", registeredFrom: "নিবন্ধন শুরু", registeredTo: "নিবন্ধন শেষ",
   sort: "সাজানো", category: "ক্যাটাগরি", query: "খোঁজ", gender: "লিঙ্গ", publish: "প্রকাশ",
+  memberJourney:"বায়োডাটা পর্যায়",
 };
 
 function valueLabel(key: string, value: string) {
@@ -92,6 +96,10 @@ function valueLabel(key: string, value: string) {
   if (key === "districtId") return districts.find((d) => d.name === value)?.bn_name || value;
   if (key === "upazilaId") return upazilas.find((u) => u.name === value)?.bn_name || value;
   if (key === "sort") return sortOptions.find((o) => o.value === value)?.label || value;
+  if (key === "memberJourney") return ({
+    signed_up:"শুধু সাইনআপ",in_progress:"খসড়া",submitted:"জমা হয়েছে",
+    published:"প্রকাশিত",
+  } as Record<string,string>)[value]||value;
   if (key === "gender") return value === "male" ? "পুরুষ" : value === "female" ? "মহিলা" : value;
   if (key === "publish") return value === "true" ? "প্রকাশিত" : value === "false" ? "অপ্রকাশিত" : value;
   return value;
@@ -113,14 +121,15 @@ export function useAdminFilterNavigation() {
 
 export function useActiveFilterCount() {
   const params = useSearchParams();
-  return NARROWING_KEYS.filter((key) => params.get(key)).length;
+  return NARROWING_KEYS.filter((key) =>
+    !PROMOTED_FILTER_KEYS.some(promoted=>promoted===key)&&params.get(key)).length;
 }
 
 /** Removable chips for every filter currently applied. */
 export function ActiveFilterChips({ onEdit }: { onEdit: () => void }) {
   const { params, push } = useAdminFilterNavigation();
   const chips: { key: string; value: string }[] = [];
-  for (const key of ["query", "gender", "publish", ...NARROWING_KEYS, "sort"]) {
+  for (const key of ["query", "gender", "publish", "memberJourney", ...NARROWING_KEYS, "sort"]) {
     const value = params.get(key);
     if (!value || ((key === "gender" || key === "publish") && value === "all")) continue;
     chips.push({ key, value });
@@ -136,7 +145,7 @@ export function ActiveFilterChips({ onEdit }: { onEdit: () => void }) {
         onClick={() => push((q) => { q.delete(key); if (key === "districtId") q.delete("upazilaId"); })}
         className="rounded-full p-1 hover:bg-rose-100"><X size={12} /></button>
     </span>)}
-    <button type="button" onClick={() => push((q) => { [...ADVANCED_KEYS, "query", "gender", "publish"].forEach((k) => q.delete(k)); })}
+    <button type="button" onClick={() => push((q) => { [...ADVANCED_KEYS, "query", "gender", "publish", "memberJourney"].forEach((k) => q.delete(k)); })}
       className="ml-1 text-[12px] font-medium text-rose-700 underline hover:text-rose-800">সব মুছুন</button>
   </div>;
 }
@@ -182,12 +191,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export default function AdminUserFilters({ onClose }: { onClose: () => void }) {
   const { params, push } = useAdminFilterNavigation();
   const query = params.toString();
+  const {data:locations}=useQueryWrapper<LocationResponse>(["public-location-options"],"/profile-questions/locations",{staleTime:60000});
+  const extra=locations?.entries || [];
   const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(ADVANCED_KEYS.map((k) => [k, params.get(k) || ""])));
   useEffect(() => {
     const q = new URLSearchParams(query);
     setDraft(Object.fromEntries(ADVANCED_KEYS.map((k) => [k, q.get(k) || ""])));
   }, [query]);
-  const set = (key: string, value: string) => setDraft((old) => ({ ...old, [key]: value, ...(key === "districtId" ? { upazilaId: "" } : {}) }));
+  const set = (key: string, value: string) => setDraft((old) => ({ ...old, [key]: value, ...(key === "districtId" ? { upazilaId: "",cityCorporation:"",area:"" } : {}),...(key==="upazilaId"?{cityCorporation:"",area:""}:{}),...(key==="cityCorporation"?{upazilaId:"",area:""}:{}) }));
   const select = (key: string, label: string, options: Option[], disabled = false, placeholder = "সকল") => <div key={key} className="min-w-0">
     <label htmlFor={"admin-filter-" + key} className={labelClass}>{label}</label>
     <select id={"admin-filter-" + key} value={draft[key] || ""} disabled={disabled} onChange={(e) => set(key, e.target.value)}
@@ -228,10 +239,12 @@ export default function AdminUserFilters({ onClose }: { onClose: () => void }) {
     <form className="space-y-6 p-4" onSubmit={(e) => { e.preventDefault(); apply(); }}>
       <Section title="অ্যাকাউন্ট ও যাচাই">{groups.map((g) => select(g.key, g.label, g.options))}</Section>
       <Section title="ঠিকানা">
-        {select("country", "দেশ", countries.map((c) => ({ value: c.en, label: c.bn })))}
-        {select("districtId", "জেলা", districts.map((d) => ({ value: d.name, label: d.bn_name })))}
-        {select("upazilaId", "উপজেলা", upazilas.filter((u) => u.district_id === district?.id).map((u) => ({ value: u.name, label: u.bn_name })),
-          !district, district ? "সকল" : "আগে জেলা বেছে নিন")}
+        {select("country", "বসবাসের দেশ", [...countries.map((c) => ({ value: c.en, label: c.en })),...extra.filter(x=>x.kind==="country").map(x=>({value:x.name,label:x.label}))])}
+        {select("districtId", "জেলা", [...districts.map((d) => ({ value: d.name, label: d.bn_name })),...extra.filter(x=>x.kind==="district").map(x=>({value:x.name,label:x.label}))])}
+        {select("upazilaId", "উপজেলা", [...upazilas.filter((u) => u.district_id === district?.id).map((u) => ({ value: u.name, label: u.bn_name })),...extra.filter(x=>x.kind==="upazila"&&x.district===draft.districtId).map(x=>({value:x.name,label:x.label}))],
+          !draft.districtId, draft.districtId ? "সকল" : "আগে জেলা বেছে নিন")}
+        {select("cityCorporation", "সিটি কর্পোরেশন", [...defaultCityCorporations,...extra.filter(x=>x.kind==="cityCorporation")].filter(x=>x.district===draft.districtId).map(x=>({value:x.name,label:x.label})),!draft.districtId)}
+        {select("area", "এলাকা / মহল্লা", [...defaultCityAreas,...extra.filter(x=>x.kind==="area")].filter(x=>x.district===draft.districtId&&(draft.cityCorporation?x.cityCorporation===draft.cityCorporation:x.upazila===draft.upazilaId)).map(x=>({value:x.name,label:x.label})),!(draft.cityCorporation||draft.upazilaId))}
       </Section>
       <Section title="প্রোফাইল">
         {multiGroups.map((g) => <MultiFilter key={g.key} id={"admin-filter-" + g.key} label={g.label} options={g.options}

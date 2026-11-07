@@ -1,16 +1,19 @@
 import {
- countries, marriedStatus, educationMediumOptions, educationOptions,
+ marriedStatus, educationMediumOptions, educationOptions,
  skinColorOptions, religiousEducationOptions, fiqhOptions, economicStatusOptions,
  professionOptions, polygamyConsentOptions,
 } from '@/staticData/all-data';
+import { countries } from '@/staticData/countries';
 import { districts } from '@/staticData/districts';
+import {defaultCityCorporations,defaultCityAreas,defaultMunicipalityUpazilas,type LocationEntry} from './location-options';
 import { upazilas } from '@/staticData/upazilas';
 import type { ProfileQuestion,QuestionOption } from './profile-questions';
 
 const strings=(items:string[]):QuestionOption[]=>items.map(s=>({value:s,label:s}));
-const format=(items:any[],value='value',label='label'):QuestionOption[]=>items.map(i=>({
- value:String(i[value]),label:String(i[label]),
-}));
+const format=<T extends object>(items:T[],value='value',label='label'):QuestionOption[]=>items.map(i=>{
+ const values=i as Record<string,unknown>;
+ return {value:String(values[value]),label:String(values[label])};
+});
 /**
  * Option values are React keys and stored answers, so they must be unique.
  * Some static lists repeat a name (e.g. upazilas "Kaukhali" and "Daulatpur"
@@ -24,24 +27,41 @@ function uniqueOptions(options:QuestionOption[]):QuestionOption[]{
   return true;
  });
 }
-export function profileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:Record<string,any>):QuestionOption[]{
- return uniqueOptions(rawProfileQuestionOptions(q,gender,formData));
+type LocationContext={address?:{district?:string;cityCorporation?:string;upazila?:string}};
+export function profileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:LocationContext,additional:LocationEntry[]=[]):QuestionOption[]{
+ return uniqueOptions(rawProfileQuestionOptions(q,gender,formData,additional));
 }
-function rawProfileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:Record<string,any>):QuestionOption[]{
+function rawProfileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:LocationContext,additional:LocationEntry[]=[]):QuestionOption[]{
  if(q.options?.length)return q.options;
- const filtered=(items:any[])=>items.filter(i=>!i.gender||i.gender==='all'||
-   i.gender==='both'||i.gender===gender);
+ const filtered=<T extends object>(items:T[]):T[]=>items.filter(i=>{
+   const audience=(i as Record<string,unknown>).gender;
+   return !audience||audience==='all'||audience==='both'||audience===gender;
+ });
  const partner=gender==='male'?'female':'male';
+ const entries=(kind:LocationEntry['kind'])=>additional.filter(item=>item.kind===kind && item.enabled!==false);
+ const toOptions=(items:Pick<LocationEntry,'name'|'label'>[])=>items.map(i=>({value:i.name,label:i.label}));
+ const district=formData?.address?.district;
+ const city=formData?.address?.cityCorporation;
+ const upazila=formData?.address?.upazila;
  switch(q.optionSource) {
  case 'gender':return [{value:'male',label:'পুরুষ'},{value:'female',label:'মহিলা'}];
  case 'maritalStatus':return format(filtered(marriedStatus).filter(i=>i.en!=='all'),'en','bn');
  case 'partnerMaritalStatus':return format(marriedStatus.filter(i=>i.gender==='all'||i.gender===partner).filter(i=>i.en!=='all'),'bn','bn');
  case 'bloodGroup':return strings(['A+','A-','B+','B-','O+','O-','AB+','AB-']);
- case 'countries':return format(countries,'en','bn');
- case 'districts':return format(districts,'name','bn_name');
+ case 'countries':return [...format(countries,'en','en'),...toOptions(entries('country'))];
+ case 'districts':return [...format(districts,'name','bn_name'),...toOptions(entries('district'))];
+ case 'cityCorporations':return district
+  ? toOptions([...defaultCityCorporations,...entries('cityCorporation')].filter(x=>x.district===district))
+  : [];
+ case 'cityAreas': return district && (city||upazila)
+  ? toOptions([...defaultCityAreas,...entries('area')].filter(x=>x.district===district &&
+    (city ? x.cityCorporation===city : x.upazila===upazila)))
+  : [];
  case 'upazilas':{
-   const selected=districts.find(d=>d.name===formData?.address?.district);
-   return format(upazilas.filter(u=>!selected||u.district_id===selected.id),'name','bn_name');
+   const selected=districts.find(d=>d.name===district);
+   return [...format(upazilas.filter(u=>selected && u.district_id===selected.id),'name','bn_name'),
+     ...toOptions(defaultMunicipalityUpazilas.filter(u=>u.district===district)),
+     ...toOptions(entries('upazila').filter(u=>u.district===district))];
  }
  case 'educationBackground':return format(filtered(educationOptions),'bangla','bangla');
  case 'educationMethod':return format(educationMediumOptions);

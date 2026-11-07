@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { MaxWords } from '../../lib/word-limit';
 
 
 export class CreateGuidelineDto {
@@ -18,15 +19,14 @@ export class CreateGuidelineDto {
   title: string;
 
   @ApiProperty({
-    description: 'FAQ description/answer',
+    description: 'Answer text, maximum 3000 words',
     example: 'বায়োডাটা তৈরি করতে প্রথমে রেজিস্ট্রেশন করুন...',
     minLength: 10,
-    maxLength: 2000,
   })
   @IsString()
   @IsNotEmpty()
   @MinLength(10)
-  @MaxLength(2000)
+  @MaxWords(3000)
   @Transform(({ value }) => value?.trim())
   description: string;
 }

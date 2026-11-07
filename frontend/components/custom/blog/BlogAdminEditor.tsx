@@ -163,7 +163,7 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
           </div>
         </Panel>
 
-        <Panel title="Content" actions={<span className="text-[12px] text-[#6c757d]">{words} words · ~{minutes} min read</span>}>
+        <Panel title="Content" description="Write the article and add optimized images or MP4/WebM videos using the editor toolbar." actions={<span className="text-[12px] text-[#6c757d]">{words} words · ~{minutes} min read</span>}>
           <RichEditor initial={initial.draft.content} onChange={onContentChange}/>
         </Panel>
       </div>
@@ -188,7 +188,7 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
               </label>
               {draft.cover.url&&<DashButton tone="danger" aria-label="Remove cover image" onClick={()=>update('cover',{url:'',alt:''})}><X size={14}/></DashButton>}
             </div>
-            <p className="text-[11px] text-[#6c757d]">JPEG, PNG, WebP or AVIF, up to 8 MB.</p>
+            <p className="text-[11px] text-[#6c757d]">JPEG, PNG, WebP or AVIF, up to 12 MB. Larger images are automatically optimized to WebP when beneficial.</p>
             <Field id="blog-cover-url" label="Or paste an image URL">
               <input id="blog-cover-url" value={draft.cover.url} placeholder="https://…" className={fieldClass}
                 onChange={e=>update('cover',{...draft.cover,url:e.target.value})}/>

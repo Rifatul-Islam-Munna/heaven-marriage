@@ -55,18 +55,29 @@ describe('Premium bKash payment security', () => {
     expect(ctx.orders.updateOne).not.toHaveBeenCalled();
   });
 
-  it('activates only the paid member, without connection credits', async () => {
+  it('activates only the verified paid member, retaining package snapshot without unexpected credits', async () => {
     const ctx = setup();
     expect(await ctx.service.executePremiumPayment(paymentId)).toEqual({ success: true });
     const [filter, update] = ctx.userCollection.updateOne.mock.calls[0];
     expect(filter.role).toBe(UserType.USER);
     expect(filter.creditedPaymentIds).toEqual({ $ne: paymentId });
-    expect(update.$set).toEqual({ isSubscriber: true });
+    expect(update.$set).toMatchObject({ isSubscriber: true,
+      premiumService: expect.objectContaining({source:'bkash',stage:'onboarding',assistedAllowance:3,includedConnections:0}) });
     expect(update.$inc).toBeUndefined();
     expect(ctx.orders.updateOne).toHaveBeenCalledWith(
       { paymentId, status: 'pending' }, expect.anything(),
     );
     expect(ctx.cases.updateOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('grants included wallet credits once when package specifies them', async () => {
+    const ctx=setup(result,{...order,premiumSnapshot:{includedConnections:2,assistedConnections:4,durationDays:60}});
+    expect(await ctx.service.executePremiumPayment(paymentId)).toEqual({success:true});
+    const [filter,update]=ctx.userCollection.updateOne.mock.calls[0];
+    expect(filter.creditedPaymentIds).toEqual({$ne:paymentId});
+    expect(update.$inc).toEqual({numberOfConnections:2});
+    expect(update.$push.connectionGrants).toMatchObject({source:'premium',quantity:2});
+    expect(update.$set.premiumService.assistedAllowance).toBe(4);
   });
 
   it('does not re-credit a previously completed order', async () => {

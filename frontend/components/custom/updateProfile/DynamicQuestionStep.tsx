@@ -1,9 +1,11 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo,useState } from 'react';
 import { useProfileStore } from '@/zustan/useProfileStore';
 import { profileQuestionOptions } from '@/lib/profile-question-options';
+import {useQueryWrapper} from '@/api-hooks/react-query-wrapper';
+import type {LocationEntry,LocationResponse} from '@/lib/location-options';
 import {
- questionApplies,readQuestionAnswer,questionUsesSeparateStorage,type ProfileQuestion, type ProfileQuestionSchema,
+ questionApplies,locationQuestionApplies,readQuestionAnswer,questionUsesSeparateStorage,type ProfileQuestion, type ProfileQuestionSchema,
 } from '@/lib/profile-questions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,13 +13,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
 export function QuestionInput({
- q,value,onChange,gender,profile,preview=false,
+ q,value,onChange,gender,profile,preview=false,locations=[],
 }:{
  q:ProfileQuestion;value:unknown;
  onChange:(next:string|number|boolean|string[])=>void;
- gender?:string;profile?:Record<string,any>;preview?:boolean;
+ gender?:string;profile?:Record<string,any>;preview?:boolean;locations?:LocationEntry[];
 }){
- const options=profileQuestionOptions(q,gender,profile);
+ const [optionSearch,setOptionSearch]=useState('');
+ const options=profileQuestionOptions(q,gender,profile,locations);
+ const filteredOptions=options.filter(opt=>opt.value===String(value??'') ||
+   !optionSearch || opt.label.toLocaleLowerCase().includes(optionSearch.toLocaleLowerCase()) ||
+   opt.value.toLocaleLowerCase().includes(optionSearch.toLocaleLowerCase()));
  const raw=(value===undefined||value===null?'':value);
  const id='question-'+q.id;
  const choices=q.type==='multi_checkbox';
@@ -43,14 +49,22 @@ export function QuestionInput({
   ):q.type==='textarea'?(
    <Textarea id={id} value={String(raw)} onChange={event=>onChange(event.target.value)}
      rows={4} maxLength={5000} dir="auto" className="border-pink-200" placeholder="আপনার উত্তর লিখুন..." />
-  ):(q.type==='select'||q.type==='dropdown')&&options.length?(
-   <select id={id} value={String(raw)} onChange={event=>onChange(event.target.value)}
-     className="h-11 w-full rounded-lg border border-pink-200 bg-white px-3 text-sm focus:outline-pink-500">
-     <option value="">নির্বাচন করুন</option>
-     {String(raw)&&!options.some(opt=>opt.value===String(raw))&&
-       <option value={String(raw)}>{String(raw)} (saved answer)</option>}
-     {options.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}
-   </select>
+  ):(q.type==='select'||q.type==='dropdown')?(
+   <div className="space-y-2">
+     {(q.optionSource==='countries' || options.length>15) &&
+       <input type="search" value={optionSearch} onChange={event=>setOptionSearch(event.target.value)}
+         aria-label={`Search ${q.question}`} placeholder="Search options / দেশ খুঁজুন..."
+         className="h-10 w-full rounded-lg border border-pink-200 px-3 text-sm focus:outline-pink-500" />}
+     <select id={id} value={String(raw)} onChange={event=>onChange(event.target.value)}
+       className="h-11 w-full rounded-lg border border-pink-200 bg-white px-3 text-sm focus:outline-pink-500">
+       <option value="">নির্বাচন করুন</option>
+       {String(raw)&&!options.some(opt=>opt.value===String(raw))&&
+         <option value={String(raw)}>{String(raw)} (saved answer)</option>}
+       {filteredOptions.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}
+     </select>
+     {!options.length && <p className="text-xs text-amber-700">আগের ঠিকানা বা parent নির্বাচন করুন।</p>}
+     {!!optionSearch && !filteredOptions.length && <p className="text-xs text-slate-500">No matching options</p>}
+   </div>
   ):(
    <Input id={id} type={q.type==='number'?'number':'text'} dir="auto"
      value={String(raw)} maxLength={q.type==='number'?undefined:5000}
@@ -67,9 +81,10 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
  const updateNestedField=useProfileStore(state=>state.updateNestedField);
  const updateCustomField=useProfileStore(state=>state.updateCustomField);
  const updateDynamicAnswer=useProfileStore(state=>state.updateDynamicAnswer);
+ const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
  const questions=useMemo(()=>schema.questions
-   .filter(q=>q.section===step&&questionApplies(q,profile.gender))
-   .sort((a,b)=>a.order-b.order),[schema,step,profile.gender]);
+   .filter(q=>q.section===step&&questionApplies(q,profile.gender)&&locationQuestionApplies(q,profile))
+   .sort((a,b)=>a.order-b.order),[schema,step,profile]);
  const setAnswer=(q:ProfileQuestion,answer:string|number|boolean|string[])=>{
    if(questionUsesSeparateStorage(q)){updateDynamicAnswer(q.id,answer);return;}
    if(q.legacyKey){updateCustomField(q.legacyKey,String(answer));return;}
@@ -79,7 +94,19 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
    const [parent,field]=q.path.split('.');
    if(field){
      updateNestedField(parent as any,field,normalized);
-     if(q.path==='address.district')updateNestedField('address','upazila','');
+     if(q.path==='address.district'){
+       updateNestedField('address','upazila','');
+       updateNestedField('address','cityCorporation','');
+       updateNestedField('address','area','');
+     }
+     if(q.path==='address.cityCorporation'){
+       updateNestedField('address','upazila','');
+       updateNestedField('address','area','');
+     }
+     if(q.path==='address.upazila'){
+       updateNestedField('address','cityCorporation','');
+       updateNestedField('address','area','');
+     }
    }else updateField(q.path as any,normalized as any);
  };
  if(!questions.length)return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-gray-500">
@@ -87,7 +114,7 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
   </div>;
  return <div className="grid gap-4 md:grid-cols-2">
   {questions.map(q=><div key={q.id} className={q.type==='textarea'||q.question.length>130?'md:col-span-2':''}>
-   <QuestionInput q={q} gender={profile.gender} profile={profile}
+   <QuestionInput q={q} gender={profile.gender} profile={profile} locations={locations?.entries}
      value={readQuestionAnswer(profile,q)} onChange={answer=>setAnswer(q,answer)}/>
   </div>)}
  </div>;

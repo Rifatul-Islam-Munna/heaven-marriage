@@ -4,7 +4,20 @@ import { Connection } from 'mongoose';
 import { FALLBACK_PROFILE_SCHEMA } from './default-question-registry';
 
 export const SECTION_NAMES = FALLBACK_PROFILE_SCHEMA.sections;
-const sourceQuestions = FALLBACK_PROFILE_SCHEMA.questions;
+const extraLocationQuestions = [
+  {id:'builtin_8e65c7400068cbdd',path:'residenceCountry',question:'আপনি বর্তমানে কোন দেশে বসবাস করছেন?',
+    publicLabel:'বর্তমান বসবাসের দেশ',section:0,gender:'both',type:'select',
+    options:[],optionSource:'countries',required:false,enabled:true,showPublic:true,order:850,locked:false},
+  {id:'builtin_8e65c7400068cbde',path:'address.cityCorporation',
+    question:'সিটি কর্পোরেশন (উপজেলার পরিবর্তে নির্বাচন করতে পারেন)',
+    publicLabel:'সিটি কর্পোরেশন',section:1,gender:'both',type:'select',options:[],
+    optionSource:'cityCorporations',required:false,enabled:true,showPublic:true,order:150,locked:false},
+  {id:'builtin_8e65c7400068cbdf',path:'address.area',
+    question:'এলাকা / মহল্লা / ওয়ার্ড (যেমন: Gulshan)',
+    publicLabel:'এলাকা',section:1,gender:'both',type:'select',options:[],
+    optionSource:'cityAreas',required:false,enabled:true,showPublic:true,order:180,locked:false},
+];
+const sourceQuestions = [...FALLBACK_PROFILE_SCHEMA.questions,...extraLocationQuestions];
 export type FieldType = 'text'|'textarea'|'number'|'select'|'dropdown'|'checkbox'|'multi_checkbox';
 export type FieldGender = 'male'|'female'|'both';
 export type QuestionOption = { label: string; value: string };
@@ -19,6 +32,13 @@ export type QuestionSchema = { revision: number; sections: {id:number;title:stri
 
 // Authentication credentials are managed by IdentityService, never the profile builder.
 const authQuestionPaths = new Set(['email','phoneNumber','password']);
+/** Core location inputs are non-removable and must keep their searchable sources. */
+export const PROTECTED_LOCATION_PATHS = new Set([
+  'nationality','residenceCountry','address.district','address.upazila',
+  'address.cityCorporation','address.area',
+]);
+export const isProtectedLocationQuestion = (q:Pick<ProfileQuestion,'path'>|undefined) =>
+  !!q?.path && PROTECTED_LOCATION_PATHS.has(q.path);
 export const BUILTINS: ProfileQuestion[] = sourceQuestions.map(q => ({...q, type:q.type as FieldType,
   gender:q.gender as FieldGender,options:q.options.map(o=>({...o})),
   locked: authQuestionPaths.has(q.path || ''),
@@ -90,13 +110,26 @@ export function validateQuestion(input: unknown): ProfileQuestion {
   });
   if(new Set(options.map(o=>o.value)).size!==options.length)
     throw new BadRequestException('Duplicate option');
-  const optionSource=existing ? (a.optionSource === '' ? '' : existing.optionSource) : '';
+  const protectedLocation=!!existing && isProtectedLocationQuestion(existing);
+  // Never allow a location input to be replaced with free text/custom choices,
+  // hidden from either gender, or disconnected from the live location catalogue.
+  if(protectedLocation && (
+    a.enabled === false ||
+    a.gender !== existing!.gender ||
+    a.type !== existing!.type ||
+    a.optionSource !== existing!.optionSource ||
+    options.length !== existing!.options.length ||
+    options.some((option,i)=>option.label!==existing!.options[i].label||
+      option.value!==existing!.options[i].value)
+  ))throw new BadRequestException('This essential location field cannot be hidden or replaced');
+  const optionSource=protectedLocation?existing!.optionSource:
+    existing ? (a.optionSource === '' ? '' : existing.optionSource) : '';
   const locked = !!existing && authQuestionPaths.has(existing.path || '');
   if (locked && (a.enabled === false || a.required !== existing!.required ||
     a.gender !== existing!.gender || a.question !== existing!.question ||
     a.type !== existing!.type)) throw new BadRequestException('Authentication fields are not configurable');
   const required = locked ? existing!.required : a.required === true;
-  const enabled = locked ? true : a.enabled !== false;
+  const enabled = (locked||protectedLocation) ? true : a.enabled !== false;
   return {
     id,
     ...(existing?.path?{path:existing.path}:{}),
@@ -211,7 +244,12 @@ export class QuestionConfigService {
       if(previous?.legacyKey) q.legacyKey=previous.legacyKey;
       submitted.set(q.id,q);
     }
-    // An omitted default is archived, never erased, preserving existing answers.
+    // Essential location questions must be present in every submitted revision.
+    // Do not silently archive one when an older/forged admin client omits it.
+    for(const old of current.questions)
+      if(isProtectedLocationQuestion(old) && !submitted.has(old.id))
+        throw new BadRequestException('Essential location question cannot be deleted: '+old.path);
+    // Other omitted questions are archived, preserving existing answers.
     for(const old of current.questions)
       if(!submitted.has(old.id))submitted.set(old.id,{...old,enabled:old.locked});
     const questions=[...submitted.values()].sort((a,b)=>a.section-b.section||a.order-b.order);

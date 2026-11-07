@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { profileQuestionOptions } from '@/lib/profile-question-options';
 import {
-  questionDisplayValue, questionUsesSeparateStorage,
+  questionDisplayValue, questionUsesSeparateStorage, isProtectedLocationQuestion,
   type ProfileQuestion, type QuestionOption, type QuestionType,
 } from '@/lib/profile-questions';
 import { cn } from '@/lib/utils';
@@ -239,13 +239,14 @@ type EditorProps = {
   onSectionChange: (section: number) => void;
   onMove: (direction: -1 | 1) => void;
   onDuplicate: () => void; onToggleArchive: () => void; onDelete: () => void; onRevert: () => void;
+  onSave?: () => void; canSave?: boolean;
   /** Phones and tablets: return to the question list. */
   onBack?: () => void;
 };
 
 export function QuestionEditor({
   question: q, sections, issues, isNew, isChanged, savedVersion, canMoveUp, canMoveDown, focusSignal,
-  onChange, onSectionChange, onMove, onDuplicate, onToggleArchive, onDelete, onRevert, onBack,
+  onChange, onSectionChange, onMove, onDuplicate, onToggleArchive, onDelete, onRevert, onBack, onSave, canSave,
 }: EditorProps) {
   const questionRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -254,6 +255,7 @@ export function QuestionEditor({
     questionRef.current?.select();
   }, [focusSignal]);
   const secret = !!q.path && SECRET_PATHS.has(q.path);
+  const protectedLocation=isProtectedLocationQuestion(q);
   const kind = q.legacyKey ? 'Older custom question' : q.path ? 'Built-in field' : 'Custom question';
   const issueFor = (field: QuestionIssue['field']) => issues.find(issue => issue.field === field);
   const questionIssue = issueFor('question'), labelIssue = issueFor('publicLabel');
@@ -272,18 +274,20 @@ export function QuestionEditor({
               <StatusPill tone="neutral">{kind}</StatusPill>
               {!q.enabled && <StatusPill tone="neutral"><EyeOff size={11} /> Hidden from form</StatusPill>}
               {q.locked && <StatusPill tone="info"><Lock size={11} /> Login field</StatusPill>}
+              {protectedLocation && <StatusPill tone="info"><Lock size={11} /> Protected location</StatusPill>}
               {isChanged && <StatusPill tone="warning">{isNew ? 'New, not saved' : 'Unsaved changes'}</StatusPill>}
             </div>
             <p className="mt-1 truncate font-mono text-[11px] text-[#6c757d]">{q.path || q.legacyKey || q.id}</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            {onSave && <DashButton tone="primary" disabled={!canSave} onClick={onSave}><Info size={14}/> Save & Publish</DashButton>}
             <DashButton className="px-2" aria-label="Move up" title="Move up" disabled={!canMoveUp} onClick={() => onMove(-1)}><ArrowUp size={15} /></DashButton>
             <DashButton className="px-2" aria-label="Move down" title="Move down" disabled={!canMoveDown} onClick={() => onMove(1)}><ArrowDown size={15} /></DashButton>
             <DashButton disabled={q.locked} onClick={onDuplicate} title="Duplicate"><Copy size={14} /><span className="hidden sm:inline">Duplicate</span></DashButton>
             {isChanged && !isNew && <DashButton onClick={onRevert} title="Undo changes to this question"><Undo2 size={14} /><span className="hidden sm:inline">Revert</span></DashButton>}
             {isNew
-              ? <DashButton tone="danger" onClick={onDelete}><Trash2 size={14} /> Delete</DashButton>
-              : <DashButton tone={q.enabled ? 'danger' : 'secondary'} disabled={q.locked} onClick={onToggleArchive}>
+              ? <DashButton tone="danger" disabled={protectedLocation} onClick={onDelete}><Trash2 size={14} /> Delete</DashButton>
+              : <DashButton tone={q.enabled ? 'danger' : 'secondary'} disabled={q.locked||protectedLocation} onClick={onToggleArchive}>
                 {q.enabled ? <><Archive size={14} /> Hide</> : <><ArchiveRestore size={14} /> Show</>}
               </DashButton>}
           </div>
@@ -292,6 +296,12 @@ export function QuestionEditor({
 
       <div className="space-y-7 p-4">
         {q.locked && <Note tone="info" icon={Lock}>This is a login field managed by the sign-in system. Only its section and position can change here.</Note>}
+        {protectedLocation && <Note tone="info" icon={Lock}>
+          Essential location field: cannot be deleted, hidden, changed to another input type, or restricted to one gender.
+          You may edit its wording, public label, Required setting or position.
+          Country, district, city and area choices remain managed in the
+          <a href="#location-manager" className="font-semibold underline"> Location Manager</a>.
+        </Note>}
         {!q.enabled && !q.locked && <Note tone="warning" icon={Info}>Hidden questions keep every answer members already gave. Show it again any time.</Note>}
 
         <Group title="Wording">
@@ -321,7 +331,7 @@ export function QuestionEditor({
             {TYPES.map(type => {
               const active = q.type === type.value;
               const Icon = type.icon;
-              return <button key={type.value} type="button" role="radio" aria-checked={active} disabled={q.locked}
+              return <button key={type.value} type="button" role="radio" aria-checked={active} disabled={q.locked||protectedLocation}
                 onClick={() => onChange({ type: type.value })}
                 className={cn('flex items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50',
                   active ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-400' : 'border-[#e9ecef] hover:border-[#ced4da] hover:bg-[#f8f9fa]')}>
@@ -336,7 +346,10 @@ export function QuestionEditor({
           {!q.locked && !!(q.path || q.legacyKey) && questionUsesSeparateStorage(q) && <Note tone="info" icon={Info}>
             With this answer type, new answers are stored separately. Answers members already gave stay in their original field and aren’t overwritten.
           </Note>}
-          {OPTION_TYPES.has(q.type) && <OptionsEditor q={q} savedVersion={savedVersion} issue={issueFor('options')} onChange={onChange} />}
+          {OPTION_TYPES.has(q.type) && (protectedLocation
+            ? <Note tone="info" icon={Lock}>This dropdown uses the permanent Country / District / City / Area catalogue.
+                Add or rename places in the Location Manager above; the field and its searchable list cannot be replaced here.</Note>
+            : <OptionsEditor q={q} savedVersion={savedVersion} issue={issueFor('options')} onChange={onChange} />)}
           {!OPTION_TYPES.has(q.type) && issueFor('options') && <p className="text-[12px]"><IssueText issue={issueFor('options')} /></p>}
         </Group>
 
@@ -344,7 +357,7 @@ export function QuestionEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="min-w-0">
               <p className={labelClass}>Asked to</p>
-              <Segmented label="Asked to" value={q.gender} disabled={q.locked} onChange={gender => onChange({ gender })} options={[
+              <Segmented label="Asked to" value={q.gender} disabled={q.locked||protectedLocation} onChange={gender => onChange({ gender })} options={[
                 { value: 'both', label: 'Everyone' }, { value: 'male', label: 'Men only' }, { value: 'female', label: 'Women only' },
               ]} />
             </div>
@@ -360,7 +373,7 @@ export function QuestionEditor({
         <Group title="Visibility">
           <div className="grid gap-2 lg:grid-cols-3">
             <Toggle id="qb-enabled" label="Show in form" description="Members are asked this question" checked={q.enabled}
-              disabled={q.locked} onChange={enabled => onChange({ enabled })} />
+              disabled={q.locked||protectedLocation} onChange={enabled => onChange({ enabled })} />
             <Toggle id="qb-required" label="Required" description="Members must answer to finish" checked={q.required}
               disabled={q.locked} onChange={required => onChange({ required })} />
             <Toggle id="qb-public" label="Show on public biodata" description={secret ? 'Private login field' : 'Visitors see the answer'}

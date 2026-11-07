@@ -46,8 +46,9 @@ describe('Biodata deletion requests and submission lifecycle (isolated MongoDB)'
     await service.onModuleInit();
     writer = Object.assign(Object.create(UserService.prototype), {
       userModel: users,
+      logger: {debug:jest.fn(),warn:jest.fn()},
       questions: { get: async () => ({
-        questions: BUILTINS.filter(question => question.path === 'age'),
+        revision:0,questions: BUILTINS.filter(question => question.path === 'age'),
       }) },
     });
   }, 120000);
@@ -148,6 +149,93 @@ describe('Biodata deletion requests and submission lifecycle (isolated MongoDB)'
       expect(guard.canActivate(context(UserType.USER))).toBe(true);
       expect(()=>guard.canActivate(context(UserType.ADMIN))).toThrow(ForbiddenException);
     }
+  });
+
+  it('persists required-question progress on the member list, biodata edit and schema revision changes',async()=>{
+    const age={...BUILTINS.find(q=>q.path==='age')!,required:true,enabled:true};
+    const extraId='q_'+'f'.repeat(32);
+    const extra={id:extraId,question:'Extra required question',publicLabel:'Extra required',
+      section:2,gender:'both',type:'text',options:[],optionSource:'',required:true,
+      enabled:true,showPublic:false,order:20,locked:false};
+    const member=await account({biodataStatus:'draft',isPublished:false,
+      isPublishFromAdmin:false,verificationStatus:'pending'});
+    const id=String(member._id);
+    const initial={revision:31,questions:[age]};
+    (writer as any).questions={get:async()=>initial};
+    const listing=await writer.getUserForAdmin({page:1,limit:10,gender:'all'} as any);
+    const entry=listing.data.find((m:any)=>String(m._id)===id);
+    expect(entry).toMatchObject({completionPercentage:100,completionRequiredCount:1,
+      completionAnsweredCount:1,completionSchemaRevision:31});
+    let stored=await users.findById(id).lean();
+    expect(stored).toMatchObject({completionPercentage:100,completionSchemaRevision:31});
+    const next={revision:32,questions:[age,extra]};
+    (writer as any).questions={get:async()=>next};
+    const updated=await writer.getUserForAdmin({page:1,limit:10,gender:'all'} as any);
+    expect(updated.data.find((m:any)=>String(m._id)===id)).toMatchObject({
+      completionPercentage:50,completionRequiredCount:2,completionAnsweredCount:1,completionSchemaRevision:32});
+    stored=await users.findById(id).lean();
+    expect(stored).toMatchObject({completionPercentage:50,completionSchemaRevision:32});
+    await writer.updatedFullUserInformation({dynamicAnswers:{[extraId]:'done'}} as any,id);
+    stored=await users.findById(id).lean();
+    expect(stored).toMatchObject({completionPercentage:100,
+      completionRequiredCount:2,completionAnsweredCount:2,completionSchemaRevision:32});
+    (writer as any).questions={get:async()=>({revision:33,questions:[age,{...extra,enabled:false}]})};
+    await writer.refreshStaleCompletionSnapshots();
+    stored=await users.findById(id).lean();
+    expect(stored).toMatchObject({completionPercentage:100,
+      completionRequiredCount:1,completionAnsweredCount:1,completionSchemaRevision:33});
+  });
+
+  it('shows exactly the same required-field completion to members and admins',async()=>{
+    const fieldId='q_'+'a'.repeat(32);
+    const required={
+      id:fieldId,question:'Required new field',publicLabel:'Required new field',
+      section:2,gender:'both',type:'text',options:[],optionSource:'',
+      required:true,enabled:true,showPublic:false,order:20,locked:false,
+    };
+    const age={...BUILTINS.find(q=>q.path==='age')!,required:true,enabled:true};
+    const member=await account({biodataStatus:'draft',isPublished:false,
+      isPublishFromAdmin:false,verificationStatus:'pending'});
+    const id=String(member._id);
+    (writer as any).questions={get:async()=>({revision:45,questions:[age,required]})};
+    const adminList=await writer.getUserForAdmin({page:1,limit:10,gender:'all'} as any);
+    const adminMember=adminList.data.find((item:any)=>String(item._id)===id);
+    const myProfile=await writer.finMyProfile(id);
+    expect(myProfile).toMatchObject({
+      completionPercentage:50,completionRequiredCount:2,completionAnsweredCount:1,
+      completionSchemaRevision:45,completion:{
+        percentage:50,requiredCount:2,answeredCount:1,schemaRevision:45,
+      },
+    });
+    expect(myProfile.completion.percentage).toBe(adminMember.completionPercentage);
+    expect(myProfile.completion.answeredCount).toBe(adminMember.completionAnsweredCount);
+    const updated=await writer.updatedFullUserInformation({dynamicAnswers:{[fieldId]:'answered'}} as any,id);
+    expect(updated.completion).toMatchObject({percentage:100,requiredCount:2,answeredCount:2});
+    const refreshed=await writer.finMyProfile(id);
+    expect(refreshed.completion.percentage).toBe(100);
+    const saved=await users.findById(id).lean();
+    expect(saved).toMatchObject({completionPercentage:100,completionAnsweredCount:2});
+    (writer as any).questions={get:async()=>({revision:46,questions:[
+      age,required,{...required,id:'q_'+'b'.repeat(32)},
+    ]})};
+    const changed=await writer.finMyProfile(id);
+    expect(changed.completion).toMatchObject({percentage:67,requiredCount:3,answeredCount:2});
+    expect((await users.findById(id).lean())).toMatchObject({
+      completionPercentage:67,completionRequiredCount:3,completionSchemaRevision:46,
+    });
+  });
+
+  it('never displays 100% to a signup-only account without biodata gender',async()=>{
+    const noProfile=await account({gender:undefined,biodataStatus:'draft',
+      isPublished:false,isPublishFromAdmin:false});
+    (writer as any).questions={get:async()=>({revision:47,questions:[
+      {...BUILTINS.find(q=>q.path==='age')!,required:true,enabled:true},
+    ]})};
+    const member=await writer.finMyProfile(String(noProfile._id));
+    const admin=await writer.getUserForAdmin({page:1,limit:10,gender:'all'} as any);
+    const adminMember=admin.data.find((item:any)=>String(item._id)===String(noProfile._id));
+    expect(member.completion).toMatchObject({percentage:0,requiredCount:0,answeredCount:0});
+    expect(adminMember).toMatchObject({completionPercentage:0,completionRequiredCount:0});
   });
 
   it('submitted biodata remains submitted after editing and re-submission, including publication', async () => {

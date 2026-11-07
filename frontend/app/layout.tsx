@@ -14,7 +14,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import QueryClint from "@/lib/QueryClint";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 import { Toaster } from "@/components/ui/sonner";
-import WhatsAppFloat from "@/components/custom/common/WhatsAppFloat";
+import SupportChatWidget from '@/components/custom/common/SupportChatWidget';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,7 +69,7 @@ export default function RootLayout({
 
         <QueryClint>
           <NuqsAdapter>
-            <WhatsAppFloat />
+            <SupportChatWidget />
             <Navbar />
             {children}
             <Footer />

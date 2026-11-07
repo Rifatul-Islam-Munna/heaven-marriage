@@ -11,6 +11,7 @@ import { Connection, Model, Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { GeminiService } from './gemini.service';
 import { User, UserDocument } from './entities/user.entity';
+import {buildProfileCompletionSnapshot} from './profile-completion-snapshot';
 import {
   completion,
   PROFILE_FIELDS,
@@ -305,7 +306,7 @@ export class ProfileAiService {
             )
             .select(
               PROFILE_FIELDS.join(' ') +
-                ' phoneNumber authVersion verificationStatus',
+                ' phoneNumber authVersion verificationStatus updatedAt',
             )
             .lean();
           if (!updated)
@@ -313,6 +314,12 @@ export class ProfileAiService {
               'প্রোফাইলের তথ্য বদলেছে। আবার লোড করে উত্তর দিন।',
             );
           profile = updated;
+          // AI-added answers are also saved in the versioned admin progress cache.
+          // Only update if the answer has not changed since this AI save.
+          await this.users.collection.updateOne(
+            {_id:new Types.ObjectId(actor),updatedAt:updated.updatedAt},
+            {$set:buildProfileCompletionSnapshot(updated,config)},
+          );
           // Show members the option text they recognise, not the stored value.
           const shown = (v: string) => dynamic?.options.find((o) => o.value === v)?.label || v;
           changed = {

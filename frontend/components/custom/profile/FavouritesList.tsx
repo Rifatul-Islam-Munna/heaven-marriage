@@ -18,6 +18,7 @@ type PublicBiodata = {
   gender?: "male" | "female";
   age?: number;
   isVerified?: boolean;
+  isSubscriber?: boolean;
   address?: { district?: string; upazila?: string };
   educationInfo?: { highestEducation?: string };
   occupational?: { profession?: string };
@@ -150,6 +151,7 @@ export default function FavouritesList({ direction }: { direction: Direction }) 
                     profession={profile.occupational?.profession || ""}
                     skinTone={profile.personalInformation?.skinTone}
                     isVerified={profile.isVerified}
+                    isSubscriber={profile.isSubscriber}
                     isForShortList={mine}
                   />
                   <div className="mt-2 flex min-h-12 items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">

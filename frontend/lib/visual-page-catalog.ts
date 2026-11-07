@@ -46,6 +46,11 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
     "dynamic": false
   },
   {
+    "path": "/dashboard/ai-training",
+    "label": "Dashboard / Ai Training",
+    "dynamic": false
+  },
+  {
     "path": "/dashboard/blog",
     "label": "Dashboard / Blog",
     "dynamic": false
@@ -83,6 +88,26 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
   {
     "path": "/dashboard/images",
     "label": "Dashboard / Images",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/locations",
+    "label": "Dashboard / Locations",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/matching",
+    "label": "Dashboard / Matching",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/payments",
+    "label": "Dashboard / Payments",
+    "dynamic": false
+  },
+  {
+    "path": "/dashboard/premium-service",
+    "label": "Dashboard / Premium Service",
     "dynamic": false
   },
   {
@@ -198,6 +223,11 @@ export const visualPageCatalog: ReadonlyArray<{ path: string; label: string; dyn
   {
     "path": "/profile/numbers",
     "label": "Profile / Numbers",
+    "dynamic": false
+  },
+  {
+    "path": "/profile/recommendations",
+    "label": "Profile / Recommendations",
     "dynamic": false
   },
   {

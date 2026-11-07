@@ -1,4 +1,6 @@
 import { GeminiService } from './gemini.service';
+import {PremiumAdminService} from './premium-admin.service';
+import {PremiumAdminController} from './premium-admin.controller';
 import { QuestionConfigModule } from '../profile-questions/question-config.module';
 import { ProfileAiService } from './profile-ai.service';
 import { ProfileAiController } from './profile-ai.controller';
@@ -26,8 +28,8 @@ import { PdfService } from './pdf.service';
 
 @Module({
   imports: [QuestionConfigModule,MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
-  controllers: [UserController,PlatformController,AiController,PublicController,ProfileAiController],
-  providers: [GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
+  controllers: [UserController,PlatformController,AiController,PublicController,ProfileAiController,PremiumAdminController],
+  providers: [PremiumAdminService,GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
   exports: [MessagingService],
 })
 export class UserModule {}

@@ -43,6 +43,7 @@ const getInitialFormData = (): Partial<User> => ({
   bloodGroup: '',
   weight: undefined,
   nationality: '',
+  residenceCountry: 'Bangladesh',
   
   // ADD THIS ✅
   customFields: {},
@@ -53,6 +54,8 @@ const getInitialFormData = (): Partial<User> => ({
     permanentAddress: '',
     district: '',
     upazila: '',
+    cityCorporation: '',
+    area: '',
     extraInfo: ''
   },
   educationInfo: {

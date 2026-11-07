@@ -15,7 +15,10 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { formatPremiumFee, resolvePremiumSettings, type PremiumSettings } from '@/lib/premium-settings';
+import IncomeOverview from './IncomeOverview';
+import { formatPremiumFee,premiumTotal, resolvePremiumSettings, type PremiumSettings } from '@/lib/premium-settings';
+import PremiumMembersPanel from './PremiumMembersPanel';
+import PremiumLiveEditor from './PremiumLiveEditor';
 import {
   DashboardHeader, DashboardPage, DashButton, KpiCard, KpiRow, Panel, PlainHeader, Segmented, SortHeader,
   StatusPill, Toggle, fieldClass, formatWhen, labelClass, type SortState,
@@ -25,11 +28,12 @@ type Case = {
   id: string; userId: string; targetId?: string; kind: string; status: string;
   message: string; transactionReference?: string; adminNotes?: string; fee?: number;
 };
-type Payment = { id: string; status: string; userId: string; quantity: number; amount: number; transactionId?: string };
+type Payment = { id: string; status: string; userId: string; quantity: number; amount: number; transactionId?: string; paymentId?:string; paidAt?:string; refundedAt?:string };
 type Audit = { _id: string; actor: string; action: string; target: string; reason: string; createdAt: string };
 type Settings = Record<string, unknown>;
 type Tone = 'positive' | 'warning' | 'neutral' | 'negative' | 'info';
 type TabKey = 'requests' | 'payments' | 'members' | 'matching' | 'premium' | 'settings' | 'audit';
+type ServicesMode='all'|'payments'|'premium';
 type Confirm = { title: string; description: string; action: string; danger?: boolean; run: () => Promise<void> };
 type PolicyKey = 'terms' | 'privacy' | 'refund';
 type SiteSettings = {
@@ -396,7 +400,7 @@ function PaymentsTab({ payments, loading, onChanged, askConfirm }: {
       (!q || [item.id, item.userId, item.transactionId || ''].some(value => value.toLowerCase().includes(q))))
       .sort((a, b) => Number(b.status === 'pending_manual') - Number(a.status === 'pending_manual'));
   }, [list, query, status]);
-  const total = visible.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const total = visible.filter(item=>item.status==='paid').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const canReverse = !busy && !!orderId.trim() && !!reference.trim() && !!reason.trim() && returned;
   const startReversal = (item: Payment) => {
     setOrderId(item.id);
@@ -421,7 +425,8 @@ function PaymentsTab({ payments, loading, onChanged, askConfirm }: {
   });
 
   return <div className="space-y-4">
-    <Panel title="Connection payments" description={`${visible.length} payments · ${taka(total)} total`} bodyClassName="p-0"
+    <IncomeOverview />
+    <Panel title="Connection payments" description={`${visible.length} orders · ${taka(total)} confirmed paid in this filtered list (not premium)`} bodyClassName="p-0"
       actions={<>
         <SearchBox value={query} onChange={setQuery} placeholder="Order, member or transaction" />
         <select aria-label="Payment status" value={status} onChange={event => setStatus(event.target.value)} className={cn(fieldClass, 'w-auto py-1.5 text-[13px]')}>
@@ -434,7 +439,7 @@ function PaymentsTab({ payments, loading, onChanged, askConfirm }: {
           <table className="w-full min-w-[820px] border-collapse text-[13px]">
             <thead className="sticky top-0 z-10 bg-white"><tr>
               <PlainHeader label="Order" /><PlainHeader label="Member" /><PlainHeader label="Connections" className="text-right" />
-              <PlainHeader label="Amount" className="text-right" /><PlainHeader label="Transaction" /><PlainHeader label="Status" />
+              <PlainHeader label="Amount" className="text-right" /><PlainHeader label="Paid at (BD)" /><PlainHeader label="Method" /><PlainHeader label="Transaction" /><PlainHeader label="Status" />
               <PlainHeader label="Actions" className="text-right" />
             </tr></thead>
             <tbody>{visible.map(item => <tr key={item.id} className={cn('border-b border-[#f0f0f0] last:border-0 hover:bg-[#f8f9fa]', item.status === 'pending_manual' && 'bg-amber-50/40')}>
@@ -442,6 +447,8 @@ function PaymentsTab({ payments, loading, onChanged, askConfirm }: {
               <td className="px-3 py-2.5"><IdChip value={item.userId} label="Member ID" profile /></td>
               <td className="px-3 py-2.5 text-right tabular-nums">{item.quantity}</td>
               <td className="px-3 py-2.5 text-right font-medium tabular-nums">{taka(item.amount)}</td>
+              <td className="max-w-[200px] whitespace-nowrap px-3 py-2.5 text-[12px] text-slate-600">{item.paidAt ? new Date(item.paidAt).toLocaleString('en-BD',{timeZone:'Asia/Dhaka',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not verified'}</td>
+              <td className="px-3 py-2.5">{item.paymentId?.startsWith('manual:')?'Manual':item.paymentId?'bKash':'—'}</td>
               <td className="max-w-[180px] px-3 py-2.5">{item.transactionId ? <span title={item.transactionId} className="block truncate font-mono text-[12px]">{item.transactionId}</span> : <span className="text-[#adb5bd]">—</span>}</td>
               <td className="px-3 py-2.5"><StatusBadge status={item.status} /></td>
               <td className="px-3 py-2.5"><div className="flex justify-end gap-1.5">
@@ -734,7 +741,18 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
     !premium.footer.trim() || !premium.requestLabel.trim() || !premium.detailsLabel.trim() ||
     !Number.isSafeInteger(premium.fee) || premium.fee < 1 || premium.fee > 1000000 ||
     !premium.steps.some(step => step.trim()) || premium.steps.filter(step => step.trim()).length > 10 ||
-    premium.steps.some(step => step.trim().length > 500) || phoneBad;
+    premium.steps.some(step => step.trim().length > 500) || phoneBad ||
+    !Number.isSafeInteger(premium.serviceCharge) || premium.serviceCharge<0 ||
+    premiumTotal(premium)>1000000 || premiumTotal(premium)<1 ||
+    !Number.isSafeInteger(premium.durationDays)||premium.durationDays<1||premium.durationDays>3650||
+    !Number.isSafeInteger(premium.assistedConnections)||premium.assistedConnections<0||premium.assistedConnections>10000||
+    !Number.isSafeInteger(premium.includedConnections)||premium.includedConnections<0||premium.includedConnections>10000||
+    !Number.isSafeInteger(premium.extraConnectionFee)||premium.extraConnectionFee<0||premium.extraConnectionFee>1000000||
+    !premium.extraConnectionPolicy.trim()||premium.extraConnectionPolicy.length>1000||
+    !premium.adHeadline.trim()||premium.adHeadline.length>200||
+    !premium.adDescription.trim()||premium.adDescription.length>500||
+    !premium.benefits.length||premium.benefits.length>8||
+    premium.benefits.some(x=>!x.trim()||x.length>180);
   const save = async () => {
     if (invalid) return;
     setBusy(true);
@@ -745,6 +763,9 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
     else toast.error(error?.message || 'Unable to save premium service');
   };
   return <div className="space-y-4">
+    <div id="premium-members-panel" className="scroll-mt-5"><PremiumMembersPanel /></div>
+    <PremiumLiveEditor premium={premium} onPatch={patch=>setPremium(current=>({...current,...patch}))}/>
+    <div id="premium-edit-settings" className="scroll-mt-5"/>
     <Panel title="Premium service" description="Controls the member profile card, public /premium page, and fee for new applications."
       actions={<a href="/premium" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[12px] font-medium text-rose-700 hover:underline"><ExternalLink size={13} /> View page</a>}>
       <div className="space-y-4">
@@ -778,11 +799,51 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
         </div>
       </div>
     </Panel>
+
+    <Panel title="Premium package, assistance & advertising" description="All prices and inclusions are public. Changes apply to NEW orders; paid members retain their original terms.">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {([
+          ['serviceCharge','Extra service charge (৳)',0,1000000],
+          ['durationDays','Duration (days)',1,3650],
+          ['assistedConnections','Team-assisted connections',0,10000],
+          ['includedConnections','Included wallet connections',0,10000],
+          ['extraConnectionFee','Extra connection reference rate (৳)',0,1000000],
+        ] as const).map(([key,label,min,max])=><div key={key}>
+           <label htmlFor={'premium-'+key} className={labelClass}>{label}</label>
+           <input id={'premium-'+key} type="number" min={min} max={max} step="1" value={premium[key]}
+             onChange={event=>set(key,Number(event.target.value))} className={fieldClass} />
+         </div>)}
+        <div className="rounded-lg bg-blue-50 px-4 py-3">
+          <p className="text-[11px] font-bold text-blue-700">Premium bKash checkout total</p>
+          <p className="mt-1 text-[23px] font-bold text-blue-950">{formatPremiumFee(premiumTotal(premium))}</p>
+          <p className="text-[11px] text-blue-800">Price + service charge · Never silently charge extra connections</p>
+        </div>
+      </div>
+      <div className="mt-4 space-y-4">
+        <div><label htmlFor="premium-extras" className={labelClass}>Extra connections rule (shown to customers)</label>
+          <textarea id="premium-extras" value={premium.extraConnectionPolicy} maxLength={1000} rows={3}
+            onChange={e=>set('extraConnectionPolicy',e.target.value)} className={cn(fieldClass,'resize-y')}/></div>
+        <div><label htmlFor="premium-benefits" className={labelClass}>Premium benefits · one per line (1–8)</label>
+          <textarea id="premium-benefits" rows={5} value={premium.benefits.join('\n')}
+            onChange={e=>set('benefits',e.target.value.split('\n').map(x=>x.trim()).filter(Boolean))}
+            className={cn(fieldClass,'resize-y')}/></div>
+      </div>
+      <div className="mt-5 space-y-3 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+        <h3 className="font-bold text-blue-900">Premium campaign headline and copy</h3>
+        <p className="text-xs leading-5 text-blue-900">Registration remains clean and free. Premium details appear on the public Premium page and as an optional offer in eligible logged-in member dashboards. The headline below is controlled here.</p>
+        <div><label htmlFor="premium-ad-headline" className={labelClass}>Campaign headline</label>
+          <input id="premium-ad-headline" value={premium.adHeadline} maxLength={200}
+            onChange={e=>set('adHeadline',e.target.value)} className={fieldClass}/></div>
+        <div><label htmlFor="premium-ad-description" className={labelClass}>Short ad description</label>
+          <textarea id="premium-ad-description" value={premium.adDescription} maxLength={500} rows={2}
+            onChange={e=>set('adDescription',e.target.value)} className={cn(fieldClass,'resize-y')}/></div>
+      </div>
+    </Panel>
     <Panel title="Public premium page" description="Text shown at /premium.">
       <div className="space-y-4">
         <div><label htmlFor="premium-intro" className={labelClass}>Introduction</label>
           <textarea id="premium-intro" rows={3} maxLength={2000} value={premium.intro} onChange={event => set('intro', event.target.value)} className={cn(fieldClass, 'resize-y')} />
-          <p className="mt-1 text-xs text-[#6c757d]">Current registration fee appears after this text.</p></div>
+          <p className="mt-1 text-xs text-[#6c757d]">Public page displays the exact total and all fee components.</p></div>
         <div><label htmlFor="premium-steps" className={labelClass}>Steps (one per line)</label>
           <textarea id="premium-steps" rows={7} value={premium.steps.join('\n')} onChange={event => set('steps', event.target.value.split('\n'))} className={cn(fieldClass, 'resize-y')} /></div>
         {invalid && <p className="text-xs text-red-600">Fill every required field. Use 1–10 steps (max 500 characters each), a fee from ৳1 to ৳1,000,000, and a valid phone number.</p>}
@@ -910,7 +971,7 @@ function AuditTab({ audit, loading }: { audit?: Audit[]; loading: boolean }) {
   </Panel>;
 }
 
-export default function ServicesManager() {
+export default function ServicesManager({mode='all'}:{mode?:ServicesMode}) {
   const queryClient = useQueryClient();
   const staffSession = useQueryWrapper<{ role: string }>(['staff-access-me'], '/staff-access/me');
   const paymentsQuery = useQueryWrapper<Payment[]>(['admin-payments'], '/platform/admin/payments');
@@ -926,9 +987,15 @@ export default function ServicesManager() {
   const [lookupError, setLookupError] = useState('');
 
   useEffect(() => {
-    const fromHash = window.location.hash.slice(1) as TabKey;
-    if (TAB_KEYS.includes(fromHash)) setTab(fromHash);
-  }, []);
+    if(mode!=='all')return;
+    const fromHash=window.location.hash.slice(1) as TabKey;
+    if(fromHash==='premium'){window.location.replace('/dashboard/premium-service');return;}
+    if(fromHash==='payments'){window.location.replace('/dashboard/payments');return;}
+    if(TAB_KEYS.includes(fromHash)){
+      const frame=window.requestAnimationFrame(()=>setTab(fromHash));
+      return ()=>window.cancelAnimationFrame(frame);
+    }
+  },[mode]);
   const selectTab = (next: TabKey) => {
     setTab(next);
     window.history.replaceState(null, '', '#' + next);
@@ -968,24 +1035,85 @@ export default function ServicesManager() {
   const refreshing = casesQuery.isFetching || paymentsQuery.isFetching || auditQuery.isFetching || statsQuery.isFetching;
   const tabs: { key: TabKey; label: string; icon: ReactNode; badge?: number }[] = [
     { key: 'requests', label: 'Requests', icon: <ClipboardList size={15} />, badge: openCases },
-    { key: 'payments', label: 'Payments', icon: <CreditCard size={15} />, badge: toVerify },
+
     { key: 'members', label: 'Member balance', icon: <User size={15} /> },
     { key: 'matching', label: 'Matching rules', icon: <SlidersHorizontal size={15} /> },
-    { key: 'premium', label: 'Premium service', icon: <Crown size={15} /> },
+
     { key: 'settings', label: 'Messenger & policies', icon: <Settings2 size={15} /> },
     { key: 'audit', label: 'History', icon: <History size={15} /> },
   ];
 
+  if(mode==='premium')return <DashboardPage>
+    <DashboardHeader
+      title="প্রিমিয়াম সার্ভিস ম্যানেজমেন্ট"
+      description="সদস্য, মেয়াদ, Assisted Connections, প্যাকেজ মূল্য এবং লাইভ কনটেন্ট প্রিভিউ—এক জায়গায়।"
+      actions={<>
+        <a href="/premium" target="_blank" rel="noopener noreferrer"
+          className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 text-[12px] font-semibold text-white hover:bg-white/20">
+          <ExternalLink size={14}/> পাবলিক পেজ দেখুন
+        </a>
+        <DashButton tone="ghost-dark" disabled={refreshing} onClick={refreshSettings}>
+          <RefreshCw size={14} className={refreshing?'animate-spin':''}/> রিফ্রেশ
+        </DashButton>
+      </>}/>
+    <nav aria-label="Premium service sections" className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3">
+      {[
+        {href:'#premium-members-panel',label:'সদস্য ও সার্ভিস প্রগ্রেস'},
+        {href:'#premium-visual-preview',label:'ভিজ্যুয়াল প্রিভিউ'},
+        {href:'#premium-edit-settings',label:'প্যাকেজ ও কনটেন্ট এডিট'},
+      ].map(item=><a key={item.href} href={item.href}
+        className="inline-flex min-h-9 items-center rounded-lg bg-slate-50 px-3 text-[12px] font-semibold text-slate-700 transition hover:bg-rose-50 hover:text-rose-800">
+        {item.label}
+      </a>)}
+    </nav>
+    <PremiumTab settings={settingsQuery.data} onSaved={refreshSettings}/>
+  </DashboardPage>;
+
+  if(mode==='payments')return <DashboardPage>
+    <DashboardHeader
+      title="পেমেন্ট ও আয়ের হিসাব"
+      description="Verified payment, refunds, মাসভিত্তিক আয়, বকেয়া যাচাই এবং লেনদেনের হিসাব।"
+      actions={<DashButton tone="ghost-dark" disabled={refreshing} onClick={refreshActivity}>
+        <RefreshCw size={14} className={refreshing?'animate-spin':''}/> Refresh
+      </DashButton>}/>
+    <PaymentsTab payments={payments} loading={paymentsQuery.isLoading} onChanged={refreshActivity}
+      askConfirm={setConfirm}/>
+    <AlertDialog open={!!confirm} onOpenChange={open=>{if(!open)setConfirm(null);}}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{confirm?.title}</AlertDialogTitle>
+          <AlertDialogDescription>{confirm?.description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction className={confirm?.danger?'bg-red-600 hover:bg-red-700':'bg-rose-600 hover:bg-rose-700'}
+            onClick={()=>{const current=confirm;setConfirm(null);if(current)void current.run();}}>
+            {confirm?.action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </DashboardPage>;
+
   return <DashboardPage>
     <DashboardHeader
-      title="Services & payments"
-      description="Member requests, connection payments and balances, matching rules, and site policies. Every action asks for a reason and is saved in the history."
+      title="সার্ভিস রিকোয়েস্ট ও কানেকশন"
+      description="ম্যানুয়াল রিকোয়েস্ট, কানেকশন ব্যালেন্স, ম্যাচিং নিয়ম, মেসেঞ্জার ও নীতি পরিচালনা করুন। পেমেন্ট ও প্রিমিয়াম আলাদা পেজে আছে।"
       meta={openCases + toVerify > 0 ? <StatusPill tone="warning">{openCases + toVerify} need attention</StatusPill> : null}
       actions={<DashButton tone="ghost-dark" disabled={refreshing} onClick={refreshActivity}>
         <RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} /> Refresh
       </DashButton>}
     />
 
+    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3">
+      <a href="/dashboard/payments" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-800 transition hover:border-rose-200 hover:bg-rose-50">
+        <CreditCard size={16} className="text-rose-600"/> পেমেন্ট ও আয়ের চার্ট
+        {toVerify>0&&<span className="rounded-full bg-amber-100 px-1.5 text-[10px] text-amber-800">{toVerify}</span>}
+      </a>
+      <a href="/dashboard/premium-service" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-800 transition hover:border-rose-200 hover:bg-rose-50">
+        <Crown size={16} className="text-blue-600"/> প্রিমিয়াম সার্ভিস ও ভিজ্যুয়াল এডিট
+      </a>
+    </div>
     <KpiRow>
       <KpiCard label="Open requests" value={cases ? openCases : '—'} tone={openCases ? 'warning' : 'positive'}
         hint={openCases ? 'Waiting for a reply or next step' : 'Nothing waiting'} />
@@ -1015,18 +1143,12 @@ export default function ServicesManager() {
       <RequestsTab cases={cases} loading={casesQuery.isLoading} onChanged={refreshActivity} onLookup={lookupFromRequest}
         canReviewDeletion={staffSession.data?.role === 'admin'} />
     </div>
-    <div role="tabpanel" id="panel-payments" aria-labelledby="tab-payments" hidden={tab !== 'payments'}>
-      <PaymentsTab payments={payments} loading={paymentsQuery.isLoading} onChanged={refreshActivity} askConfirm={setConfirm} />
-    </div>
     <div role="tabpanel" id="panel-members" aria-labelledby="tab-members" hidden={tab !== 'members'}>
       <MembersTab memberId={memberId} setMemberId={setMemberId} lookup={lookup} lookupState={lookupState} lookupError={lookupError}
         onLookup={id => void runLookup(id)} askConfirm={setConfirm} onChanged={refreshActivity} />
     </div>
     <div role="tabpanel" id="panel-matching" aria-labelledby="tab-matching" hidden={tab !== 'matching'}>
       <MatchingTab settings={settingsQuery.data} onSaved={refreshSettings} />
-    </div>
-    <div role="tabpanel" id="panel-premium" aria-labelledby="tab-premium" hidden={tab !== 'premium'}>
-      <PremiumTab settings={settingsQuery.data} onSaved={refreshSettings} />
     </div>
     <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden={tab !== 'settings'}>
       <SettingsTab settings={settingsQuery.data} onSaved={refreshSettings} />

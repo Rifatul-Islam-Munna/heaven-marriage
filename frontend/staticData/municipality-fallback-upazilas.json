@@ -1,0 +1,128 @@
+[
+  {
+    "kind": "upazila",
+    "name": "Matlab South",
+    "label": "মতলব দক্ষিণ",
+    "district": "Chandpur"
+  },
+  {
+    "kind": "upazila",
+    "name": "Matlab North",
+    "label": "মতলব উত্তর",
+    "district": "Chandpur"
+  },
+  {
+    "kind": "upazila",
+    "name": "Coxsbazar Sadar",
+    "label": "কক্সবাজার সদর",
+    "district": "Cox's Bazar"
+  },
+  {
+    "kind": "upazila",
+    "name": "Singra",
+    "label": "সিংড়া",
+    "district": "Natore"
+  },
+  {
+    "kind": "upazila",
+    "name": "Gurudaspur",
+    "label": "গুরুদাসপুর",
+    "district": "Natore"
+  },
+  {
+    "kind": "upazila",
+    "name": "Naldanga",
+    "label": "নলডাঙ্গা",
+    "district": "Natore"
+  },
+  {
+    "kind": "upazila",
+    "name": "Joypurhat Sadar",
+    "label": "জয়পুরহাট সদর",
+    "district": "Joypurhat"
+  },
+  {
+    "kind": "upazila",
+    "name": "Chapainawabganj Sadar",
+    "label": "চাঁপাইনবাবগঞ্জ সদর",
+    "district": "Nawabganj"
+  },
+  {
+    "kind": "upazila",
+    "name": "Meherpur Sadar",
+    "label": "মেহেরপুর সদর",
+    "district": "Meherpur"
+  },
+  {
+    "kind": "upazila",
+    "name": "Narail Sadar",
+    "label": "নড়াইল সদর",
+    "district": "Narail"
+  },
+  {
+    "kind": "upazila",
+    "name": "Lohagara",
+    "label": "লোহাগড়া",
+    "district": "Narail"
+  },
+  {
+    "kind": "upazila",
+    "name": "Kalia",
+    "label": "কালিয়া",
+    "district": "Narail"
+  },
+  {
+    "kind": "upazila",
+    "name": "Chuadanga Sadar",
+    "label": "চুয়াডাঙ্গা সদর",
+    "district": "Chuadanga"
+  },
+  {
+    "kind": "upazila",
+    "name": "Raipura",
+    "label": "রায়পুরা",
+    "district": "Narsingdi"
+  },
+  {
+    "kind": "upazila",
+    "name": "Shariatpur Sadar",
+    "label": "শরিয়তপুর সদর",
+    "district": "Shariatpur"
+  },
+  {
+    "kind": "upazila",
+    "name": "Goalanda",
+    "label": "গোয়ালন্দ",
+    "district": "Rajbari"
+  },
+  {
+    "kind": "upazila",
+    "name": "Durgapur",
+    "label": "দুর্গাপুর",
+    "district": "Netrokona"
+  },
+  {
+    "kind": "upazila",
+    "name": "Kendua",
+    "label": "কেন্দুয়া",
+    "district": "Netrokona"
+  },
+  {
+    "kind": "upazila",
+    "name": "Madan",
+    "label": "মদন",
+    "district": "Netrokona"
+  },
+  {
+    "kind": "upazila",
+    "name": "Mohongonj",
+    "label": "মোহনগঞ্জ",
+    "district": "Netrokona"
+  },
+  {
+    "kind": "upazila",
+    "name": "Netrokona Sadar",
+    "label": "নেত্রকোণা সদর",
+    "district": "Netrokona"
+  }
+]

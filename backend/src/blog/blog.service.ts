@@ -51,7 +51,7 @@ export function safeBlogUrl(value:unknown,label:string,email=false):string {
   throw new BadRequestException('Invalid '+label+' URL: use HTTPS or a relative path');
 }
 const permitted=new Set(['doc','paragraph','heading','text','bulletList','orderedList',
-  'listItem','blockquote','codeBlock','horizontalRule','hardBreak','image']);
+  'listItem','blockquote','codeBlock','horizontalRule','hardBreak','image','video']);
 const formats=new Set(['bold','italic','underline','strike','code','link']);
 function validateNode(value:unknown,depth:number,budget:{nodes:number;chars:number}):BlogNode{
   if(depth>14||++budget.nodes>3500)throw new BadRequestException('Article exceeds editor complexity limit');
@@ -86,6 +86,18 @@ function validateNode(value:unknown,depth:number,budget:{nodes:number;chars:numb
     const alt=str(a.alt,'image alt text',250);
     if(!src||!alt)throw new BadRequestException('Images require a URL and descriptive alt text');
     node.attrs={src,alt,title:str(a.title||a.caption,'caption',320)};
+    return node;
+  }
+  if(type==='video'){
+    const a=obj(input.attrs,'video'),src=safeBlogUrl(a.src,'video');
+    if(!src)throw new BadRequestException('Video URL is required');
+    const location=new URL(src,'https://niqaha.com');
+    if(!/\.(mp4|webm)$/i.test(location.pathname))
+      throw new BadRequestException('Article video must be an MP4 or WebM URL');
+    const title=str(a.title||a.caption,'video description',250);
+    if(title.length<3)throw new BadRequestException('Video needs a descriptive title');
+    const poster=safeBlogUrl(a.poster||'','video poster');
+    node.attrs={src,title,poster};
     return node;
   }
   if(type==='hardBreak'||type==='horizontalRule')return node;

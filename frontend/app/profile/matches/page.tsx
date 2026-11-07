@@ -121,6 +121,7 @@ export default function SmartMatchesPage() {
           <div>
             <div className="inline-flex items-center gap-2 text-sm font-semibold text-pink-600"><Sparkles className="size-4" /> Find My Matches</div>
             <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">স্মার্ট ম্যাচিং</h1>
+            <Link href={"/profile/recommendations" as never} className="mt-2 inline-flex rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-semibold text-pink-800 hover:bg-pink-100">এজেন্সির সুপারিশ দেখুন</Link>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">আপনার বায়োডাটায় উল্লেখ করা জীবনসঙ্গীর প্রত্যাশার সঙ্গে প্রকাশিত বায়োডাটাগুলোর তুলনা। কোনো AI অনুমান নয়—শুধু দেওয়া তথ্য অনুযায়ী হিসাব।</p>
           </div>
           <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}><RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} /> নতুন করে দেখুন</Button>

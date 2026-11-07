@@ -1,0 +1,110 @@
+{
+  "missingDistricts": [],
+  "unmatched": [
+    {
+      "district": "Chandpur",
+      "upazila": "Matlab South",
+      "pourashava": "Matlab"
+    },
+    {
+      "district": "Chandpur",
+      "upazila": "Matlab North",
+      "pourashava": "Sangarchar"
+    },
+    {
+      "district": "Cox's Bazar",
+      "upazila": "Coxsbazar Sadar",
+      "pourashava": "Cox's Bazar"
+    },
+    {
+      "district": "Natore",
+      "upazila": "Singra",
+      "pourashava": "Singra"
+    },
+    {
+      "district": "Natore",
+      "upazila": "Gurudaspur",
+      "pourashava": "Gurudaspur"
+    },
+    {
+      "district": "Natore",
+      "upazila": "Naldanga",
+      "pourashava": "Naldanga"
+    },
+    {
+      "district": "Joypurhat",
+      "upazila": "Joypurhat Sadar",
+      "pourashava": "Joypurhat"
+    },
+    {
+      "district": "Nawabganj",
+      "upazila": "Chapainawabganj Sadar",
+      "pourashava": "Chapai Nawabganj"
+    },
+    {
+      "district": "Meherpur",
+      "upazila": "Meherpur Sadar",
+      "pourashava": "Meherpur"
+    },
+    {
+      "district": "Narail",
+      "upazila": "Narail Sadar",
+      "pourashava": "Narail"
+    },
+    {
+      "district": "Narail",
+      "upazila": "Lohagara",
+      "pourashava": "Lohagara"
+    },
+    {
+      "district": "Narail",
+      "upazila": "Kalia",
+      "pourashava": "Kalia"
+    },
+    {
+      "district": "Chuadanga",
+      "upazila": "Chuadanga Sadar",
+      "pourashava": "Chuadanga"
+    },
+    {
+      "district": "Narsingdi",
+      "upazila": "Raipura",
+      "pourashava": "Raipura"
+    },
+    {
+      "district": "Shariatpur",
+      "upazila": "Shariatpur Sadar",
+      "pourashava": "Shariatpur"
+    },
+    {
+      "district": "Rajbari",
+      "upazila": "Goalanda",
+      "pourashava": "Goalanda"
+    },
+    {
+      "district": "Netrokona",
+      "upazila": "Durgapur",
+      "pourashava": "Durgapur"
+    },
+    {
+      "district": "Netrokona",
+      "upazila": "Kendua",
+      "pourashava": "Kendua"
+    },
+    {
+      "district": "Netrokona",
+      "upazila": "Madan",
+      "pourashava": "Madan"
+    },
+    {
+      "district": "Netrokona",
+      "upazila": "Mohongonj",
+      "pourashava": "Mohongonj"
+    },
+    {
+      "district": "Netrokona",
+      "upazila": "Netrokona Sadar",
+      "pourashava": "Netrokona"
+    }
+  ]
+}

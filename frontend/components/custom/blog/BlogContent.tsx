@@ -63,6 +63,18 @@ function RenderNode({node,nodeIndex}:{node:BlogNode;nodeIndex:number|string}):Re
         {caption&&<figcaption className="border-t border-pink-100 px-5 py-3 text-center text-sm leading-6 text-muted-foreground">{caption}</figcaption>}
       </figure>;
     }
+    case 'video':{
+      const src=String(node.attrs?.src||''),title=String(node.attrs?.title||'');
+      const poster=String(node.attrs?.poster||'');
+      if(!src||!title)return null;
+      return <figure className="my-9 overflow-hidden rounded-2xl border border-pink-100 bg-pink-50/40">
+        <video src={src} poster={poster||undefined} controls playsInline preload="metadata"
+          aria-label={title} className="mx-auto aspect-video max-h-[580px] w-full bg-slate-950 object-contain">
+          <a href={src} rel="noopener noreferrer">Watch or download the video</a>
+        </video>
+        <figcaption className="border-t border-pink-100 px-5 py-3 text-center text-sm leading-6 text-muted-foreground">{title}</figcaption>
+      </figure>;
+    }
     default:return null;
   }
 }

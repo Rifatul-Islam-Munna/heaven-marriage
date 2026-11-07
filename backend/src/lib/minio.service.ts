@@ -94,6 +94,8 @@ export class MinioService implements OnModuleInit {
         Key:filePath.filename , 
         Body: fileContent,
         ContentType:filePath.mimetype ,
+        ContentLength:filePath.size,
+        ContentDisposition:'inline',
         
       });
 

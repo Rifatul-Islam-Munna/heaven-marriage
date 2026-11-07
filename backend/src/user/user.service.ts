@@ -2,11 +2,12 @@ import { IdentityService } from './identity.service';
 import { QuestionConfigService, sanitizeDynamicAnswers } from '../profile-questions/question-config.service';
 import { PlatformService } from './platform.service';
 import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter, publicProfile } from './profile-rules';
+import {buildProfileCompletionSnapshot,describeProfileCompletion,needsProfileCompletionSync} from './profile-completion-snapshot';
 import { favouritePagination, favouritesPipeline, type FavouriteDirection } from './favourites';
-import { biodataStage, hasSubmittedBiodata } from './biodata-lifecycle';
+import { biodataStage, hasSubmittedBiodata, hasStartedBiodata } from './biodata-lifecycle';
 import { dailyRotationExpression } from './discovery-selection';
 import { recordDiscoveryEvent } from './discovery-cycle';
-import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException } from '@nestjs/common';
+import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminSetPasswordDto, AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -82,6 +83,29 @@ export class UserService  implements OnModuleInit{
       },
     );
   }
+  /** Small bounded reconciliation for members not opened in the admin table
+   * since the last Dynamic Question Builder revision. Safe across restarts. */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async refreshStaleCompletionSnapshots(){
+    try{
+      const schema=await this.questions.get();
+      const profiles=await this.userModel.find({role:UserType.USER,
+        biodataStatus:{$ne:'deleted'},completionSchemaRevision:{$ne:schema.revision}})
+        .limit(200).lean().exec();
+      if(!profiles.length)return;
+      const writes=profiles.map((member:any)=>({
+        updateOne:{
+          filter:{_id:member._id,updatedAt:member.updatedAt,
+            completionSchemaRevision:{$ne:schema.revision}},
+          update:{$set:buildProfileCompletionSnapshot(member,schema)},
+        },
+      }));
+      await this.userModel.collection.bulkWrite(writes,{ordered:false});
+    }catch(error){
+      this.logger.warn('Completion snapshot reconciliation skipped: '+String(error));
+    }
+  }
+
   async create(createUserDto: CreateUserDto) {return this.identity.register(createUserDto);}
 
   async resendOtp(id:string){return this.identity.resend(id);}
@@ -140,7 +164,8 @@ async findUserAndUpdated() {
       const status=completion(state,schema.questions);
       if(status.percentage<100)throw new HttpException({message:'Required questions are unanswered',missing:status.remaining},400);
       payload.biodataStatus='submitted';
-      payload.submittedAt=new Date();
+      // Keep the FIRST submission timestamp even when a rejected biodata is resubmitted.
+      if (!current.submittedAt) payload.submittedAt=new Date();
       payload.isPublishFromAdmin=false;
       payload.verificationStatus='pending';
     }
@@ -152,13 +177,19 @@ async findUserAndUpdated() {
       filter.verificationStatus = current.verificationStatus;
       filter.biodataStatus = current.biodataStatus;
     }
-    const data=await this.userModel.findOneAndUpdate(filter,{$set:profileUpdateSet(payload)},{new:true,runValidators:true}).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
+    const expected=profileUpdatePreview(current,payload);
+    const snapshot=buildProfileCompletionSnapshot(expected,schema);
+    const data=await this.userModel.findOneAndUpdate(filter,
+      {$set:{...profileUpdateSet(payload),...snapshot}},
+      {new:true,runValidators:true})
+      .select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
     if (!data) throw new HttpException('Biodata state changed. Refresh and retry.', 409);
+    const savedProgress=describeProfileCompletion(data,schema).completion;
     return {message:(updated as any).submit
       ? !needsReviewSubmission ? 'Biodata already submitted; edits saved' : 'Biodata submitted for review'
       : 'Biodata changes saved',
-      data,completion:completion(data,schema.questions),
-      biodataStage:biodataStage(data,completion(data,schema.questions).percentage)};
+      data,completion:savedProgress,
+      biodataStage:biodataStage(data,savedProgress.percentage)};
   }
 
   async loginUser(payload:LoginDto){return this.identity.login(payload);}
@@ -230,6 +261,8 @@ async findUserAndUpdated() {
     religiousEducation,
     skinColor,
     upazilaId,
+    cityCorporation,
+    area,
     country,
     polygamy
     
@@ -341,8 +374,14 @@ async findUserAndUpdated() {
   if (upazilaId) {
     matchConditions['address.upazila'] = upazilaId;
   }
+  if(cityCorporation)matchConditions['address.cityCorporation']=cityCorporation;
+  if(area)matchConditions['address.area']=area;
   if(country){
-    matchConditions.nationality = country
+    // Do not overwrite the $or used by the marital-status/polygamy filter.
+    matchConditions.$and = [
+      ...(matchConditions.$and || []),
+      {$or:[{residenceCountry:country},{residenceCountry:{$exists:false},nationality:country}]},
+    ];
   }
 
   if (educationMedium && educationMedium.length > 0) {
@@ -574,10 +613,22 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
-    const profileCompletion = completion(findOne,(await this.questions.get()).questions);
-    return {...findOne, completion: profileCompletion,
-      biodataStage: biodataStage(findOne, profileCompletion.percentage),
-      alreadySubmitted: hasSubmittedBiodata(findOne)};
+    const schema=await this.questions.get();
+    const {snapshot,completion:profileCompletion}=describeProfileCompletion(findOne,schema);
+    // Reconcile the same revisioned completion snapshot shown in Member Management.
+    // A conditional raw write avoids changing a concurrent profile update.
+    if(findOne.role===UserType.USER && findOne.biodataStatus!=='deleted' &&
+       needsProfileCompletionSync(findOne,snapshot)){
+      try{
+        await this.userModel.collection.updateOne(
+          {_id:findOne._id,updatedAt:(findOne as unknown as {updatedAt?:Date}).updatedAt},
+          {$set:snapshot},
+        );
+      }catch(error){this.logger.warn('Profile completion cache sync skipped: '+String(error));}
+    }
+    return {...findOne,...snapshot,completion:profileCompletion,
+      biodataStage:biodataStage(findOne,profileCompletion.percentage),
+      alreadySubmitted:hasSubmittedBiodata(findOne)};
   }
 
  async update( updateUserDto: UpdateUserDto,actor:string,actorRole:string=UserType.ADMIN) {
@@ -597,7 +648,14 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
-    return findOne;
+    // Account and biodata edits made by administrators also refresh the cache.
+    const activeSchema=await this.questions.get();
+    const snapshot=buildProfileCompletionSnapshot(findOne,activeSchema);
+    await this.userModel.collection.updateOne(
+      {_id:findOne._id,updatedAt:(findOne as unknown as {updatedAt?:Date}).updatedAt},
+      {$set:snapshot},
+    );
+    return {...findOne,...snapshot};
   }
 
    async removeUser(id:string){return this.platform.createCase(id,'deletion',{});}
@@ -647,10 +705,12 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
   this.logger.debug("searchQuery->",isPublished)
 
   const filter:any=adminFilter(query);
-  if(actorRole!==UserType.ADMIN)filter.role=UserType.USER;
+  // This is member management, not the staff directory. Soft-deleted bios
+  // are excluded everywhere, including the unfiltered total/count cards.
+  filter.biodataStatus={ $ne:'deleted' };
+  if(actorRole!==UserType.ADMIN || !query.role || query.role==='all')filter.role=UserType.USER;
 
-  // Execute query with pagination
-  const [data, totalItems] = await Promise.all([
+  const [data, totalItems, questionSchema] = await Promise.all([
     this.userModel
       .find(filter)
 .select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds')
@@ -660,12 +720,33 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
       .lean()
       .exec(),
     this.userModel.countDocuments(filter).exec(),
+    this.questions.get(),
   ]);
 
   const totalPages = Math.ceil(totalItems / limit);
+  const stale:any[]=[];
+  const members = data.map((member:any) => {
+    const snapshot=buildProfileCompletionSnapshot(member,questionSchema);
+    const stage=biodataStage(member,snapshot.completionPercentage);
+    const journey=stage==='published'?'published':
+      hasSubmittedBiodata(member)?'submitted':
+      hasStartedBiodata(member)?'in_progress':'signed_up';
+    if(needsProfileCompletionSync(member,snapshot))stale.push({member,snapshot});
+    return {...member,...snapshot,biodataStage:stage,memberJourney:journey};
+  });
+  // Live schema is authoritative; persist outdated rows without changing updatedAt.
+  // Compare updatedAt to avoid overwriting progress from a concurrent biodata save.
+  if(stale.length){
+    try{
+      await this.userModel.collection.bulkWrite(stale.map(({member,snapshot})=>({
+        updateOne:{filter:{_id:member._id,updatedAt:member.updatedAt},
+          update:{$set:snapshot}},
+      })),{ordered:false});
+    }catch(error){this.logger.warn('Could not refresh member completion cache: '+String(error));}
+  }
 
   return {
-    data,
+    data:members,
     page,
     limit,
     totalItems,
@@ -675,18 +756,37 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
   };
 }
 
+/** Explicit, reviewable publish action used by the member list. */
+async publishUserAdmin(id:string,actor:string,actorRole:string=UserType.ADMIN) {
+  await this.assertManageableTarget(id,actorRole);
+  const member:any = await this.userModel.findById(id).lean();
+  if(!member || member.role!==UserType.USER || member.biodataStatus==='deleted')
+    throw new BadRequestException('Member biodata not available');
+  if(member.verificationStatus==='suspended')
+    throw new ForbiddenException('Suspended members cannot be published');
+  if(!hasSubmittedBiodata(member))
+    throw new BadRequestException('The member must submit their biodata before publishing');
+  const progress=completion(member,(await this.questions.get()).questions);
+  if(progress.percentage<100)
+    throw new BadRequestException('Required biodata fields are incomplete ('+progress.percentage+'%)');
+  const updated=await this.userModel.findOneAndUpdate(
+    {_id:id,role:UserType.USER,biodataStatus:{$in:['submitted','approved']},
+      verificationStatus:{$ne:'suspended'}},
+    {$set:{isPublished:true,isPublishFromAdmin:true,verificationStatus:'approved',
+      biodataStatus:'approved'}},
+    {new:true,runValidators:true},
+  ).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
+  if(!updated)throw new BadRequestException('Biodata status changed. Refresh and retry.');
+  await this.platform.audit(actor,'biodata.admin.publish',id);
+  return {message:'Biodata published',data:updated};
+}
+
 async toggleSubscription(id:string,actor:string,actorRole:string=UserType.ADMIN) {
   await this.assertManageableTarget(id,actorRole);
-  await this.platform.audit(actor,"membership.admin.toggle",id);
-  const findOne = await this.userModel.findById(id).select("isSubscriber").lean();
-  if(!findOne) {
-    throw new HttpException('User not found', 400);
-  }
-  const updateSubscription = await this.userModel.findByIdAndUpdate(id,{$set:{isSubscriber:!findOne.isSubscriber}},{new:true}).lean();
-  if(!updateSubscription) {
-    throw new HttpException('User not found', 400);
-  }
-  return updateSubscription;
+  const findOne = await this.userModel.findById(id).select('isSubscriber').lean();
+  if(!findOne)throw new HttpException('User not found',400);
+  await this.platform.adminTogglePremium(actor,id,!findOne.isSubscriber);
+  return this.userModel.findById(id).select('-password -otpNumber -otpValidatedAt').lean();
 }
 async userDeleteAdmin(id:string) {
   const findOne = await this.userModel.findByIdAndDelete(id).lean();

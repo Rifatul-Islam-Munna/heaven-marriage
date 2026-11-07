@@ -12,7 +12,6 @@ import {
   User,
   Heart,
   MapPin,
-  Home,
   Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,10 @@ import {
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { marriedStatus } from "@/staticData/all-data";
-import { countries } from "@/staticData/all-data";
+import { countries } from "@/staticData/countries";
+import {useQueryWrapper} from "@/api-hooks/react-query-wrapper";
+import {defaultCityCorporations,defaultCityAreas,defaultMunicipalityUpazilas,type LocationResponse} from "@/lib/location-options";
+import SearchLocationPicker from './SearchLocationPicker';
 
 // Data
 const genderOptions = [
@@ -50,13 +52,16 @@ export default function BiodataFilter() {
   const [districtName, setDistrictName] = useState("");
   const [upazilaName, setUpazilaName] = useState("");
   const [countryName, setCountryName] = useState("");
+  const [cityName,setCityName]=useState("");
+  const [areaName,setAreaName]=useState("");
+  const {data:locations}=useQueryWrapper<LocationResponse>(["public-location-options"],"/profile-questions/locations",{staleTime:60000});
+  const extra=locations?.entries||[];
   const [query, setQuery] = useState("");
   const [premiumOnly, setPremiumOnly] = useState(false);
 
   const [genderOpen, setGenderOpen] = useState(false);
   const [maritalOpen, setMaritalOpen] = useState(false);
   const [districtOpen, setDistrictOpen] = useState(false);
-  const [upazilaOpen, setUpazilaOpen] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
 
   // Filter marital status based on selected gender
@@ -77,6 +82,8 @@ export default function BiodataFilter() {
     if (maritalStatus !== "all") params.set("maritalStatus", maritalStatus);
     if (districtName) params.set("districtId", districtName);
     if (upazilaName) params.set("upazilaId", upazilaName);
+    if (cityName) params.set("cityCorporation",cityName);
+    if (areaName) params.set("area",areaName);
     if (countryName) params.set("country", countryName);
     if (query.trim()) params.set("query", query.trim());
     if (premiumOnly) params.set("category", "premium");
@@ -90,6 +97,8 @@ export default function BiodataFilter() {
     setMaritalStatus("all");
     setDistrictName("");
     setUpazilaName("");
+    setCityName("");
+    setAreaName("");
     setCountryName("");
     setQuery("");
     setPremiumOnly(false);
@@ -116,24 +125,34 @@ export default function BiodataFilter() {
   };
 
   const selectedDistrictData = districts.find((d) => d.name === districtName);
-  const availableUpazilas = selectedDistrictData
-    ? upazilas.filter(
-        (upazila) => upazila.district_id === selectedDistrictData.id,
-      )
-    : [];
+  const availableUpazilas = [
+    ...upazilas.filter(u=>selectedDistrictData&&u.district_id===selectedDistrictData.id),
+    ...defaultMunicipalityUpazilas.filter(u=>u.district===districtName).map((u,i)=>({
+      id:'municipality-'+i,name:u.name,bn_name:u.label,district_id:'municipality',
+    })),
+    ...extra.filter(u=>u.kind==="upazila"&&u.district===districtName).map((u,i)=>({
+      id:"custom-"+i,name:u.name,bn_name:u.label,district_id:"custom",
+    })),
+  ];
+  const cities=[...defaultCityCorporations,...extra.filter(e=>e.kind==="cityCorporation")]
+    .filter(c=>c.district===districtName);
+  const areas=[...defaultCityAreas,...extra.filter(e=>e.kind==="area")]
+    .filter(e=>e.district===districtName && e.enabled!==false);
 
   const hasFilters =
     gender !== "all" ||
     maritalStatus !== "all" ||
     districtName ||
     upazilaName ||
+    cityName || areaName ||
     countryName ||
     query.trim() ||
     premiumOnly;
 
   const selectedDistrict = districts.find((d) => d.name === districtName);
-  const selectedUpazila = upazilas.find((u) => u.name === upazilaName);
-  const selectedCountry = countries.find((c) => c.en === countryName);
+  const selectedUpazila = availableUpazilas.find((u) => u.name === upazilaName);
+  const selectedCountry = countries.find((c) => c.en === countryName) ||
+    extra.filter(x=>x.kind==='country').map((x,i)=>({id:i+1000,en:x.name,bn:x.label})).find(x=>x.en===countryName);
 
   return (
     <section className="w-full bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white py-8 md:py-10 lg:py-12">
@@ -294,7 +313,7 @@ export default function BiodataFilter() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600 transition-colors group-hover:bg-pink-200">
                     <Globe className="h-4 w-4" />
                   </div>
-                  <span>দেশ</span>
+                  <span>বর্তমান বসবাসের দেশ</span>
                 </label>
                 <Popover open={countryOpen} onOpenChange={setCountryOpen}>
                   <PopoverTrigger asChild>
@@ -305,7 +324,7 @@ export default function BiodataFilter() {
                       className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
                     >
                       <span className="truncate">
-                        {selectedCountry?.bn || "দেশ নির্বাচন করুন"}
+                        {selectedCountry?.bn || countryName || "দেশ নির্বাচন করুন"}
                       </span>
                       <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -321,7 +340,7 @@ export default function BiodataFilter() {
                       />
                       <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-48 overflow-y-auto">
-                        {countries.map((country) => (
+                        {[...countries,...extra.filter(x=>x.kind==='country').map((x,i)=>({id:i+1000,en:x.name,bn:x.label}))].map((country) => (
                           <CommandItem
                             key={country.id}
                             value={country.bn}
@@ -367,7 +386,7 @@ export default function BiodataFilter() {
                       className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
                     >
                       <span className="truncate">
-                        {selectedDistrict?.bn_name || "জেলা নির্বাচন করুন"}
+                        {selectedDistrict?.bn_name || districtName || "জেলা নির্বাচন করুন"}
                       </span>
                       <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -383,7 +402,7 @@ export default function BiodataFilter() {
                       />
                       <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-48 overflow-y-auto">
-                        {districts.map((d) => (
+                        {[...districts,...extra.filter(e=>e.kind==='district').map((e,i)=>({id:'custom-'+i,name:e.name,bn_name:e.label}))].map((d) => (
                           <CommandItem
                             key={d.id}
                             value={d.bn_name}
@@ -392,6 +411,7 @@ export default function BiodataFilter() {
                                 districtName === d.name ? "" : d.name,
                               );
                               setUpazilaName("");
+                              setCityName("");setAreaName("");
                               setDistrictOpen(false);
                             }}
                             className="py-2.5 sm:py-3"
@@ -413,75 +433,19 @@ export default function BiodataFilter() {
                 </Popover>
               </div>
 
-              {/* Upazila Filter */}
-              <div
-                className={cn(
-                  "group",
-                  !districtName && "pointer-events-none opacity-50",
-                )}
-              >
-                <label className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600 transition-colors group-hover:bg-pink-200">
-                    <Home className="h-4 w-4" />
-                  </div>
-                  <span>এলাকা</span>
-                </label>
-                <Popover open={upazilaOpen} onOpenChange={setUpazilaOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={upazilaOpen}
-                      disabled={!districtName}
-                      className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 disabled:cursor-not-allowed sm:h-12 sm:text-base"
-                    >
-                      <span className="truncate">
-                        {selectedUpazila?.bn_name || "এলাকা নির্বাচন করুন"}
-                      </span>
-                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[200px] p-0 sm:w-[260px]"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput
-                        placeholder="এলাকা খুঁজুন..."
-                        className="h-10"
-                      />
-                      <CommandEmpty>কোনো এলাকা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-48 overflow-y-auto">
-                        {availableUpazilas.map((upazila) => (
-                          <CommandItem
-                            key={upazila.id}
-                            value={upazila.bn_name}
-                            onSelect={() => {
-                              setUpazilaName(
-                                upazilaName === upazila.name
-                                  ? ""
-                                  : upazila.name,
-                              );
-                              setUpazilaOpen(false);
-                            }}
-                            className="py-2.5 sm:py-3"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                upazilaName === upazila.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {upazila.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {/* One cascading selector: district > Upazila OR City Corporation > Area/Ward. */}
+              <SearchLocationPicker
+                districtName={districtName}
+                upazilas={availableUpazilas}
+                cities={cities}
+                areas={areas}
+                value={{upazilaName,cityName,areaName}}
+                onChange={next=>{
+                  setUpazilaName(next.upazilaName);
+                  setCityName(next.cityName);
+                  setAreaName(next.areaName);
+                }}
+              />
             </div>
 
             <label className="mt-4 inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-900">
@@ -555,28 +519,39 @@ export default function BiodataFilter() {
                 )}
                 {districtName && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
-                    {selectedDistrict?.bn_name}
+                    {selectedDistrict?.bn_name || districtName}
                     <X
                       className="h-3 w-3 cursor-pointer hover:text-pink-900"
                       onClick={() => {
                         setDistrictName("");
                         setUpazilaName("");
+                        setCityName("");
+                        setAreaName("");
                       }}
                     />
                   </span>
                 )}
-                {upazilaName && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
-                    {selectedUpazila?.bn_name}
-                    <X
-                      className="h-3 w-3 cursor-pointer hover:text-pink-900"
-                      onClick={() => setUpazilaName("")}
-                    />
-                  </span>
+                {(upazilaName||cityName) && (
+                  <button type="button"
+                    aria-label="নির্বাচিত উপজেলা বা সিটি কর্পোরেশন মুছুন"
+                    onClick={() => {setUpazilaName("");setCityName("");setAreaName("");}}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200">
+                    {cityName?(cities.find(c=>c.name===cityName)?.label||cityName):(selectedUpazila?.bn_name||upazilaName)}
+                    <X className="size-3" aria-hidden/>
+                  </button>
+                )}
+                {areaName && (
+                  <button type="button"
+                    aria-label="নির্বাচিত এলাকা বা ওয়ার্ড মুছুন"
+                    onClick={()=>setAreaName("")}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200">
+                    {areas.find(e=>e.name===areaName)?.label||areaName}
+                    <X className="size-3" aria-hidden/>
+                  </button>
                 )}
                 {query.trim() && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-700 sm:px-3 sm:text-sm">
-                    "{query}"
+                    &ldquo;{query}&rdquo;
                     <X
                       className="h-3 w-3 cursor-pointer hover:text-pink-900"
                       onClick={() => setQuery("")}

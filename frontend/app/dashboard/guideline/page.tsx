@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { countWords, MAX_CONTENT_WORDS } from '@/lib/word-limit';
 import {
   Table,
   TableBody,
@@ -118,6 +119,7 @@ export default function AdminGuidelinesDashboard() {
       toast.error("সকল ফিল্ড পূরণ করুন");
       return;
     }
+    if(countWords(createForm.description)>MAX_CONTENT_WORDS){toast.error('উত্তর সর্বোচ্চ ৩,০০০ শব্দ হতে পারবে');return;}
     createMutation.mutate(createForm);
   };
 
@@ -128,6 +130,7 @@ export default function AdminGuidelinesDashboard() {
       toast.error("সকল ফিল্ড পূরণ করুন");
       return;
     }
+    if(countWords(editForm.description)>MAX_CONTENT_WORDS){toast.error('উত্তর সর্বোচ্চ ৩,০০০ শব্দ হতে পারবে');return;}
     updateMutation.mutate({
       id: editingGuideline?._id,
       ...editForm,
@@ -232,7 +235,6 @@ export default function AdminGuidelinesDashboard() {
                     })
                   }
                   required
-                  maxLength={2000}
                   rows={6}
                   className="resize-none"
                 />
@@ -242,7 +244,7 @@ export default function AdminGuidelinesDashboard() {
                     {countItems(createForm.description)} টি আইটেম
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {createForm.description.length}/2000
+                    {countWords(createForm.description).toLocaleString('bn-BD')} / ৩,০০০ শব্দ
                   </p>
                 </div>
               </div>
@@ -258,7 +260,7 @@ export default function AdminGuidelinesDashboard() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || countWords(createForm.description) > MAX_CONTENT_WORDS}
                   className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700"
                 >
                   {createMutation.isPending ? (
@@ -281,16 +283,10 @@ export default function AdminGuidelinesDashboard() {
         <Table>
           <TableHeader>
             <TableRow className="bg-pink-50">
+              <TableHead className="sticky left-0 z-10 w-40 bg-pink-50 font-bold text-pink-900">অ্যাকশন / Edit</TableHead>
               <TableHead className="font-semibold w-[25%]">শিরোনাম</TableHead>
-              <TableHead className="font-semibold w-[50%]">
-                নির্দেশনা তালিকা
-              </TableHead>
-              <TableHead className="font-semibold text-center w-[10%]">
-                আইটেম
-              </TableHead>
-              <TableHead className="font-semibold text-right w-[15%]">
-                অ্যাকশন
-              </TableHead>
+              <TableHead className="font-semibold">নির্দেশনা তালিকা</TableHead>
+              <TableHead className="font-semibold text-center">আইটেম</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -305,6 +301,16 @@ export default function AdminGuidelinesDashboard() {
             ) : (
               guidelines.map((guideline) => (
                 <TableRow key={guideline._id} className="hover:bg-pink-50/50">
+                  <TableCell className="sticky left-0 z-[1] bg-white px-2">
+                    <div className="flex items-center justify-start gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => openEditDialog(guideline)}
+                        className="border-pink-200 font-semibold text-pink-700 hover:bg-pink-50">
+                        <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label="Delete guideline" onClick={() => setDeleteId(guideline._id)}
+                        className="text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4"/></Button>
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium ">
                     {guideline.title}
                   </TableCell>
@@ -317,26 +323,6 @@ export default function AdminGuidelinesDashboard() {
                     <Badge variant="secondary" className="">
                       {countItems(guideline.description)}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(guideline)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(guideline._id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -440,7 +426,6 @@ export default function AdminGuidelinesDashboard() {
                   })
                 }
                 required
-                maxLength={2000}
                 rows={6}
                 className="resize-none"
               />
@@ -450,7 +435,7 @@ export default function AdminGuidelinesDashboard() {
                   {countItems(editForm.description)} টি আইটেম
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {editForm.description.length}/2000
+                  {countWords(editForm.description).toLocaleString('bn-BD')} / ৩,০০০ শব্দ
                 </p>
               </div>
             </div>
@@ -466,7 +451,7 @@ export default function AdminGuidelinesDashboard() {
               </Button>
               <Button
                 type="submit"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || countWords(editForm.description) > MAX_CONTENT_WORDS}
                 className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
               >
                 {updateMutation.isPending ? (

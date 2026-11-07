@@ -1,0 +1,2291 @@
+[
+  {
+    "kind": "area",
+    "name": "Debidwar Pourashava",
+    "label": "দেবিদ্বার পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Debidwar"
+  },
+  {
+    "kind": "area",
+    "name": "Barura Pourashava",
+    "label": "বরুড়া পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Barura"
+  },
+  {
+    "kind": "area",
+    "name": "Chandina Pourashava",
+    "label": "চান্দিনা পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Chandina"
+  },
+  {
+    "kind": "area",
+    "name": "Chauddagram Pourashava",
+    "label": "চৌদ্দগ্রাম পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Chauddagram"
+  },
+  {
+    "kind": "area",
+    "name": "Daudkandi Pourashava",
+    "label": "দাউদকান্দি পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Daudkandi"
+  },
+  {
+    "kind": "area",
+    "name": "Homna Pourashava",
+    "label": "হোমনা পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Homna"
+  },
+  {
+    "kind": "area",
+    "name": "Laksam Pourashava",
+    "label": "লাকসাম পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Laksam"
+  },
+  {
+    "kind": "area",
+    "name": "Nangalkot Pourashava",
+    "label": "নাঙ্গলকোট পৌরসভা",
+    "district": "Cumilla",
+    "upazila": "Nangalkot"
+  },
+  {
+    "kind": "area",
+    "name": "Chhagalnaiya Pourashava",
+    "label": "ছাগলনাইয়া পৌরসভা",
+    "district": "Feni",
+    "upazila": "Chagalnaiya"
+  },
+  {
+    "kind": "area",
+    "name": "Feni Pourashava",
+    "label": "ফেনী পৌরসভা",
+    "district": "Feni",
+    "upazila": "Feni Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Sonagazi Pourashava",
+    "label": "সোনাগাজী পৌরসভা",
+    "district": "Feni",
+    "upazila": "Sonagazi"
+  },
+  {
+    "kind": "area",
+    "name": "Parshuram Pourashava",
+    "label": "পরশুরাম পৌরসভা",
+    "district": "Feni",
+    "upazila": "Parshuram"
+  },
+  {
+    "kind": "area",
+    "name": "Daganbhuiyan Pourashava",
+    "label": "দাগনভূঞা পৌরসভা",
+    "district": "Feni",
+    "upazila": "Daganbhyan"
+  },
+  {
+    "kind": "area",
+    "name": "Brahmanbaria Pourashava",
+    "label": "ব্রাহ্মণবাড়িয়া পৌরসভা",
+    "district": "Brahmanbaria",
+    "upazila": "Brahmanbaria Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Kasba Pourashava",
+    "label": "কসবা পৌরসভা",
+    "district": "Brahmanbaria",
+    "upazila": "Kasba"
+  },
+  {
+    "kind": "area",
+    "name": "Akhaura Pourashava",
+    "label": "আখাউড়া পৌরসভা",
+    "district": "Brahmanbaria",
+    "upazila": "Akhaura"
+  },
+  {
+    "kind": "area",
+    "name": "Nobinagar Pourashava",
+    "label": "নবীনগর পৌরসভা",
+    "district": "Brahmanbaria",
+    "upazila": "Nabinagar"
+  },
+  {
+    "kind": "area",
+    "name": "Bancharampur Pourashava",
+    "label": "বাঞ্ছারামপুর পৌরসভা",
+    "district": "Brahmanbaria",
+    "upazila": "Bancharampur"
+  },
+  {
+    "kind": "area",
+    "name": "Rangamati Pourashava",
+    "label": "রাঙ্গামাটি পৌরসভা",
+    "district": "Rangamati",
+    "upazila": "Rangamati Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Baghaichari Pourashava",
+    "label": "বাঘাইছড়ি পৌরসভা",
+    "district": "Rangamati",
+    "upazila": "Bagaichhari"
+  },
+  {
+    "kind": "area",
+    "name": "Noakhali Pourashava",
+    "label": "নোয়াখালী পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Noakhali Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Bashurhat Pourashava",
+    "label": "বসুরহাট পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Companyganj"
+  },
+  {
+    "kind": "area",
+    "name": "Choumuhoni Pourashava",
+    "label": "চৌমুহনী পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Begumganj"
+  },
+  {
+    "kind": "area",
+    "name": "Hatia Pourashava",
+    "label": "হাতিয়া পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Hatia"
+  },
+  {
+    "kind": "area",
+    "name": "Kabirhat Pourashava",
+    "label": "কবিরহাট পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Kobirhat"
+  },
+  {
+    "kind": "area",
+    "name": "Senbug Pourashava",
+    "label": "সেনবাগ পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Shenbag"
+  },
+  {
+    "kind": "area",
+    "name": "Chatkhil Pourashava",
+    "label": "চাটখিল পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Chatkhil"
+  },
+  {
+    "kind": "area",
+    "name": "Sonaimuri Pourashava",
+    "label": "সোনাইমুড়ী পৌরসভা",
+    "district": "Noakhali",
+    "upazila": "Sonaimuri"
+  },
+  {
+    "kind": "area",
+    "name": "Kachua Pourashava",
+    "label": "কচুয়া পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Kachua"
+  },
+  {
+    "kind": "area",
+    "name": "Narayanpur Pourashava",
+    "label": "নারায়ণপুর পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Kachua"
+  },
+  {
+    "kind": "area",
+    "name": "Shahrasti Pourashava",
+    "label": "শাহরাস্তি পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Shahrasti"
+  },
+  {
+    "kind": "area",
+    "name": "Chandpur Pourashava",
+    "label": "চাঁদপুর পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Chandpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Matlab Pourashava",
+    "label": "মতলব পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Matlab South"
+  },
+  {
+    "kind": "area",
+    "name": "Hajiganj Pourashava",
+    "label": "হাজীগঞ্জ পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Haziganj"
+  },
+  {
+    "kind": "area",
+    "name": "Sangarchar Pourashava",
+    "label": "ছেংগারচর পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Matlab North"
+  },
+  {
+    "kind": "area",
+    "name": "Faridgonj Pourashava",
+    "label": "ফরিদগঞ্জ পৌরসভা",
+    "district": "Chandpur",
+    "upazila": "Faridganj"
+  },
+  {
+    "kind": "area",
+    "name": "Lakshmipur Pourashava",
+    "label": "লক্ষ্মীপুর পৌরসভা",
+    "district": "Lakshmipur",
+    "upazila": "Lakshmipur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Raipur Pourashava",
+    "label": "রায়পুর পৌরসভা",
+    "district": "Lakshmipur",
+    "upazila": "Raipur"
+  },
+  {
+    "kind": "area",
+    "name": "Ramgati Pourashava",
+    "label": "রামগতি পৌরসভা",
+    "district": "Lakshmipur",
+    "upazila": "Ramgati"
+  },
+  {
+    "kind": "area",
+    "name": "Ramgonj Pourashava",
+    "label": "রামগঞ্জ পৌরসভা",
+    "district": "Lakshmipur",
+    "upazila": "Ramganj"
+  },
+  {
+    "kind": "area",
+    "name": "Rangunia Pourashava",
+    "label": "রাঙ্গুনিয়া পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Rangunia"
+  },
+  {
+    "kind": "area",
+    "name": "Sitakunda Pourashava",
+    "label": "সীতাকুন্ড পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Sitakunda"
+  },
+  {
+    "kind": "area",
+    "name": "Bariyarhat Pourashava",
+    "label": "বারইয়ারহাট পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Mirsharai"
+  },
+  {
+    "kind": "area",
+    "name": "Mirsharai Pourashava",
+    "label": "মিরসরাই পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Mirsharai"
+  },
+  {
+    "kind": "area",
+    "name": "Patiya Pourashava",
+    "label": "পটিয়া পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Patiya"
+  },
+  {
+    "kind": "area",
+    "name": "Sandwip Pourashava",
+    "label": "সন্দ্বীপ পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Sandwip"
+  },
+  {
+    "kind": "area",
+    "name": "Banshkhali Pourashava",
+    "label": "বাঁশখালী পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Banshkhali"
+  },
+  {
+    "kind": "area",
+    "name": "Boalkhali Pourashava",
+    "label": "বোয়ালখালী পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Boalkhali"
+  },
+  {
+    "kind": "area",
+    "name": "Chandanaish Pourashava",
+    "label": "চন্দনাইশ পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Chandanaish"
+  },
+  {
+    "kind": "area",
+    "name": "Dohazari Pourashava",
+    "label": "দোহাজারী পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Chandanaish"
+  },
+  {
+    "kind": "area",
+    "name": "Satkania Pourashava",
+    "label": "সাতকানিয়া পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Satkania"
+  },
+  {
+    "kind": "area",
+    "name": "Hathazari Pourashava",
+    "label": "হাটহাজারী পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Hathazari"
+  },
+  {
+    "kind": "area",
+    "name": "Fatikchhari Pourashava",
+    "label": "ফটিকছড়ি পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Fatikchhari"
+  },
+  {
+    "kind": "area",
+    "name": "Nazirhat Pourashava",
+    "label": "নাজিরহাট পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Fatikchhari"
+  },
+  {
+    "kind": "area",
+    "name": "Raozan Pourashava",
+    "label": "রাউজান পৌরসভা",
+    "district": "Chattogram",
+    "upazila": "Raozan"
+  },
+  {
+    "kind": "area",
+    "name": "Cox's Bazar Pourashava",
+    "label": "কক্সবাজার পৌরসভা",
+    "district": "Cox's Bazar",
+    "upazila": "Coxsbazar Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Chakaria Pourashava",
+    "label": "চকরিয়া পৌরসভা",
+    "district": "Cox's Bazar",
+    "upazila": "Chakaria"
+  },
+  {
+    "kind": "area",
+    "name": "Moheshkhali Pourashava",
+    "label": "মহেশখালী পৌরসভা",
+    "district": "Cox's Bazar",
+    "upazila": "Maheshkhali"
+  },
+  {
+    "kind": "area",
+    "name": "Teknaf Pourashava",
+    "label": "টেকনাফ পৌরসভা",
+    "district": "Cox's Bazar",
+    "upazila": "Teknaf"
+  },
+  {
+    "kind": "area",
+    "name": "Khagrachhari Pourashava",
+    "label": "খাগড়াছড়ি পৌরসভা",
+    "district": "Khagrachari",
+    "upazila": "Khagrachhari"
+  },
+  {
+    "kind": "area",
+    "name": "Ramgarh Pourashava",
+    "label": "রামগড় পৌরসভা",
+    "district": "Khagrachari",
+    "upazila": "Ramgarh"
+  },
+  {
+    "kind": "area",
+    "name": "Matiranga Pourashava",
+    "label": "মাটিরাঙ্গা পৌরসভা",
+    "district": "Khagrachari",
+    "upazila": "Matiranga"
+  },
+  {
+    "kind": "area",
+    "name": "Bandarban Pourashava",
+    "label": "বান্দরবান পৌরসভা",
+    "district": "Bandarban",
+    "upazila": "Bandarban Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Lama Pourashava",
+    "label": "লামা পৌরসভা",
+    "district": "Bandarban",
+    "upazila": "Lama"
+  },
+  {
+    "kind": "area",
+    "name": "Belkuchi Pourashava",
+    "label": "বেলকুচি পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Belkuchi"
+  },
+  {
+    "kind": "area",
+    "name": "Kazipur Pourashava",
+    "label": "কাজিপুর পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Kazipur"
+  },
+  {
+    "kind": "area",
+    "name": "Raigonj Pourashava",
+    "label": "রায়গঞ্জ পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Raiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Shahjadpur Pourashava",
+    "label": "শাহজাদপুর পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Shahjadpur"
+  },
+  {
+    "kind": "area",
+    "name": "Sirajganj Pourashava",
+    "label": "সিরাজগঞ্জ পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Sirajganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Tarash Pourashava",
+    "label": "তাড়াশ পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Tarash"
+  },
+  {
+    "kind": "area",
+    "name": "Ullapara Pourashava",
+    "label": "উল্লাপাড়া পৌরসভা",
+    "district": "Sirajgonj",
+    "upazila": "Ullahpara"
+  },
+  {
+    "kind": "area",
+    "name": "Sujanagar Pourashava",
+    "label": "সুজানগর পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Sujanagar"
+  },
+  {
+    "kind": "area",
+    "name": "Ishwardi Pourashava",
+    "label": "ঈশ্বরদী পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Ishwardi"
+  },
+  {
+    "kind": "area",
+    "name": "Bhangura Pourashava",
+    "label": "ভাঙ্গুড়া পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Bhangura"
+  },
+  {
+    "kind": "area",
+    "name": "Pabna Pourashava",
+    "label": "পাবনা পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Pabna Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Bera Pourashava",
+    "label": "বেড়া পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Bera"
+  },
+  {
+    "kind": "area",
+    "name": "Atghoria Pourashava",
+    "label": "আটঘরিয়া পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Atgharia"
+  },
+  {
+    "kind": "area",
+    "name": "Chatmohar Pourashava",
+    "label": "চাটমোহর পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Chatmohar"
+  },
+  {
+    "kind": "area",
+    "name": "Santhia Pourashava",
+    "label": "সাঁথিয়া পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Santhia"
+  },
+  {
+    "kind": "area",
+    "name": "Faridpur Pourashava",
+    "label": "ফরিদপুর পৌরসভা",
+    "district": "Pabna",
+    "upazila": "Faridpur"
+  },
+  {
+    "kind": "area",
+    "name": "Kahaloo Pourashava",
+    "label": "কাহালু পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Kahaloo"
+  },
+  {
+    "kind": "area",
+    "name": "Shariakandi Pourashava",
+    "label": "সারিয়াকান্দি পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Sariakandi"
+  },
+  {
+    "kind": "area",
+    "name": "Dhupchanchia Pourashava",
+    "label": "দুপচাঁচিয়া পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Dhupchanchia"
+  },
+  {
+    "kind": "area",
+    "name": "Talora Pourashava",
+    "label": "তালোড়া পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Dhupchanchia"
+  },
+  {
+    "kind": "area",
+    "name": "Shantahar Pourashava",
+    "label": "সান্তাহার পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Adamdighi"
+  },
+  {
+    "kind": "area",
+    "name": "Nandigram Pourashava",
+    "label": "নন্দীগ্রাম পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Nandigram"
+  },
+  {
+    "kind": "area",
+    "name": "Sonatola Pourashava",
+    "label": "সোনাতলা পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Sonatala"
+  },
+  {
+    "kind": "area",
+    "name": "Dhunot Pourashava",
+    "label": "ধুনট পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Dhunat"
+  },
+  {
+    "kind": "area",
+    "name": "Gabtali Pourashava",
+    "label": "গাবতলী পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Gabtali"
+  },
+  {
+    "kind": "area",
+    "name": "Sherpur Pourashava",
+    "label": "শেরপুর পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Sherpur"
+  },
+  {
+    "kind": "area",
+    "name": "Shibganj Pourashava",
+    "label": "শিবগঞ্জ পৌরসভা",
+    "district": "Bogura",
+    "upazila": "Shibganj"
+  },
+  {
+    "kind": "area",
+    "name": "Naohata Pourashava",
+    "label": "নওহাটা পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Paba"
+  },
+  {
+    "kind": "area",
+    "name": "Katakhali Pourashava",
+    "label": "কাটাখালী পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Paba"
+  },
+  {
+    "kind": "area",
+    "name": "Durgapur Pourashava",
+    "label": "দুর্গাপুর পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Durgapur"
+  },
+  {
+    "kind": "area",
+    "name": "Keshorehat Pourashava",
+    "label": "কেশরহাট পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Mohanpur"
+  },
+  {
+    "kind": "area",
+    "name": "Charghat Pourashava",
+    "label": "চারঘাট পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Charghat"
+  },
+  {
+    "kind": "area",
+    "name": "Puthia Pourashava",
+    "label": "পুঠিয়া পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Puthia"
+  },
+  {
+    "kind": "area",
+    "name": "Bagha Pourashava",
+    "label": "বাঘা পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Bagha"
+  },
+  {
+    "kind": "area",
+    "name": "Arani Pourashava",
+    "label": "আড়ানী পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Bagha"
+  },
+  {
+    "kind": "area",
+    "name": "Godagari Pourashava",
+    "label": "গোদাগাড়ী পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Godagari"
+  },
+  {
+    "kind": "area",
+    "name": "Kakonhat Pourashava",
+    "label": "কাঁকনহাট পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Godagari"
+  },
+  {
+    "kind": "area",
+    "name": "Mundumala Pourashava",
+    "label": "মুন্ডুমালা পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Tanore"
+  },
+  {
+    "kind": "area",
+    "name": "Tanore Pourashava",
+    "label": "তানোর পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Tanore"
+  },
+  {
+    "kind": "area",
+    "name": "Taherpur Pourashava",
+    "label": "তাহেরপুর পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Bagmara"
+  },
+  {
+    "kind": "area",
+    "name": "Bhabaniganj Pourashava",
+    "label": "ভবানীগঞ্জ পৌরসভা",
+    "district": "Rajshahi",
+    "upazila": "Bagmara"
+  },
+  {
+    "kind": "area",
+    "name": "Natore Pourashava",
+    "label": "নাটোর পৌরসভা",
+    "district": "Natore",
+    "upazila": "Natore Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Singra Pourashava",
+    "label": "সিংড়া পৌরসভা",
+    "district": "Natore",
+    "upazila": "Singra"
+  },
+  {
+    "kind": "area",
+    "name": "Banpara Pourashava",
+    "label": "বনপাড়া পৌরসভা",
+    "district": "Natore",
+    "upazila": "Baraigram"
+  },
+  {
+    "kind": "area",
+    "name": "Baraigram Pourashava",
+    "label": "বড়াইগ্রাম পৌরসভা",
+    "district": "Natore",
+    "upazila": "Baraigram"
+  },
+  {
+    "kind": "area",
+    "name": "Bagatipara Pourashava",
+    "label": "বাগাতিপাড়া পৌরসভা",
+    "district": "Natore",
+    "upazila": "Bagatipara"
+  },
+  {
+    "kind": "area",
+    "name": "Gopalpur Pourashava",
+    "label": "গোপালপুর পৌরসভা",
+    "district": "Natore",
+    "upazila": "Lalpur"
+  },
+  {
+    "kind": "area",
+    "name": "Gurudaspur Pourashava",
+    "label": "গুরুদাসপুর পৌরসভা",
+    "district": "Natore",
+    "upazila": "Gurudaspur"
+  },
+  {
+    "kind": "area",
+    "name": "Naldanga Pourashava",
+    "label": "নলডাঙ্গা পৌরসভা",
+    "district": "Natore",
+    "upazila": "Naldanga"
+  },
+  {
+    "kind": "area",
+    "name": "Akkelpur Pourashava",
+    "label": "আক্কেলপুর পৌরসভা",
+    "district": "Joypurhat",
+    "upazila": "Akkelpur"
+  },
+  {
+    "kind": "area",
+    "name": "Kalai Pourashava",
+    "label": "কালাই পৌরসভা",
+    "district": "Joypurhat",
+    "upazila": "Kalai"
+  },
+  {
+    "kind": "area",
+    "name": "Khetlal Pourashava",
+    "label": "ক্ষেতলাল পৌরসভা",
+    "district": "Joypurhat",
+    "upazila": "Khetlal"
+  },
+  {
+    "kind": "area",
+    "name": "Panchbibi Pourashava",
+    "label": "পাঁচবিবি পৌরসভা",
+    "district": "Joypurhat",
+    "upazila": "Panchbibi"
+  },
+  {
+    "kind": "area",
+    "name": "Joypurhat Pourashava",
+    "label": "জয়পুরহাট পৌরসভা",
+    "district": "Joypurhat",
+    "upazila": "Joypurhat Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Chapai Nawabganj Pourashava",
+    "label": "চাঁপাইনবাবগঞ্জ পৌরসভা",
+    "district": "Nawabganj",
+    "upazila": "Chapainawabganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Rohanpur Pourashava",
+    "label": "রহনপুর পৌরসভা",
+    "district": "Nawabganj",
+    "upazila": "Gomastapur"
+  },
+  {
+    "kind": "area",
+    "name": "Nachol Pourashava",
+    "label": "নাচোল পৌরসভা",
+    "district": "Nawabganj",
+    "upazila": "Nachole"
+  },
+  {
+    "kind": "area",
+    "name": "Shibganj Pourashava",
+    "label": "শিবগঞ্জ পৌরসভা",
+    "district": "Nawabganj",
+    "upazila": "Shibganj"
+  },
+  {
+    "kind": "area",
+    "name": "Nazipur Pourashava",
+    "label": "নজিপুর পৌরসভা",
+    "district": "Naogaon",
+    "upazila": "Patnitala"
+  },
+  {
+    "kind": "area",
+    "name": "Dhamoirhat Pourashava",
+    "label": "ধামইরহাট পৌরসভা",
+    "district": "Naogaon",
+    "upazila": "Dhamoirhat"
+  },
+  {
+    "kind": "area",
+    "name": "Naogaon Pourashava",
+    "label": "নওগাঁ পৌরসভা",
+    "district": "Naogaon",
+    "upazila": "Naogaon Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Manirampur Pourashava",
+    "label": "মণিরামপুর পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Manirampur"
+  },
+  {
+    "kind": "area",
+    "name": "Noapara Pourashava",
+    "label": "নওয়াপাড়া পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Abhaynagar"
+  },
+  {
+    "kind": "area",
+    "name": "Bagher Para Pourashava",
+    "label": "বাঘারপাড়া পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Bagherpara"
+  },
+  {
+    "kind": "area",
+    "name": "Chowgachha Pourashava",
+    "label": "চৌগাছা পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Chaugachha"
+  },
+  {
+    "kind": "area",
+    "name": "Jhikargacha Pourashava",
+    "label": "ঝিকরগাছা পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Jhikargachha"
+  },
+  {
+    "kind": "area",
+    "name": "Keshabpur Pourashava",
+    "label": "কেশবপুর পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Keshabpur"
+  },
+  {
+    "kind": "area",
+    "name": "Jashore Pourashava",
+    "label": "যশোর পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Jessore Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Benapol Pourashava",
+    "label": "বেনাপোল পৌরসভা",
+    "district": "Jashore",
+    "upazila": "Sharsha"
+  },
+  {
+    "kind": "area",
+    "name": "Kalaroa Pourashava",
+    "label": "কলারোয়া পৌরসভা",
+    "district": "Satkhira",
+    "upazila": "Kalaroa"
+  },
+  {
+    "kind": "area",
+    "name": "Satkhira Pourashava",
+    "label": "সাতক্ষীরা পৌরসভা",
+    "district": "Satkhira",
+    "upazila": "Satkhira Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Meherpur Pourashava",
+    "label": "মেহেরপুর পৌরসভা",
+    "district": "Meherpur",
+    "upazila": "Meherpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Gangni Pourashava",
+    "label": "গাংনী পৌরসভা",
+    "district": "Meherpur",
+    "upazila": "angni"
+  },
+  {
+    "kind": "area",
+    "name": "Narail Pourashava",
+    "label": "নড়াইল পৌরসভা",
+    "district": "Narail",
+    "upazila": "Narail Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Lohagara Pourashava",
+    "label": "লোহাগড়া পৌরসভা",
+    "district": "Narail",
+    "upazila": "Lohagara"
+  },
+  {
+    "kind": "area",
+    "name": "Kalia Pourashava",
+    "label": "কালিয়া পৌরসভা",
+    "district": "Narail",
+    "upazila": "Kalia"
+  },
+  {
+    "kind": "area",
+    "name": "Chuadanga Pourashava",
+    "label": "চুয়াডাঙ্গা পৌরসভা",
+    "district": "Chuadanga",
+    "upazila": "Chuadanga Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Alamdanga Pourashava",
+    "label": "আলমডাঙ্গা পৌরসভা",
+    "district": "Chuadanga",
+    "upazila": "Alamdanga"
+  },
+  {
+    "kind": "area",
+    "name": "Darshana Pourashava",
+    "label": "দর্শনা পৌরসভা",
+    "district": "Chuadanga",
+    "upazila": "Damurhuda"
+  },
+  {
+    "kind": "area",
+    "name": "Jibannagar Pourashava",
+    "label": "জীবননগর পৌরসভা",
+    "district": "Chuadanga",
+    "upazila": "Jibannagar"
+  },
+  {
+    "kind": "area",
+    "name": "Kushtia Pourashava",
+    "label": "কুষ্টিয়া পৌরসভা",
+    "district": "Kushtia",
+    "upazila": "Kushtia Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Kumarkhali Pourashava",
+    "label": "কুমারখালী পৌরসভা",
+    "district": "Kushtia",
+    "upazila": "Kumarkhali"
+  },
+  {
+    "kind": "area",
+    "name": "Khoksa Pourashava",
+    "label": "খোকসা পৌরসভা",
+    "district": "Kushtia",
+    "upazila": "Khoksa"
+  },
+  {
+    "kind": "area",
+    "name": "Mirpur Pourashava",
+    "label": "মিরপুর পৌরসভা",
+    "district": "Kushtia",
+    "upazila": "Mirpur"
+  },
+  {
+    "kind": "area",
+    "name": "Bheramara Pourashava",
+    "label": "ভেড়ামারা পৌরসভা",
+    "district": "Kushtia",
+    "upazila": "Bheramara"
+  },
+  {
+    "kind": "area",
+    "name": "Magura Pourashava",
+    "label": "মাগুরা পৌরসভা",
+    "district": "Magura",
+    "upazila": "Magura Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Paikgasa Pourashava",
+    "label": "পাইকগাছা পৌরসভা",
+    "district": "Khulna",
+    "upazila": "Paikgachha"
+  },
+  {
+    "kind": "area",
+    "name": "Chalna Pourashava",
+    "label": "চালনা পৌরসভা",
+    "district": "Khulna",
+    "upazila": "Dacope"
+  },
+  {
+    "kind": "area",
+    "name": "Bagerhat Pourashava",
+    "label": "বাগেরহাট পৌরসভা",
+    "district": "Bagerhat",
+    "upazila": "Bagerhat Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Morrelganj Pourashava",
+    "label": "মোড়েলগঞ্জ পৌরসভা",
+    "district": "Bagerhat",
+    "upazila": "Morrelganj"
+  },
+  {
+    "kind": "area",
+    "name": "Mongla Pourashava",
+    "label": "মোংলা পৌরসভা",
+    "district": "Bagerhat",
+    "upazila": "Mongla"
+  },
+  {
+    "kind": "area",
+    "name": "Jhenaidah Pourashava",
+    "label": "ঝিনাইদহ পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Jhenaidah Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Shailkupa Pourashava",
+    "label": "শৈলকুপা পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Shailkupa"
+  },
+  {
+    "kind": "area",
+    "name": "Harinakunda Pourashava",
+    "label": "হরিণাকুন্ডু পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Harinakunda"
+  },
+  {
+    "kind": "area",
+    "name": "Kaliganj Pourashava",
+    "label": "কালীগঞ্জ পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Kaliganj"
+  },
+  {
+    "kind": "area",
+    "name": "Kotchandpur Pourashava",
+    "label": "কোটচাঁদপুর পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Kotchandpur"
+  },
+  {
+    "kind": "area",
+    "name": "Moheshpur Pourashava",
+    "label": "মহেশপুর পৌরসভা",
+    "district": "Jhenaidah",
+    "upazila": "Maheshpur"
+  },
+  {
+    "kind": "area",
+    "name": "Jhalakathi Pourashava",
+    "label": "ঝালকাঠি পৌরসভা",
+    "district": "Jhalokati",
+    "upazila": "Jhalokati Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Nalchity Pourashava",
+    "label": "নলছিটি পৌরসভা",
+    "district": "Jhalokati",
+    "upazila": "Nalchity"
+  },
+  {
+    "kind": "area",
+    "name": "Bauphal Pourashava",
+    "label": "বাউফল পৌরসভা",
+    "district": "Patuakhali",
+    "upazila": "Bauphal"
+  },
+  {
+    "kind": "area",
+    "name": "Patuakhali Pourashava",
+    "label": "পটুয়াখালী পৌরসভা",
+    "district": "Patuakhali",
+    "upazila": "Patuakhali Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Kalapara Pourashava",
+    "label": "কলাপাড়া পৌরসভা",
+    "district": "Patuakhali",
+    "upazila": "Kalapara"
+  },
+  {
+    "kind": "area",
+    "name": "Kuakata Pourashava",
+    "label": "কুয়াকাটা পৌরসভা",
+    "district": "Patuakhali",
+    "upazila": "Kalapara"
+  },
+  {
+    "kind": "area",
+    "name": "Galachipa Pourashava",
+    "label": "গলাচিপা পৌরসভা",
+    "district": "Patuakhali",
+    "upazila": "Galachipa"
+  },
+  {
+    "kind": "area",
+    "name": "Pirojpur Pourashava",
+    "label": "পিরোজপুর পৌরসভা",
+    "district": "Pirojpur",
+    "upazila": "Pirojpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Bhandaria Pourashava",
+    "label": "ভান্ডারিয়া পৌরসভা",
+    "district": "Pirojpur",
+    "upazila": "Bhandaria"
+  },
+  {
+    "kind": "area",
+    "name": "Mathbaria Pourashava",
+    "label": "মঠবাড়িয়া পৌরসভা",
+    "district": "Pirojpur",
+    "upazila": "Mathbaria"
+  },
+  {
+    "kind": "area",
+    "name": "Shorupkathi Pourashava",
+    "label": "স্বরূপকাঠী পৌরসভা",
+    "district": "Pirojpur",
+    "upazila": "Nesarabad"
+  },
+  {
+    "kind": "area",
+    "name": "Bakerganj Pourashava",
+    "label": "বাকেরগঞ্জ পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Bakerganj"
+  },
+  {
+    "kind": "area",
+    "name": "Wazirpur Pourashava",
+    "label": "উজিরপুর পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Wazirpur"
+  },
+  {
+    "kind": "area",
+    "name": "Banaripara Pourashava",
+    "label": "বানারীপাড়া পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Banaripara"
+  },
+  {
+    "kind": "area",
+    "name": "Gournadi Pourashava",
+    "label": "গৌরনদী পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Gaurnadi"
+  },
+  {
+    "kind": "area",
+    "name": "Mehendiganj Pourashava",
+    "label": "মেহেন্দিগঞ্জ পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Mehendiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Muladi Pourashava",
+    "label": "মুলাদী পৌরসভা",
+    "district": "Barishal",
+    "upazila": "Muladi"
+  },
+  {
+    "kind": "area",
+    "name": "Bhola Pourashava",
+    "label": "ভোলা পৌরসভা",
+    "district": "Bhola",
+    "upazila": "Bhola Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Borhanuddin Pourashava",
+    "label": "বোরহানউদ্দিন পৌরসভা",
+    "district": "Bhola",
+    "upazila": "Burhanuddin"
+  },
+  {
+    "kind": "area",
+    "name": "Charfession Pourashava",
+    "label": "চরফ্যাশন পৌরসভা",
+    "district": "Bhola",
+    "upazila": "Char Fasson"
+  },
+  {
+    "kind": "area",
+    "name": "Doulatkhan Pourashava",
+    "label": "দৌলতখান পৌরসভা",
+    "district": "Bhola",
+    "upazila": "Daulatkhan"
+  },
+  {
+    "kind": "area",
+    "name": "Lalmohan Pourashava",
+    "label": "লালমোহন পৌরসভা",
+    "district": "Bhola",
+    "upazila": "Lalmohan"
+  },
+  {
+    "kind": "area",
+    "name": "Amtali Pourashava",
+    "label": "আমতলী পৌরসভা",
+    "district": "Barguna",
+    "upazila": "Amtali"
+  },
+  {
+    "kind": "area",
+    "name": "Barguna Pourashava",
+    "label": "বরগুনা পৌরসভা",
+    "district": "Barguna",
+    "upazila": "Barguna Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Betagi Pourashava",
+    "label": "বেতাগী পৌরসভা",
+    "district": "Barguna",
+    "upazila": "Betagi"
+  },
+  {
+    "kind": "area",
+    "name": "Patharghata Pourashava",
+    "label": "পাথরঘাটা পৌরসভা",
+    "district": "Barguna",
+    "upazila": "Patharghata"
+  },
+  {
+    "kind": "area",
+    "name": "Beanibazar Pourashava",
+    "label": "বিয়ানীবাজার পৌরসভা",
+    "district": "Sylhet",
+    "upazila": "Beanibazar"
+  },
+  {
+    "kind": "area",
+    "name": "Golapgonj Pourashava",
+    "label": "গোলাপগঞ্জ পৌরসভা",
+    "district": "Sylhet",
+    "upazila": "Golapganj"
+  },
+  {
+    "kind": "area",
+    "name": "Kanaighat Pourashava",
+    "label": "কানাইঘাট পৌরসভা",
+    "district": "Sylhet",
+    "upazila": "Kanaighat"
+  },
+  {
+    "kind": "area",
+    "name": "jakiganj Pourashava",
+    "label": "জকিগঞ্জ পৌরসভা",
+    "district": "Sylhet",
+    "upazila": "Zakiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Barlekha Pourashava",
+    "label": "বড়লেখা পৌরসভা",
+    "district": "Maulvibazar",
+    "upazila": "Barlekha"
+  },
+  {
+    "kind": "area",
+    "name": "Kamolganj Pourashava",
+    "label": "কমলগঞ্জ পৌরসভা",
+    "district": "Maulvibazar",
+    "upazila": "Kamalganj"
+  },
+  {
+    "kind": "area",
+    "name": "Kulaura Pourashava",
+    "label": "কুলাউড়া পৌরসভা",
+    "district": "Maulvibazar",
+    "upazila": "Kulaura"
+  },
+  {
+    "kind": "area",
+    "name": "Moulvibazar Pourashava",
+    "label": "মৌলভীবাজার পৌরসভা",
+    "district": "Maulvibazar",
+    "upazila": "Moulvibazar Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Sreemangal Pourashava",
+    "label": "শ্রীমঙ্গল পৌরসভা",
+    "district": "Maulvibazar",
+    "upazila": "Sreemangal"
+  },
+  {
+    "kind": "area",
+    "name": "Nabiganj Pourashava",
+    "label": "নবীগঞ্জ পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Nabiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Ajmiriganj Pourashava",
+    "label": "আজমিরীগঞ্জ পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Ajmiriganj"
+  },
+  {
+    "kind": "area",
+    "name": "Chunarughat Pourashava",
+    "label": "চুনারুঘাট পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Chunarughat"
+  },
+  {
+    "kind": "area",
+    "name": "Habiganj Pourashava",
+    "label": "হবিগঞ্জ পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Habiganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Madhabpur Pourashava",
+    "label": "মাধবপুর পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Madhabpur"
+  },
+  {
+    "kind": "area",
+    "name": "Shayestaganj Pourashava",
+    "label": "শায়েস্তাগঞ্জ পৌরসভা",
+    "district": "Habiganj",
+    "upazila": "Shaistagonj"
+  },
+  {
+    "kind": "area",
+    "name": "Sunamganj Pourashava",
+    "label": "সুনামগঞ্জ পৌরসভা",
+    "district": "Sunamganj",
+    "upazila": "Sunamganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Chhatak Pourashava",
+    "label": "ছাতক পৌরসভা",
+    "district": "Sunamganj",
+    "upazila": "Chhatak"
+  },
+  {
+    "kind": "area",
+    "name": "Jagannathpur Pourashava",
+    "label": "জগন্নাথপুর পৌরসভা",
+    "district": "Sunamganj",
+    "upazila": "Jagannathpur"
+  },
+  {
+    "kind": "area",
+    "name": "Derai Pourashava",
+    "label": "দিরাই পৌরসভা",
+    "district": "Sunamganj",
+    "upazila": "Derai"
+  },
+  {
+    "kind": "area",
+    "name": "Monohardi Pourashava",
+    "label": "মনোহরদী পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Monohardi"
+  },
+  {
+    "kind": "area",
+    "name": "Narsingdi Pourashava",
+    "label": "নরসিংদী পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Narsingdi Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Madhabdi Pourashava",
+    "label": "মাধবদী পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Narsingdi Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Ghorasal Pourashava",
+    "label": "ঘোড়াশাল পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Palash"
+  },
+  {
+    "kind": "area",
+    "name": "Raipura Pourashava",
+    "label": "রায়পুরা পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Raipura"
+  },
+  {
+    "kind": "area",
+    "name": "Shibpur Pourashava",
+    "label": "শিবপুর পৌরসভা",
+    "district": "Narsingdi",
+    "upazila": "Shibpur"
+  },
+  {
+    "kind": "area",
+    "name": "Kaliganj Pourashava",
+    "label": "কালীগঞ্জ পৌরসভা",
+    "district": "Gazipur",
+    "upazila": "Kaliganj"
+  },
+  {
+    "kind": "area",
+    "name": "Kaliakair Pourashava",
+    "label": "কালিয়াকৈর পৌরসভা",
+    "district": "Gazipur",
+    "upazila": "Kaliakior"
+  },
+  {
+    "kind": "area",
+    "name": "Sreepur Pourashava",
+    "label": "শ্রীপুর পৌরসভা",
+    "district": "Gazipur",
+    "upazila": "Sripur"
+  },
+  {
+    "kind": "area",
+    "name": "Shariatpur Pourashava",
+    "label": "শরীয়তপুর পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Shariatpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Naria Pourashava",
+    "label": "নড়িয়া পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Naria"
+  },
+  {
+    "kind": "area",
+    "name": "Zajira Pourashava",
+    "label": "জাজিরা পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Jajira"
+  },
+  {
+    "kind": "area",
+    "name": "Gosairhat Pourashava",
+    "label": "গোসাইরহাট পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Gosairhat"
+  },
+  {
+    "kind": "area",
+    "name": "Bhedarganj Pourashava",
+    "label": "ভেদরগঞ্জ পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Bhedarganj"
+  },
+  {
+    "kind": "area",
+    "name": "Damudya Pourashava",
+    "label": "ডামুড্যা পৌরসভা",
+    "district": "Shariatpur",
+    "upazila": "Damudya"
+  },
+  {
+    "kind": "area",
+    "name": "Araihazar Pourashava",
+    "label": "আড়াইহাজার পৌরসভা",
+    "district": "Narayanganj",
+    "upazila": "Araihazar"
+  },
+  {
+    "kind": "area",
+    "name": "Gopaldi Pourashava",
+    "label": "গোপালদী পৌরসভা",
+    "district": "Narayanganj",
+    "upazila": "Araihazar"
+  },
+  {
+    "kind": "area",
+    "name": "Tarabo Pourashava",
+    "label": "তারাব পৌরসভা",
+    "district": "Narayanganj",
+    "upazila": "Rupganj"
+  },
+  {
+    "kind": "area",
+    "name": "Kanchon Pourashava",
+    "label": "কাঞ্চন পৌরসভা",
+    "district": "Narayanganj",
+    "upazila": "Rupganj"
+  },
+  {
+    "kind": "area",
+    "name": "Sonargaon Pourashava",
+    "label": "সোনারগাঁ পৌরসভা",
+    "district": "Narayanganj",
+    "upazila": "Sonargaon"
+  },
+  {
+    "kind": "area",
+    "name": "Basail Pourashava",
+    "label": "বাসাইল পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Basail"
+  },
+  {
+    "kind": "area",
+    "name": "Bhuapur Pourashava",
+    "label": "ভূয়াপুর পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Bhuapur"
+  },
+  {
+    "kind": "area",
+    "name": "Ghatail Pourashava",
+    "label": "ঘাটাইল পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Ghatail"
+  },
+  {
+    "kind": "area",
+    "name": "Gopalpur Pourashava",
+    "label": "গোপালপুর পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Gopalpur"
+  },
+  {
+    "kind": "area",
+    "name": "Madhupur Pourashava",
+    "label": "মধুপুর পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Madhupur"
+  },
+  {
+    "kind": "area",
+    "name": "Mirzapur Pourashava",
+    "label": "মির্জাপুর পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Mirzapur"
+  },
+  {
+    "kind": "area",
+    "name": "Sakhipur Pourashava",
+    "label": "সখিপুর পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Sakhipur"
+  },
+  {
+    "kind": "area",
+    "name": "Tangail Pourashava",
+    "label": "টাঙ্গাইল পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Tangail Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Kalihati Pourashava",
+    "label": "কালিহাতী পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Kalihati"
+  },
+  {
+    "kind": "area",
+    "name": "Elenga Pourashava",
+    "label": "এলেঙ্গা পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Kalihati"
+  },
+  {
+    "kind": "area",
+    "name": "Dhanbari Pourashava",
+    "label": "ধনবাড়ী পৌরসভা",
+    "district": "Tangail",
+    "upazila": "Dhanbari"
+  },
+  {
+    "kind": "area",
+    "name": "Katiadi Pourashava",
+    "label": "কটিয়াদী পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Katiadi"
+  },
+  {
+    "kind": "area",
+    "name": "Bhairab Pourashava",
+    "label": "ভৈরব পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Bhairab"
+  },
+  {
+    "kind": "area",
+    "name": "Hossainpur Pourashava",
+    "label": "হোসেনপুর পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Hossainpur"
+  },
+  {
+    "kind": "area",
+    "name": "Pakundia Pourashava",
+    "label": "পাকুন্দিয়া পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Pakundia"
+  },
+  {
+    "kind": "area",
+    "name": "Kuliarchar Pourashava",
+    "label": "কুলিয়ারচর পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Kuliarchar"
+  },
+  {
+    "kind": "area",
+    "name": "Kishoreganj Pourashava",
+    "label": "কিশোরগঞ্জ পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Kishoreganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Karimgonj Pourashava",
+    "label": "করিমগঞ্জ পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Karimganj"
+  },
+  {
+    "kind": "area",
+    "name": "Bajitpur Pourashava",
+    "label": "বাজিতপুর পৌরসভা",
+    "district": "Kishoreganj",
+    "upazila": "Bajitpur"
+  },
+  {
+    "kind": "area",
+    "name": "Manikganj Pourashava",
+    "label": "মানিকগঞ্জ পৌরসভা",
+    "district": "Manikganj",
+    "upazila": "Manikganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Singair Pourashava",
+    "label": "সিংগাইর পৌরসভা",
+    "district": "Manikganj",
+    "upazila": "Singair"
+  },
+  {
+    "kind": "area",
+    "name": "Savar Pourashava",
+    "label": "সাভার পৌরসভা",
+    "district": "Dhaka",
+    "upazila": "Savar"
+  },
+  {
+    "kind": "area",
+    "name": "Dhamrai Pourashava",
+    "label": "ধামরাই পৌরসভা",
+    "district": "Dhaka",
+    "upazila": "Dhamrai"
+  },
+  {
+    "kind": "area",
+    "name": "Dohar Pourashava",
+    "label": "দোহার পৌরসভা",
+    "district": "Dhaka",
+    "upazila": "Dohar"
+  },
+  {
+    "kind": "area",
+    "name": "Munshiganj Pourashava",
+    "label": "মুন্সীগঞ্জ পৌরসভা",
+    "district": "Munshiganj",
+    "upazila": "Munshiganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Mirkadim Pourashava",
+    "label": "মিরকাদিম পৌরসভা",
+    "district": "Munshiganj",
+    "upazila": "Munshiganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Rajbari Pourashava",
+    "label": "রাজবাড়ী পৌরসভা",
+    "district": "Rajbari",
+    "upazila": "Rajbari Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Goalanda Pourashava",
+    "label": "গোয়ালন্দ পৌরসভা",
+    "district": "Rajbari",
+    "upazila": "Goalanda"
+  },
+  {
+    "kind": "area",
+    "name": "Pangsha Pourashava",
+    "label": "পাংশা পৌরসভা",
+    "district": "Rajbari",
+    "upazila": "Pangsha"
+  },
+  {
+    "kind": "area",
+    "name": "Madaripur Pourashava",
+    "label": "মাদারীপুর পৌরসভা",
+    "district": "Madaripur",
+    "upazila": "Madaripur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Shibchar Pourashava",
+    "label": "শিবচর পৌরসভা",
+    "district": "Madaripur",
+    "upazila": "Shibchar"
+  },
+  {
+    "kind": "area",
+    "name": "Kalkini Pourashava",
+    "label": "কালকিনি পৌরসভা",
+    "district": "Madaripur",
+    "upazila": "Kalkini"
+  },
+  {
+    "kind": "area",
+    "name": "Rajoir Pourashava",
+    "label": "রাজৈর পৌরসভা",
+    "district": "Madaripur",
+    "upazila": "Rajoir"
+  },
+  {
+    "kind": "area",
+    "name": "Gopalganj Pourashava",
+    "label": "গোপালগঞ্জ পৌরসভা",
+    "district": "Gopalganj",
+    "upazila": "Gopalganj Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Tungipara Pourashava",
+    "label": "টুঙ্গিপাড়া পৌরসভা",
+    "district": "Gopalganj",
+    "upazila": "Tungipara"
+  },
+  {
+    "kind": "area",
+    "name": "Kotalipara Pourashava",
+    "label": "কোটালীপাড়া পৌরসভা",
+    "district": "Gopalganj",
+    "upazila": "Kotalipara"
+  },
+  {
+    "kind": "area",
+    "name": "Muksudpur Pourashava",
+    "label": "মুকসুদপুর পৌরসভা",
+    "district": "Gopalganj",
+    "upazila": "Muksudpur"
+  },
+  {
+    "kind": "area",
+    "name": "Faridpur Pourashava",
+    "label": "ফরিদপুর পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Faridpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Alfadanga Pourashava",
+    "label": "আলফাডাঙ্গা পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Alfadanga"
+  },
+  {
+    "kind": "area",
+    "name": "Boalmari Pourashava",
+    "label": "বোয়ালমারী পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Boalmari"
+  },
+  {
+    "kind": "area",
+    "name": "Nagarkanda Pourashava",
+    "label": "নগরকান্দা পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Nagarkanda"
+  },
+  {
+    "kind": "area",
+    "name": "Bhanga Pourashava",
+    "label": "ভাঙ্গা পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Bhanga"
+  },
+  {
+    "kind": "area",
+    "name": "Madhukhali Pourashava",
+    "label": "মধুখালী পৌরসভা",
+    "district": "Faridpur",
+    "upazila": "Madhukhali"
+  },
+  {
+    "kind": "area",
+    "name": "Panchagarh Pourashava",
+    "label": "পঞ্চগড় পৌরসভা",
+    "district": "Panchagarh",
+    "upazila": "Panchagarh Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Debiganj Pourashava",
+    "label": "দেবীগঞ্জ পৌরসভা",
+    "district": "Panchagarh",
+    "upazila": "Debiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Boda Pourashava",
+    "label": "বোদা পৌরসভা",
+    "district": "Panchagarh",
+    "upazila": "Boda"
+  },
+  {
+    "kind": "area",
+    "name": "Birganj Pourashava",
+    "label": "বীরগঞ্জ পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Birganj"
+  },
+  {
+    "kind": "area",
+    "name": "Ghoraghat Pourashava",
+    "label": "ঘোড়াঘাট পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Ghoraghat"
+  },
+  {
+    "kind": "area",
+    "name": "Birampur Pourashava",
+    "label": "বিরামপুর পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Birampur"
+  },
+  {
+    "kind": "area",
+    "name": "Parbatipur Pourashava",
+    "label": "পার্বতীপুর পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Parbatipur"
+  },
+  {
+    "kind": "area",
+    "name": "Setabganj Pourashava",
+    "label": "সেতাবগঞ্জ পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Bochaganj"
+  },
+  {
+    "kind": "area",
+    "name": "Fulbari Pourashava",
+    "label": "ফুলবাড়ী পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Phulbari"
+  },
+  {
+    "kind": "area",
+    "name": "Dinajpur Pourashava",
+    "label": "দিনাজপুর পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Dinajpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Hakimpur Pourashava",
+    "label": "হাকিমপুর পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Hakimpur"
+  },
+  {
+    "kind": "area",
+    "name": "Biral Pourashava",
+    "label": "বিরল পৌরসভা",
+    "district": "Dinajpur",
+    "upazila": "Biral"
+  },
+  {
+    "kind": "area",
+    "name": "Lalmonirhat Pourashava",
+    "label": "লালমনিরহাট পৌরসভা",
+    "district": "Lalmonirhat",
+    "upazila": "Lalmanirhat Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Patgram Pourashava",
+    "label": "পাটগ্রাম পৌরসভা",
+    "district": "Lalmonirhat",
+    "upazila": "Patgram"
+  },
+  {
+    "kind": "area",
+    "name": "Saidpur Pourashava",
+    "label": "সৈয়দপুর পৌরসভা",
+    "district": "Nilphamari",
+    "upazila": "Saidpur"
+  },
+  {
+    "kind": "area",
+    "name": "Domar Pourashava",
+    "label": "ডোমার পৌরসভা",
+    "district": "Nilphamari",
+    "upazila": "Domar"
+  },
+  {
+    "kind": "area",
+    "name": "Jaldhaka Pourashava",
+    "label": "জলঢাকা পৌরসভা",
+    "district": "Nilphamari",
+    "upazila": "Jaldhaka"
+  },
+  {
+    "kind": "area",
+    "name": "Nilphamari Pourashava",
+    "label": "নীলফামারী পৌরসভা",
+    "district": "Nilphamari",
+    "upazila": "Nilphamari Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Gaibandha Pourashava",
+    "label": "গাইবান্ধা পৌরসভা",
+    "district": "Gaibandha",
+    "upazila": "Gaibandha sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Palashbari Pourashava",
+    "label": "পলাশবাড়ী পৌরসভা",
+    "district": "Gaibandha",
+    "upazila": "Palashbari"
+  },
+  {
+    "kind": "area",
+    "name": "Gobindaganj Pourashava",
+    "label": "গোবিন্দগঞ্জ পৌরসভা",
+    "district": "Gaibandha",
+    "upazila": "Gobindaganj"
+  },
+  {
+    "kind": "area",
+    "name": "Sundarganj Pourashava",
+    "label": "সুন্দরগঞ্জ পৌরসভা",
+    "district": "Gaibandha",
+    "upazila": "Sundarganj"
+  },
+  {
+    "kind": "area",
+    "name": "Thakurgaon Pourashava",
+    "label": "ঠাকুরগাঁও পৌরসভা",
+    "district": "Thakurgaon",
+    "upazila": "Thakurgaon Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Pirganj Pourashava",
+    "label": "পীরগঞ্জ পৌরসভা",
+    "district": "Thakurgaon",
+    "upazila": "Pirganj"
+  },
+  {
+    "kind": "area",
+    "name": "Ranisankail Pourashava",
+    "label": "রাণীশংকৈল পৌরসভা",
+    "district": "Thakurgaon",
+    "upazila": "Ranisankail"
+  },
+  {
+    "kind": "area",
+    "name": "Badargonj Pourashava",
+    "label": "বদরগঞ্জ পৌরসভা",
+    "district": "Rangpur",
+    "upazila": "Badarganj"
+  },
+  {
+    "kind": "area",
+    "name": "Pirganj Pourashava",
+    "label": "পীরগঞ্জ পৌরসভা",
+    "district": "Rangpur",
+    "upazila": "Pirganj"
+  },
+  {
+    "kind": "area",
+    "name": "Haragach Pourashava",
+    "label": "হারাগাছ পৌরসভা",
+    "district": "Rangpur",
+    "upazila": "Kaunia"
+  },
+  {
+    "kind": "area",
+    "name": "Kurigram Pourashava",
+    "label": "কুড়িগ্রাম পৌরসভা",
+    "district": "Kurigram",
+    "upazila": "Kurigram Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Nageshwari Pourashava",
+    "label": "নাগেশ্বরী পৌরসভা",
+    "district": "Kurigram",
+    "upazila": "Nageshwari"
+  },
+  {
+    "kind": "area",
+    "name": "Ulipur Pourashava",
+    "label": "উলিপুর পৌরসভা",
+    "district": "Kurigram",
+    "upazila": "Ulipur"
+  },
+  {
+    "kind": "area",
+    "name": "Sherpur Pourashava",
+    "label": "শেরপুর পৌরসভা",
+    "district": "Sherpur",
+    "upazila": "Sherpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Nalitabari Pourashava",
+    "label": "নালিতাবাড়ী পৌরসভা",
+    "district": "Sherpur",
+    "upazila": "Nalitabari"
+  },
+  {
+    "kind": "area",
+    "name": "Sreebordi Pourashava",
+    "label": "শ্রীবরদী পৌরসভা",
+    "district": "Sherpur",
+    "upazila": "Sreebardi"
+  },
+  {
+    "kind": "area",
+    "name": "Nokla Pourashava",
+    "label": "নকলা পৌরসভা",
+    "district": "Sherpur",
+    "upazila": "Nakla"
+  },
+  {
+    "kind": "area",
+    "name": "Fulbaria Pourashava",
+    "label": "ফুলবাড়ীয়া পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Fulbaria"
+  },
+  {
+    "kind": "area",
+    "name": "Trishal Pourashava",
+    "label": "ত্রিশাল পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Trishal"
+  },
+  {
+    "kind": "area",
+    "name": "Bhaluka Pourashava",
+    "label": "ভালুকা পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Bhaluka"
+  },
+  {
+    "kind": "area",
+    "name": "Muktagacha Pourashava",
+    "label": "মুক্তাগাছা পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Muktagachha"
+  },
+  {
+    "kind": "area",
+    "name": "Phulpur Pourashava",
+    "label": "ফুলপুর পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Phulpur"
+  },
+  {
+    "kind": "area",
+    "name": "Haluaghat Pourashava",
+    "label": "হালুয়াঘাট পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Haluaghat"
+  },
+  {
+    "kind": "area",
+    "name": "Gauripur Pourashava",
+    "label": "গৌরীপুর পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Gauripur"
+  },
+  {
+    "kind": "area",
+    "name": "Gafargaon Pourashava",
+    "label": "গফরগাঁও পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Gaffargaon"
+  },
+  {
+    "kind": "area",
+    "name": "Ishwarganj Pourashava",
+    "label": "ঈশ্বরগঞ্জ পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Ishwarganj"
+  },
+  {
+    "kind": "area",
+    "name": "Nandail Pourashava",
+    "label": "নান্দাইল পৌরসভা",
+    "district": "Mymensingh",
+    "upazila": "Nandail"
+  },
+  {
+    "kind": "area",
+    "name": "Jamalpur Pourashava",
+    "label": "জামালপুর পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Jamalpur Sadar"
+  },
+  {
+    "kind": "area",
+    "name": "Melandah Pourashava",
+    "label": "মেলান্দহ পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Melandaha"
+  },
+  {
+    "kind": "area",
+    "name": "Hazrabari Pourashava",
+    "label": "হাজরাবাড়ী পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Melandaha"
+  },
+  {
+    "kind": "area",
+    "name": "Islampur Pourashava",
+    "label": "ইসলামপুর পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Islampur"
+  },
+  {
+    "kind": "area",
+    "name": "Dewangonj Pourashava",
+    "label": "দেওয়ানগঞ্জ পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Dewanganj"
+  },
+  {
+    "kind": "area",
+    "name": "Sarishabari Pourashava",
+    "label": "সরিষাবাড়ী পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Sarishabari"
+  },
+  {
+    "kind": "area",
+    "name": "Madarganj Pourashava",
+    "label": "মাদারগঞ্জ পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Madarganj"
+  },
+  {
+    "kind": "area",
+    "name": "Bokshigonj Pourashava",
+    "label": "বকশীগঞ্জ পৌরসভা",
+    "district": "Jamalpur",
+    "upazila": "Baksiganj"
+  },
+  {
+    "kind": "area",
+    "name": "Durgapur Pourashava",
+    "label": "দুর্গাপুর পৌরসভা",
+    "district": "Netrokona",
+    "upazila": "Durgapur"
+  },
+  {
+    "kind": "area",
+    "name": "Kendua Pourashava",
+    "label": "কেন্দুয়া পৌরসভা",
+    "district": "Netrokona",
+    "upazila": "Kendua"
+  },
+  {
+    "kind": "area",
+    "name": "Madan Pourashava",
+    "label": "মদন পৌরসভা",
+    "district": "Netrokona",
+    "upazila": "Madan"
+  },
+  {
+    "kind": "area",
+    "name": "Mohongonj Pourashava",
+    "label": "মোহনগঞ্জ পৌরসভা",
+    "district": "Netrokona",
+    "upazila": "Mohongonj"
+  },
+  {
+    "kind": "area",
+    "name": "Netrokona Pourashava",
+    "label": "নেত্রকোণা পৌরসভা",
+    "district": "Netrokona",
+    "upazila": "Netrokona Sadar"
+  }
+]

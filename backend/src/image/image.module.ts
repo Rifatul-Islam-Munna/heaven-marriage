@@ -6,5 +6,6 @@ import { MinioService } from 'src/lib/minio.service';
 @Module({
   controllers: [ImageController],
   providers: [ImageService,MinioService],
+  exports: [MinioService],
 })
 export class ImageModule {}

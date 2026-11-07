@@ -61,6 +61,8 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { districts } from "@/staticData/districts";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import {defaultCityCorporations,defaultCityAreas,type LocationResponse} from "@/lib/location-options";
 import { upazilas } from "@/staticData/upazilas";
 import { useDebounce } from "use-debounce";
 import {
@@ -132,6 +134,11 @@ function FilterContent({
   selectedDistrict,
   selectedUpazila,
 }: FilterContentProps) {
+  const {data:locations}=useQueryWrapper<LocationResponse>(["public-location-options"],"/profile-questions/locations",{staleTime:60000});
+  const extra=locations?.entries||[];
+  const availableLocalUpazilas=[...availableUpazilas,...extra.filter(x=>x.kind==="upazila"&&x.district===filters.districtId).map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))];
+  const cityOptions=[...defaultCityCorporations,...extra.filter(x=>x.kind==="cityCorporation")].filter(x=>x.district===filters.districtId);
+  const areaOptions=[...defaultCityAreas,...extra.filter(x=>x.kind==="area")].filter(x=>x.district===filters.districtId && (filters.cityCorporation?x.cityCorporation===filters.cityCorporation:x.upazila===filters.upazilaId));
   const [age, setAge] = useState({
     min: 10,
     max: 40,
@@ -320,7 +327,7 @@ function FilterContent({
                       />
                       <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-[50vh] overflow-y-auto">
-                        {districts.map((d) => (
+                        {[...districts,...extra.filter(x=>x.kind==='district').map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))].map((d) => (
                           <CommandItem
                             key={d.id}
                             value={d.bn_name}
@@ -329,6 +336,8 @@ function FilterContent({
                                 districtId:
                                   filters.districtId === d.name ? null : d.name,
                                 upazilaId: null,
+                                cityCorporation: null,
+                                area: null,
                               });
                               // Close dialog - you'll need to manage this state
                               document
@@ -383,7 +392,7 @@ function FilterContent({
                       />
                       <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-48 overflow-y-auto">
-                        {districts.map((d) => (
+                        {[...districts,...extra.filter(x=>x.kind==='district').map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))].map((d) => (
                           <CommandItem
                             key={d.id}
                             value={d.bn_name}
@@ -392,6 +401,8 @@ function FilterContent({
                                 districtId:
                                   filters.districtId === d.name ? null : d.name,
                                 upazilaId: null,
+                                cityCorporation: null,
+                                area: null,
                               });
                               setDistrictOpen(false);
                             }}
@@ -449,7 +460,7 @@ function FilterContent({
                       />
                       <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-[50vh] overflow-y-auto">
-                        {availableUpazilas.map((upazila) => (
+                        {availableLocalUpazilas.map((upazila) => (
                           <CommandItem
                             key={upazila.id}
                             value={upazila.bn_name}
@@ -459,6 +470,7 @@ function FilterContent({
                                   filters.upazilaId === upazila.name
                                     ? null
                                     : upazila.name,
+                                cityCorporation: null,area: null,
                               });
                               document
                                 .querySelector('[data-state="open"]')
@@ -513,7 +525,7 @@ function FilterContent({
                       />
                       <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup className="max-h-48 overflow-y-auto">
-                        {availableUpazilas.map((upazila) => (
+                        {availableLocalUpazilas.map((upazila) => (
                           <CommandItem
                             key={upazila.id}
                             value={upazila.bn_name}
@@ -523,6 +535,7 @@ function FilterContent({
                                   filters.upazilaId === upazila.name
                                     ? null
                                     : upazila.name,
+                                cityCorporation: null,area: null,
                               });
                               setUpazilaOpen(false);
                             }}
@@ -544,6 +557,26 @@ function FilterContent({
                   </PopoverContent>
                 </Popover>
               </div>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5 text-xs font-semibold">সিটি কর্পোরেশন
+                <select aria-label="সিটি কর্পোরেশন" value={filters.cityCorporation||""}
+                  disabled={!filters.districtId}
+                  onChange={e=>setFilters({cityCorporation:e.target.value||null,upazilaId:null,area:null})}
+                  className="h-9 w-full rounded-md border bg-white px-2 text-sm">
+                  <option value="">সব সিটি কর্পোরেশন</option>
+                  {cityOptions.map(x=><option key={x.name} value={x.name}>{x.label}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1.5 text-xs font-semibold">এলাকা / মহল্লা
+                <select aria-label="এলাকা / মহল্লা" value={filters.area||""}
+                  disabled={!filters.districtId || !(filters.cityCorporation||filters.upazilaId)}
+                  onChange={e=>setFilters({area:e.target.value||null})}
+                  className="h-9 w-full rounded-md border bg-white px-2 text-sm">
+                  <option value="">সব এলাকা</option>
+                  {areaOptions.map(x=><option key={x.name} value={x.name}>{x.label}</option>)}
+                </select>
+              </label>
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -936,6 +969,8 @@ export default function BiodataAdvancedFilter() {
     ageMax: parseAsInteger.withDefault(40),
     districtId: parseAsString, // Will store district NAME (not actual id)
     upazilaId: parseAsString, // Will store upazila NAME (not actual id)
+    cityCorporation: parseAsString,
+    area: parseAsString,
     educationMedium: parseAsArrayOf(parseAsString).withDefault([]),
     religiousEducation: parseAsArrayOf(parseAsString).withDefault([]),
     heightMin: parseAsInteger.withDefault(4),
@@ -986,6 +1021,8 @@ export default function BiodataAdvancedFilter() {
       ageMax: 40,
       districtId: null,
       upazilaId: null,
+      cityCorporation: null,
+      area: null,
       educationMedium: [],
       religiousEducation: [],
       heightMin: 4,
@@ -1016,6 +1053,7 @@ export default function BiodataAdvancedFilter() {
     filters.ageMax !== 40 ||
     filters.districtId ||
     filters.upazilaId ||
+    filters.cityCorporation || filters.area ||
     filters.educationMedium.length > 0 ||
     filters.religiousEducation.length > 0 ||
     filters.heightMin !== 4 ||

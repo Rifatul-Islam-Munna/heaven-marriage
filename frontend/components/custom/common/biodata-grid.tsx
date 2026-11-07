@@ -29,6 +29,7 @@ interface Biodata {
   profession: string;
   gender: "male" | "female";
   isVerified?: boolean;
+  isSubscriber?: boolean;
   isUrgent?: boolean;
 }
 
@@ -189,6 +190,7 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
           <BiodataCard
             key={biodata._id}
             isVerified={biodata.isVerified}
+            isSubscriber={biodata.isSubscriber}
             age={biodata?.age ?? 0}
             biodataNumber={biodata?.userId ?? ""}
             district={biodata?.address?.district ?? ""}

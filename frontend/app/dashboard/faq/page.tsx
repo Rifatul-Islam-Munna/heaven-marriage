@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { countWords, MAX_CONTENT_WORDS } from '@/lib/word-limit';
 import {
   Table,
   TableBody,
@@ -118,6 +119,7 @@ export default function AdminFaqDashboard() {
       toast.error("সকল ফিল্ড পূরণ করুন");
       return;
     }
+    if(countWords(createForm.description)>MAX_CONTENT_WORDS){toast.error('উত্তর সর্বোচ্চ ৩,০০০ শব্দ হতে পারবে');return;}
     createMutation.mutate(createForm);
   };
 
@@ -128,6 +130,7 @@ export default function AdminFaqDashboard() {
       toast.error("সকল ফিল্ড পূরণ করুন");
       return;
     }
+    if(countWords(editForm.description)>MAX_CONTENT_WORDS){toast.error('উত্তর সর্বোচ্চ ৩,০০০ শব্দ হতে পারবে');return;}
     updateMutation.mutate({
       id: editingFaq?._id,
       ...editForm,
@@ -224,12 +227,11 @@ export default function AdminFaqDashboard() {
                     })
                   }
                   required
-                  maxLength={2000}
                   rows={6}
                   className="resize-none"
                 />
                 <p className="text-xs text-muted-foreground text-right">
-                  {createForm.description.length}/2000
+                  {countWords(createForm.description).toLocaleString('bn-BD')} / ৩,০০০ শব্দ
                 </p>
               </div>
 
@@ -244,7 +246,7 @@ export default function AdminFaqDashboard() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || countWords(createForm.description) > MAX_CONTENT_WORDS}
                   className="w-full sm:w-auto bg-pink-600 hover:bg-pink-700"
                 >
                   {createMutation.isPending ? (
@@ -267,11 +269,9 @@ export default function AdminFaqDashboard() {
         <Table>
           <TableHeader>
             <TableRow className="bg-pink-50">
-              <TableHead className=" font-semibold w-[30%]">প্রশ্ন</TableHead>
-              <TableHead className=" font-semibold w-[50%]">উত্তর</TableHead>
-              <TableHead className=" font-semibold text-right w-[20%]">
-                অ্যাকশন
-              </TableHead>
+              <TableHead className="sticky left-0 z-10 w-40 bg-pink-50 font-bold text-pink-900">অ্যাকশন / Edit</TableHead>
+              <TableHead className="w-[30%] font-semibold">প্রশ্ন</TableHead>
+              <TableHead className="font-semibold">উত্তর</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -286,29 +286,19 @@ export default function AdminFaqDashboard() {
             ) : (
               faqs.map((faq) => (
                 <TableRow key={faq._id} className="hover:bg-pink-50/50">
+                  <TableCell className="sticky left-0 z-[1] bg-white px-2">
+                    <div className="flex items-center justify-start gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => openEditDialog(faq)}
+                        className="border-pink-200 font-semibold text-pink-700 hover:bg-pink-50">
+                        <Pencil className="mr-1.5 h-4 w-4" /> Edit
+                      </Button>
+                      <Button variant="ghost" size="icon" aria-label="Delete faq" onClick={() => setDeleteId(faq._id)}
+                        className="text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4"/></Button>
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium ">{faq.title}</TableCell>
                   <TableCell className="">
                     <p className="line-clamp-2">{faq.description}</p>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(faq)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(faq._id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -402,12 +392,11 @@ export default function AdminFaqDashboard() {
                   })
                 }
                 required
-                maxLength={2000}
                 rows={6}
                 className="resize-none"
               />
               <p className="text-xs text-muted-foreground text-right">
-                {editForm.description.length}/2000
+                {countWords(editForm.description).toLocaleString('bn-BD')} / ৩,০০০ শব্দ
               </p>
             </div>
 
@@ -422,7 +411,7 @@ export default function AdminFaqDashboard() {
               </Button>
               <Button
                 type="submit"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || countWords(editForm.description) > MAX_CONTENT_WORDS}
                 className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
               >
                 {updateMutation.isPending ? (

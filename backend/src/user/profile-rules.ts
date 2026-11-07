@@ -9,6 +9,7 @@ export const PROFILE_FIELDS = [
   'bloodGroup',
   'weight',
   'nationality',
+  'residenceCountry',
   'whatsapp',
   'guardianPhone',
   'fatherName',
@@ -32,9 +33,21 @@ export const STEP_REQUIRED = Array.from({length:10},(_,section)=>
   BUILTINS.filter(q=>q.section===section&&q.required&&q.enabled).map(q=>q.path||q.id));
 export const valueAt = (u:any,p:string)=>p.split('.').reduce((value,key)=>value?.[key],u);
 
+/** The one eligibility rule for dynamic required-question completion. */
+export function applicableRequiredQuestions(u:any, questions:readonly ProfileQuestion[]=BUILTINS) {
+  return questions.filter(q=>{
+    if(!q.enabled || !q.required || (q.gender!=='both'&&q.gender!==u?.gender))return false;
+    // City Corporation is an alternative to upazila. Foreign residents do
+    // not need Bangladeshi administrative divisions to submit their biodata.
+    if(q.path?.startsWith('address.') && ['district','upazila','cityCorporation','area'].includes(q.path.split('.')[1])) {
+      if(u?.residenceCountry && u.residenceCountry!=='Bangladesh')return false;
+      if(q.path==='address.upazila' && u?.address?.cityCorporation)return false;
+    }
+    return true;
+  });
+}
 export function completion(u:any, questions:readonly ProfileQuestion[]=BUILTINS) {
-  const applicable=questions.filter(q=>q.enabled&&q.required&&
-    (q.gender==='both'||q.gender===u?.gender));
+  const applicable=applicableRequiredQuestions(u,questions);
   const missing=applicable.filter(q=>{
     const value=answerForQuestion(u||{},q);
     return value===undefined||value===null||value===''||
@@ -64,6 +77,7 @@ export function publicProfile(u: any, unlocked = false) {
     'bloodGroup',
     'weight',
     'nationality',
+    'residenceCountry',
     'isPublished',
     'isPublishFromAdmin',
     'isSubscriber',
@@ -72,10 +86,13 @@ export function publicProfile(u: any, unlocked = false) {
   ]);
   out.name = unlocked ? u.name : undefined;
   out.identityUnlocked = unlocked;
-  out.accountType = u.isSubscriber ? 'premium' : 'general';
+  const premiumActive=!!u.isSubscriber && (!u.premiumService?.expiresAt ||
+    new Date(u.premiumService.expiresAt).getTime()>Date.now());
+  out.isSubscriber=premiumActive;
+  out.accountType = premiumActive ? 'premium' : 'general';
   out.isVerified =
     u.verificationStatus === 'approved' && u.isPublishFromAdmin === true;
-  out.address = pick(u.address, ['district', 'upazila']);
+  out.address = pick(u.address, ['district', 'upazila', 'cityCorporation', 'area']);
   out.educationInfo = pick(u.educationInfo, [
     'educationMethod',
     'highestEducation',
@@ -265,14 +282,21 @@ export function adminFilter(q: any) {
   const f: any = {};
   if (q.query?.trim()) f.$text = { $search: q.query.trim() };
   if (q.gender && q.gender !== 'all') f.gender = q.gender;
-  if (q.isPublished && q.isPublished !== 'all')
-    f.isPublishFromAdmin = q.isPublished === 'true';
+  // A public biodata needs BOTH publish flags and must not be suspended/rejected.
+  // The admin cards and table must use the same rule as public discovery.
+  if (q.isPublished === 'true') Object.assign(f, visibleFilter);
+  else if (q.isPublished === 'false') f.$nor = [visibleFilter];
   for (const [key, path] of Object.entries({
     districtId: 'address.district',
     upazilaId: 'address.upazila',
-    country: 'nationality',
+    cityCorporation: 'address.cityCorporation',
+    area: 'address.area',
   }))
     if (q[key]) f[path] = q[key];
+  if (q.country) f.$and = [...(f.$and || []),{$or:[
+    {residenceCountry:q.country},
+    {residenceCountry:{$exists:false},nationality:q.country},
+  ]}];
   for (const [key, path] of Object.entries({
     maritalStatus: 'maritalStatus',
     educationMedium: 'educationInfo.educationMethod',
@@ -305,6 +329,26 @@ export function adminFilter(q: any) {
     f.verificationStatus = q.verificationStatus;
   if (['draft', 'submitted'].includes(q.biodataStatus))
     f.biodataStatus = q.biodataStatus;
+  if(q.memberJourney === 'published') Object.assign(f,visibleFilter);
+  if(q.memberJourney === 'submitted') {
+    f.biodataStatus = {$in:['submitted','approved']};
+    f.$nor = [...(f.$nor||[]),visibleFilter];
+  }
+  const hasBiodataStarted = [
+    {draftSavedAt:{$exists:true}},{draftStep:{$gt:0}},
+    {age:{$gt:0}},{maritalStatus:{$exists:true,$nin:[null,'']}},
+    {'address.district':{$exists:true,$nin:[null,'']}},
+    {'educationInfo.highestEducation':{$exists:true,$nin:[null,'']}},
+    {'personalInformation.height':{$exists:true}},
+    {'occupational.profession':{$exists:true,$nin:[null,'']}},
+    {'expectedLifePartner.age':{$exists:true,$nin:[null,'']}},
+  ];
+  if(['signed_up','in_progress'].includes(q.memberJourney)) {
+    f.biodataStatus = {$nin:['submitted','approved','deleted']};
+    if(q.memberJourney==='signed_up')
+      f.$nor=[...(f.$nor||[]),...hasBiodataStarted];
+    else f.$and=[...(f.$and||[]),{$or:hasBiodataStarted}];
+  }
   if (q.category?.includes('verified')) f.verificationStatus = 'approved';
   if (q.category?.includes('general')) f.isSubscriber = { $ne: true };
   for (const [key, path] of Object.entries({

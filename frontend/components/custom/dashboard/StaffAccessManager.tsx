@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Eye, EyeOff, Loader2, RefreshCw, Search, Shield, ShieldCheck, UserMinus, UserPlus, X } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, Loader2, RefreshCw, Search, Shield, ShieldCheck, UserMinus, UserPlus, X, Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAFF_SECTIONS, type DashboardSection, type StaffRole } from '@/lib/dashboard-access';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -154,7 +154,7 @@ function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: ()
             <input id="new-name" autoFocus dir="auto" value={name} onChange={event => setName(event.target.value)} placeholder="e.g. Abdullah Rahman" className={fieldClass} />
           </div>
           <div>
-            <label htmlFor="new-email" className={labelClass}>Email</label>
+            <label htmlFor="new-email" className={labelClass}>Login email (Gmail / Email)</label>
             <input id="new-email" type="email" autoComplete="off" value={email} onChange={event => setEmail(event.target.value)} placeholder="name@example.com"
               aria-invalid={emailBad} className={cn(fieldClass, emailBad && 'border-red-400')} />
           </div>
@@ -285,7 +285,7 @@ export default function StaffAccessManager() {
   return <DashboardPage>
     <DashboardHeader
       title="Team & access"
-      description="Add team members and choose exactly which dashboard pages each person can open. Changes apply on their next click."
+      description="See each admin, manager and editor’s login email alongside their role, and manage access to dashboard pages."
       actions={<>
         <DashButton tone="ghost-dark" disabled={loading} onClick={() => void refresh()} aria-label="Reload team"><RefreshCw size={14} className={loading ? 'animate-spin' : undefined} /></DashButton>
         <DashButton tone="primary" onClick={() => { setCreateKey(key => key + 1); setCreateOpen(true); }}><UserPlus size={14} /> Add team member</DashButton>
@@ -331,7 +331,11 @@ export default function StaffAccessManager() {
                     account.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-[#f1f3f5] text-[#495057]')}>{initials(account.name)}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium">{account.name || 'Unnamed account'}</span>
-                    <span className="block truncate text-[12px] text-[#6c757d]">{account.email || account.phoneNumber || (account.userId ? '#' + account.userId : 'No contact')}</span>
+                    {account.email ? <span className="mt-1 flex min-w-0 items-center gap-1 text-[12px] font-medium text-slate-700" title={account.email}>
+                      <Mail className="size-3.5 shrink-0 text-pink-600"/><span className="min-w-0 truncate">Login email: {account.email}</span>
+                    </span> : <span className="mt-1 flex min-w-0 items-center gap-1 text-[12px] text-amber-700">
+                      <Phone className="size-3.5 shrink-0"/><span className="min-w-0 truncate">{account.phoneNumber ? 'Phone login: '+account.phoneNumber : 'No login email or phone'}</span>
+                    </span>}
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-0.5">
                     <StatusPill tone={ROLE_TONE[account.role] || 'neutral'}>{ROLE_LABEL[account.role] || account.role}</StatusPill>
@@ -356,7 +360,19 @@ export default function StaffAccessManager() {
               <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#f1f3f5] text-[14px] font-semibold text-[#495057]">{initials(selected.name)}</span>
               <div className="min-w-0">
                 <h2 className="truncate text-[15px] font-semibold">{selected.name || 'Unnamed account'}</h2>
-                <p className="truncate text-[12px] text-[#6c757d]">{[selected.email, selected.phoneNumber, selected.userId && '#' + selected.userId].filter(Boolean).join(' · ')}</p>
+                <p className="text-[12px] text-[#6c757d]">{selected.userId ? 'Account #'+selected.userId : 'Team account'}</p>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                  {selected.email ? <>
+                    <Mail className="size-3.5 text-pink-600"/>
+                    <span className="font-semibold text-slate-700">Login email:</span>
+                    <span className="max-w-full break-all font-mono text-slate-900">{selected.email}</span>
+                    <button type="button" onClick={()=>copyText(selected.email,'Login email copied')}
+                      aria-label="Copy login email" title="Copy login email" className="rounded border p-1 text-pink-700 hover:bg-pink-50"><Copy size={13}/></button>
+                  </> : <>
+                    <Phone className="size-3.5 text-amber-700"/>
+                    <span className="font-medium text-amber-800">No login email · Phone login: {selected.phoneNumber || 'not provided'}</span>
+                  </>}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">

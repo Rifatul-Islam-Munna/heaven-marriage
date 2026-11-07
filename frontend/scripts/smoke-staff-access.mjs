@@ -139,13 +139,13 @@ try{
    const tab=await browser.newPage();
    await tab.setCookie({name:'access_token',value:'token-admin',url:site,httpOnly:true});
    await tab.goto(site+'/dashboard/access',{waitUntil:'domcontentloaded',timeout:30000});
-   await tab.waitForFunction(()=>document.body.textContent.includes('The right access.'),{timeout:18000});
+   await tab.waitForFunction(()=>document.body.textContent.includes('Team & access'),{timeout:18000});
    await tab.waitForFunction(()=>document.body.textContent.includes('Test staff member'),{timeout:12000});
    await tab.evaluate(()=>{
      const target=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('Test staff member'));
      if(!target)throw Error('Role editor staff row missing');target.click();
    });
-   await tab.waitForFunction(()=>document.body.textContent.includes('Manager page permissions'),{timeout:10000});
+   await tab.waitForFunction(()=>document.body.textContent.includes('Pages this manager can open'),{timeout:10000});
    assert.ok(await tab.$('input[type=checkbox]'));
    console.log('PASS: Chrome admin staff editor renders current grants and manager checkboxes.');
    await tab.evaluate(()=>{
@@ -162,7 +162,7 @@ try{
      if(!save)throw Error('Save access button disabled');
      save.click();
    });
-   await tab.waitForFunction(()=>document.body.textContent.includes('Role and page access saved'),{timeout:12000});
+   await tab.waitForFunction(()=>document.body.textContent.includes('Access saved. It applies right away.'),{timeout:12000});
    assert.ok(sessions['token-manager'].permissions.includes('faq'));
    assert.equal((await load('/dashboard/faq','token-manager')).status,200);
    console.log('PASS: Admin checkbox change in Chrome saves new manager page access to backend.');
@@ -171,7 +171,7 @@ try{
    const seo=await browser.newPage();
    await seo.setCookie({name:'access_token',value:'token-seo',url:site,httpOnly:true});
    await seo.goto(site+'/dashboard/seo',{waitUntil:'domcontentloaded',timeout:30000});
-   await seo.waitForFunction(()=>document.body.textContent.includes('Every page. Every detail.'),{timeout:16000});
+   await seo.waitForFunction(()=>document.body.textContent.includes('SEO'),{timeout:16000});
    assert.equal(await seo.$('a[href="/dashboard/blog"]'),null);
    assert.equal(await seo.$('a[href="/dashboard/access"]'),null);
    console.log('PASS: SEO staff sidebar excludes blog and staff permission administration.');

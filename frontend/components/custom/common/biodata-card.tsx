@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { leadEvent } from "@/lib/google-tag-manager";
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, ArrowRight, Loader2 } from "lucide-react";
+import { Heart, ArrowRight, Loader2, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useQueryClient } from "@tanstack/react-query";
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import Image from "next/image";
 import { professionOptions } from "@/staticData/all-data";
 
@@ -24,6 +25,7 @@ interface BiodataCardProps {
   skinTone?: string;
   gender: "male" | "female";
   isVerified?: boolean;
+  isSubscriber?: boolean;
   className?: string;
   isForShortList?: boolean;
   userId?: string;
@@ -62,12 +64,15 @@ export default function BiodataCard({
   skinTone,
   gender,
   isVerified = false,
+  isSubscriber = false,
   className,
   isForShortList,
   userId,
 }: BiodataCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const client = useQueryClient();
+  const {data:publicSettings}=useQueryWrapper<{premium?:{visible?:boolean}}>(["public-settings"],"/public/settings",{staleTime:60000});
+  const showPremiumBadge=publicSettings?.premium?.visible===true;
 
   const { mutate, isPending } = useCommonMutationApi({
     method: "POST",
@@ -95,7 +100,8 @@ export default function BiodataCard({
         className,
       )}
     >
-      {isVerified&&<Badge variant="secondary">Verified</Badge>}
+      {isSubscriber && showPremiumBadge ? <span title="Active Premium assistance, not government identity verification" className="mb-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-800"><BadgeCheck size={14}/> Blue Premium Verified</span>
+      : isVerified && <span title="Biodata reviewed and published by the Niqaha team" className="mb-2 inline-flex items-center gap-1 rounded-full bg-pink-100 px-2.5 py-1 text-[11px] font-bold text-pink-800"><BadgeCheck size={14}/> Pink Biodata Verified</span>}
       {/* Main Layout: 3-Column Grid */}
       <div className="flex items-end gap-3">
         <div className=" flex gap-3  lg:gap-4 items-center  flex-1">

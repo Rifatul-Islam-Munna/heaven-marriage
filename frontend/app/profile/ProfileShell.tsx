@@ -7,17 +7,27 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { TiThMenu } from "react-icons/ti";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { User } from "@/@types/user";
-import { currentBiodataStage } from "@/lib/biodata-status";
+import { currentBiodataStage,profileCompletion as completionPercentage } from "@/lib/biodata-status";
 
 const SidebarHeader = () => {
   const { toggleSidebar } = useSidebar();
+  const pathname = usePathname();
+  const mobileLinks = [
+    {href:"/profile",label:"ড্যাশবোর্ড"},
+    {href:"/profile/my-profile",label:"বায়োডাটা গেম"},
+    {href:"/profile/matches",label:"স্মার্ট ম্যাচ"},
+    {href:"/profile/recommendations",label:"সুপারিশ"},
+    {href:"/profile/settings",label:"সেটিংস"},
+  ] as const;
 
   return (
     <header
-      className="flex h-16 shrink-0 items-center justify-start gap-2 border-b px-4"
+      className="flex h-16 min-w-0 shrink-0 items-center justify-start gap-2 overflow-hidden border-b px-2 sm:px-4"
     >
       <button
         type="button"
@@ -26,8 +36,15 @@ const SidebarHeader = () => {
         className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-gray-800 transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-pink-600"
       >
         <TiThMenu className="h-5 w-5" aria-hidden />
-        <span className="text-sm font-semibold">মেনু</span>
+        <span className="hidden text-sm font-semibold sm:inline">মেনু</span>
       </button>
+      <nav aria-label="মোবাইল প্রোফাইল নেভিগেশন" className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain md:hidden">
+        {mobileLinks.map(item=><Link key={item.href} href={item.href}
+          aria-current={pathname===item.href?"page":undefined}
+          className={`shrink-0 rounded-full px-3 py-2 text-xs font-semibold whitespace-nowrap ${pathname===item.href?"bg-pink-600 text-white":"bg-pink-50 text-pink-800"}`}>
+          {item.label}
+        </Link>)}
+      </nav>
     </header>
   );
 };
@@ -41,9 +58,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 
   // Use the backend's live admin-managed question completion calculation.
-  const profileCompletion = Math.max(0, Math.min(100, Number(user?.completion?.percentage) || 0));
+  const profileCompletion=completionPercentage(user);
+  const requiredCount=user?.completion?.requiredCount??user?.completionRequiredCount??0;
+  const answeredCount=user?.completion?.answeredCount??user?.completionAnsweredCount??0;
   const stage = currentBiodataStage(user);
-  const isProfileIncomplete = profileCompletion < 100 && stage === "draft";
+  const isProfileIncomplete = user?.role === "user" && profileCompletion < 100 && stage === "draft";
 
   // Create userObject with useMemo to avoid unnecessary recalculations
   const userObject = useMemo(
@@ -52,10 +71,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       name: user?.name || "ব্যবহারকারী",
       isProfileIncomplete: isProfileIncomplete,
       profileCompletion: profileCompletion,
+      requiredCount,answeredCount,
       biodataStage: stage,
       connections: user?.numberOfConnections,
     }),
-    [user, isProfileIncomplete, profileCompletion, stage],
+    [user, isProfileIncomplete, profileCompletion, requiredCount, answeredCount, stage],
   );
 
   // Create data object with ProfileTop dynamically
@@ -73,7 +93,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               url: "/profile",
             },
             ...(user?.role === "user"
-              ? [{ title: "স্মার্ট ম্যাচিং", url: "/profile/matches" }]
+              ? [{ title: "স্মার্ট ম্যাচিং", url: "/profile/matches" },
+                  { title: "এজেন্সির সুপারিশ", url: "/profile/recommendations" }]
               : []),
             {
               title: "আমার সংযোগ",
@@ -106,7 +127,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar data={sidebarData} />
       <SidebarInset className="w-full min-w-0">
         <SidebarHeader />

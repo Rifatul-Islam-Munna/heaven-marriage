@@ -21,6 +21,7 @@ import LoginWithGoogle from "./GoogleLogin";
 import AuthDivider from "./AuthDivider";
 import Image from "next/image";
 import Link from "next/link";
+import type { Route } from "next";
 
 export default function SignIn() {
   const { refetch } = useUser();
@@ -36,9 +37,12 @@ export default function SignIn() {
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
     onSuccess: (data) => {
       if (data.data) {
+        const next = new URLSearchParams(window.location.search).get("next");
+        const safeNext = next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
+          ? next : "/profile";
         ["admin","seo","blog","manager"].includes(data?.data?.user?.role||"")
           ? router.push("/dashboard")
-          : router.push("/profile");
+          : router.push(safeNext as Route);
         return toast.success("সফলভাবে লগইন হয়েছে");
       }
       return toast.error(data?.error?.message);

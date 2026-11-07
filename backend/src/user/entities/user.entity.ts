@@ -56,7 +56,8 @@ export class User {
     weight:number 
     
     @Prop()
-    nationality:string 
+    nationality:string
+    @Prop() residenceCountry?:string;
 
 
     @Prop({default:false})
@@ -69,6 +70,15 @@ export class User {
 
     @Prop()
     isSubscriber:boolean
+    // All-time manual count of agency recommendations delivered offline.
+    // Separate from Premium assisted credits and preserved across renewals.
+    @Prop({type:Number,default:0}) offlineRecommendations:number;
+    @Prop({type:Object})
+    premiumService?:{
+      source?:'bkash'|'admin';stage?:string;startedAt?:Date;expiresAt?:Date;
+      assistedAllowance?:number;assistedUsed?:number;includedConnections?:number;
+      baseFee?:number;serviceCharge?:number;updatedAt?:Date;adminNotes?:string;
+    };
     @Prop({default:0})
     numberOfConnections:number
 
@@ -87,6 +97,11 @@ export class User {
     @Prop() guardianPhone:string;
     @Prop({default:0}) draftStep:number;
     @Prop() draftSavedAt:Date;
+    // Admin-only, revisioned cache of the live Dynamic Question Builder progress.
+    @Prop({type:Number}) completionPercentage?:number;
+    @Prop({type:Number}) completionRequiredCount?:number;
+    @Prop({type:Number}) completionAnsweredCount?:number;
+    @Prop({type:Number,index:true}) completionSchemaRevision?:number;
     @Prop({default:false}) deletionRequested:boolean;
     @Prop({default:0}) profileViews:number;
     @Prop({default:0}) profileInterests:number;
@@ -103,6 +118,8 @@ export class User {
         permanentAddress:string
         district:string, // will be enum
         upazila:string; // will be enum
+        cityCorporation?:string;
+        area?:string;
         extraInfo:string
      }
 

@@ -52,7 +52,8 @@ RUN apk add --no-cache \
     font-noto-devanagari \
     terminus-font \
     nodejs \
-    yarn
+    yarn \
+    ffmpeg
 
 # Tell Puppeteer to use installed Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \

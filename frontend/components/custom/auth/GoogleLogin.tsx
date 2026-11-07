@@ -47,8 +47,11 @@ export default function LoginWithGoogle({
       if (result.data.isNewUser)
         registrationEvent(String(result.data.user._id), "google");
       queryClient.clear();
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
+        ? next : "/profile";
       router.replace(
-        ["admin","seo","blog","manager"].includes(result.data.user.role) ? "/dashboard" : "/profile",
+        ["admin","seo","blog","manager"].includes(result.data.user.role) ? "/dashboard" : safeNext as import("next").Route,
       );
       router.refresh();
     },

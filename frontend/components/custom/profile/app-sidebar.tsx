@@ -18,12 +18,54 @@ import {
 } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, Gem, Heart, HeartHandshake } from "lucide-react";
+import { AlertCircle, Gem, Heart, HeartHandshake, ChevronDown, ChevronRight, UsersRound, CreditCard, PanelsTopLeft, Headset, Settings2 } from "lucide-react";
 
+type NavGroupEntry={title:string;url:string;items:{title:string;url:string;icon?:string}[]};
+function GroupNavigation({group,collapsible,isMobile,closeMobile,pathName}:{
+  group:NavGroupEntry;collapsible:boolean;isMobile:boolean;closeMobile:()=>void;pathName:string;
+}){
+  const groupActive=group.items.some(item=>
+    pathName===item.url||(item.url!=='/dashboard'&&pathName.startsWith(item.url+'/')));
+  const [open,setOpen]=React.useState(!collapsible||groupActive);
+  React.useEffect(()=>{if(groupActive)setOpen(true);},[groupActive]);
+  const Icon=group.title.includes('ম্যাচিং')?UsersRound:
+    group.title.includes('পেমেন্ট')?CreditCard:
+    group.title.includes('কনটেন্ট')?PanelsTopLeft:
+    group.title.includes('সহায়তা')?Headset:Settings2;
+  return <SidebarGroup className="gap-0.5">
+    <SidebarGroupLabel className="h-auto px-2 py-1">
+      {collapsible?
+        <button type="button" onClick={()=>setOpen(value=>!value)}
+          aria-expanded={open} aria-label={group.title+' নেভিগেশন'}
+          className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-[12px] font-bold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900">
+          <Icon className="size-4 shrink-0 text-rose-500" aria-hidden/>
+          <span className="min-w-0 flex-1">{group.title}</span>
+          <ChevronDown size={15} className={open?'transition-transform':'-rotate-90 transition-transform'} aria-hidden/>
+        </button>:
+        <span className="text-[12px] font-semibold">{group.title}</span>}
+    </SidebarGroupLabel>
+    {open&&<SidebarGroupContent>
+      <SidebarMenu className="gap-0.5">
+        {group.items.map(item=><SidebarMenuItem key={item.url}>
+          <SidebarMenuButton asChild isActive={pathName===item.url}
+            className="min-h-9 rounded-lg text-[13px] data-[active=true]:bg-rose-50 data-[active=true]:font-semibold data-[active=true]:text-rose-800">
+            <Link href={item.url as Route} onClick={()=>{if(isMobile)closeMobile();}} className="font-medium">
+              {item.icon==='heart'&&<Heart className="size-4 text-pink-600" aria-hidden/>}
+              {item.icon==='heart-handshake'&&<HeartHandshake className="size-4 text-pink-600" aria-hidden/>}
+              {collapsible&&<ChevronRight size={13} className="shrink-0 text-slate-400" aria-hidden/>}
+              <span>{item.title}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>)}
+      </SidebarMenu>
+    </SidebarGroupContent>}
+  </SidebarGroup>;
+}
 export function AppSidebar({
   data,
 }: {
   data: {
+    collapseGroups?:boolean;
     navMain: {
       title: string;
       url: string;
@@ -38,6 +80,7 @@ export function AppSidebar({
       name: string;
       isProfileIncomplete: boolean;
       profileCompletion: number;
+      requiredCount?:number;answeredCount?:number;
       biodataStage?: string;
       connections?: number;
     };
@@ -82,7 +125,12 @@ export function AppSidebar({
               <Progress
                 value={data.ProfileTop.profileCompletion}
                 className="h-2"
+                aria-label="আবশ্যিক প্রশ্নের ভিত্তিতে বায়োডাটা সম্পন্ন"
               />
+              {typeof data.ProfileTop.requiredCount==='number'&&data.ProfileTop.requiredCount>0&&
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  আবশ্যিক উত্তর: {data.ProfileTop.answeredCount??0} / {data.ProfileTop.requiredCount}
+                </p>}
 
               {data.ProfileTop.isProfileIncomplete && (
                 <div className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950/20 rounded-md border border-amber-200 dark:border-amber-800">
@@ -131,27 +179,9 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="md:pt-4">
-        {/* We create a SidebarGroup for each parent. */}
-        {data.navMain.map((item) => (
-          <SidebarGroup key={item.title}>
-            <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {item.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathName === item.url}>
-                      <Link href={item.url as Route} onClick={() => { if (isMobile) setOpenMobile(false); }} className="font-medium">
-                        {item.icon === "heart" && <Heart className="size-4 text-pink-600" aria-hidden="true" />}
-                        {item.icon === "heart-handshake" && <HeartHandshake className="size-4 text-pink-600" aria-hidden="true" />}
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {data.navMain.map(group=><GroupNavigation key={group.title}
+          group={group} collapsible={!!data.collapseGroups} pathName={pathName}
+          isMobile={isMobile} closeMobile={()=>setOpenMobile(false)}/>)}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

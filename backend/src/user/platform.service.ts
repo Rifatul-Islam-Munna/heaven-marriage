@@ -1,4 +1,7 @@
 import { scoreMatch, compareMatches, countMatchPreferences, MATCH_FIELD_PATHS } from './matching';
+import { reciprocalMatch, compareReciprocal } from './admin-matching';
+import {premiumRecommendationSmsTargets} from './recommendation-sms';
+import {SmsService} from './sms.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,9 +17,12 @@ import { User, UserDocument, UserType } from './entities/user.entity';
 import { BkashService } from './bkash.service';
 import { MessagingService } from './messaging.service';
 import { completion, publicProfile, visibleFilter, PROFILE_FIELDS } from './profile-rules';
+import {describeProfileCompletion} from './profile-completion-snapshot';
 import { biodataStage, hasSubmittedBiodata } from './biodata-lifecycle';
 import { QuestionConfigService } from '../profile-questions/question-config.service';
-import { resolvePremiumSettings } from './premium-settings';
+import { resolvePremiumSettings,premiumTotal } from './premium-settings';
+import {premiumEntitlement,premiumIsActive,PREMIUM_STAGES} from './premium-service';
+import {buildIncomeReport,type SettledOrder} from './admin-income';
 import { dailyRotationExpression, selectDiscovery } from './discovery-selection';
 import { discoveryCycle, recordDiscoveryEvent } from './discovery-cycle';
 
@@ -29,6 +35,7 @@ export class PlatformService implements OnModuleInit {
     private bkash: BkashService,
     private messages: MessagingService,
     private questionConfig: QuestionConfigService,
+    private sms?: SmsService,
   ) {}
   async onModuleInit() {
     await this.db.collection('premium_orders').createIndex(
@@ -56,6 +63,10 @@ export class PlatformService implements OnModuleInit {
       .createIndex({ cycle: 1, score: -1, _id: 1 });
     await this.db.collection('discovery_engagement')
       .createIndex({ profileId: 1, cycle: 1 });
+    await this.db.collection('member_recommendations')
+      .createIndex({ recipientId: 1, createdAt: -1 });
+    await this.db.collection('member_recommendations')
+      .createIndex({ recipientId: 1, candidateId: 1 }, { unique: true });
     await this.db.collection('discovery_engagement')
       .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   }
@@ -280,7 +291,26 @@ export class PlatformService implements OnModuleInit {
       payments,
     };
   }
-  /** A premium checkout never uses connection_orders or grants connection credits. */
+  /** Preserve the old Member Management toggle while creating the same service record as Premium Admin. */
+  async adminTogglePremium(actor:string,id:string,activate:boolean){
+    const user:any=await this.users.findById(id).select('role isSubscriber premiumService').lean();
+    if(!user||user.role!==UserType.USER)throw new NotFoundException('Member unavailable');
+    const update:Record<string,unknown>={isSubscriber:activate};
+    if(activate&&(!user.premiumService||!premiumIsActive(user))){
+      const plan=resolvePremiumSettings((await this.db.collection('platform_settings')
+        .findOne({key:'public'}))?.premium);
+      update.premiumService=premiumEntitlement(plan,new Date(),'admin');
+    }
+    if(!activate&&user.premiumService){
+      update['premiumService.stage']='paused';
+      update['premiumService.updatedAt']=new Date();
+    }
+    await this.users.updateOne({_id:id,role:UserType.USER},{$set:update});
+    await this.audit(actor,activate?'premium.admin.activate':'premium.admin.deactivate',id,
+      'Member Management premium toggle');
+    return {message:activate?'Premium activated':'Premium deactivated'};
+  }
+  /** Premium checkout is separate from connection_orders. It may grant only the configured included connections once. */
   async createPremiumPayment(actor: string) {
     const settings = resolvePremiumSettings(
       (await this.db.collection('platform_settings').findOne({ key: 'public' }))?.premium,
@@ -292,23 +322,28 @@ export class PlatformService implements OnModuleInit {
     const member = await this.users.findById(actor).lean();
     if (!member || member.role !== UserType.USER)
       throw new ForbiddenException('Only members can purchase premium');
-    if (member.isSubscriber) throw new BadRequestException('You are already a premium member');
-    const config = await this.questionConfig.get();
-    if (completion(member, config.questions).percentage < 100)
-      throw new BadRequestException('Complete your biodata before buying premium');
+    if (premiumIsActive(member)) throw new BadRequestException('You already have an active premium membership');
+    // Premium can be purchased before biodata completion; the team may help
+    // the member complete their profile after successful payment.
     const cases = this.db.collection('service_cases');
+    // A completed/expired Premium term needs a NEW case; never reuse its active case.
     const existing = await cases.findOne({
       userId: actor, kind: 'premium',
-      status: { $in: ['pending', 'contacted', 'payment_pending', 'paid', 'active'] },
+      status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] },
     });
-    const caseId = existing?.id ?? (await this.createCase(actor, 'premium', {})).id;
-    const amount = settings.fee;
+    let caseId: string = existing?.id;
+    const amount = premiumTotal(settings);
+    if (!caseId) {
+      caseId = randomUUID();
+      await cases.insertOne({id:caseId,userId:actor,kind:'premium',
+        status:'pending',message:'',fee:amount,createdAt:new Date(),updatedAt:new Date()});
+    }
     if (!Number.isSafeInteger(amount) || amount < 1)
       throw new BadRequestException('Invalid premium fee');
     const id = randomUUID();
     await this.db.collection('premium_orders').insertOne({
       id, userId: actor, caseId, amount, currency: 'BDT',
-      status: 'pending', createdAt: new Date(),
+      premiumSnapshot: settings, status: 'pending', createdAt: new Date(),
     });
     try {
       const payment = await this.bkash.createPayment(amount, id, 'premium');
@@ -350,9 +385,20 @@ export class PlatformService implements OnModuleInit {
         result.merchantInvoiceNumber !== order.id))
       return { success: false };
 
+    const snapshot=resolvePremiumSettings(order.premiumSnapshot);
+    const entitlement=premiumEntitlement(snapshot);
+    const included=snapshot.includedConnections;
     const update = await this.users.collection.updateOne(
       { _id: this.oid(order.userId), creditedPaymentIds: { $ne: paymentId }, role: UserType.USER },
-      { $set: { isSubscriber: true }, $addToSet: { creditedPaymentIds: paymentId } as any },
+      {
+        $set: { isSubscriber: true,premiumService:entitlement },
+        $addToSet: { creditedPaymentIds: paymentId } as any,
+        ...(included>0 ? {
+          $inc: {numberOfConnections:included},
+          $push: {connectionGrants:{id:'premium:'+paymentId,quantity:included,used:0,
+            status:'active',source:'premium',createdAt:new Date(),expiresAt:entitlement.expiresAt}},
+        } : {}),
+      } as any,
     );
     const member = await this.users.collection.findOne(
       { _id: this.oid(order.userId), creditedPaymentIds: paymentId },
@@ -365,7 +411,7 @@ export class PlatformService implements OnModuleInit {
         status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] } },
       { $set: { status: 'active', method: 'bkash',
         transactionReference: String(result.trxID || paymentId),
-        paymentId, fee: order.amount, updatedAt: new Date() } },
+        paymentId, fee: order.amount, updatedAt: new Date(),serviceStage:'onboarding' } },
     );
     if (update.modifiedCount) await this.audit(order.userId, 'premium.bkash.activated', order.id);
     return { success: true };
@@ -559,7 +605,7 @@ export class PlatformService implements OnModuleInit {
       targetId: p.targetId || null,
       message: String(p.message || '').slice(0, 2000),
       status: 'pending',
-      fee: premium?.fee ?? null,
+      fee: premium ? premiumTotal(premium) : null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -706,15 +752,22 @@ export class PlatformService implements OnModuleInit {
     if (c.kind === 'premium' && p.status === 'active') {
       if (!['paid', 'active'].includes(c.status))
         throw new BadRequestException('Confirm payment before activation');
+      const existingMember:any=await this.users.findById(c.userId).select('premiumService').lean();
+      const set:any={isSubscriber:true};
+      if(!existingMember?.premiumService){
+        const settings=resolvePremiumSettings((await this.db.collection('platform_settings')
+          .findOne({key:'public'}))?.premium);
+        set.premiumService=premiumEntitlement(settings,new Date(),'admin');
+      }
       await this.users.updateOne(
-        { _id: c.userId },
-        { $set: { isSubscriber: true } },
+        { _id: c.userId,role:UserType.USER },
+        { $set:set },
       );
     }
     if (c.kind === 'premium' && p.status === 'refunded')
       await this.users.updateOne(
         { _id: c.userId },
-        { $set: { isSubscriber: false } },
+        { $set: { isSubscriber: false,'premiumService.stage':'paused' } },
       );
     if (c.kind === 'report' && p.status === 'approved')
       await this.users.updateOne(
@@ -789,6 +842,148 @@ export class PlatformService implements OnModuleInit {
     }
     return { success: true };
   }
+  /** Admin-only, reciprocal, explainable matching. No private identity fields in results. */
+  async adminMatches(target: string, page = 1, limit = 12) {
+    const search = String(target || '').trim();
+    const digits = search.replace(/[^\d]/g, '');
+    const phoneOptions = new Set([search]);
+    if (/^(?:\+?88)?01[3-9]\d{8}$/.test(search)) {
+      phoneOptions.add(digits.startsWith('88') ? '0' + digits.slice(2) : digits);
+      phoneOptions.add(digits.startsWith('88') ? digits : '88' + digits);
+      phoneOptions.add('+' + (digits.startsWith('88') ? digits : '88' + digits));
+    }
+    const source: any = await this.users.findOne(
+      Types.ObjectId.isValid(search) ? { _id: search } :
+        { $or: [{ userId: search }, { email: search.toLowerCase() },
+          { phoneNumber: { $in: [...phoneOptions] } }] },
+    ).lean();
+    if (!source || source.role !== UserType.USER || source.biodataStatus === 'deleted')
+      throw new NotFoundException('Member not found');
+    if (!['male', 'female'].includes(source.gender))
+      throw new BadRequestException('Member gender is required');
+    const settings = await this.db.collection('platform_settings').findOne({key:'public'});
+    const schema = await this.questionConfig.get();
+    const candidates = this.users.find({
+      ...visibleFilter, role: UserType.USER,
+      biodataStatus: { $ne:'deleted' },
+      gender: source.gender === 'male' ? 'female':'male',
+      _id: { $ne: source._id },
+    }).select('userId gender age maritalStatus createdAt isSubscriber expectedLifePartner address educationInfo personalInformation occupational familyInfo').lean().cursor();
+    // Preference explanations can only use the fields configured for public visibility.
+    const clean = (member: any) => {
+      const item = publicProfile(member);
+      this.questionConfig.applyPublicVisibility(item,schema);
+      return item;
+    };
+    const all: ReturnType<typeof reciprocalMatch>[] = [];
+    for await (const candidate of candidates) {
+      const match = reciprocalMatch(
+        { ...clean(source), expectedLifePartner: source.expectedLifePartner },
+        { ...clean(candidate), expectedLifePartner: candidate.expectedLifePartner },
+        settings || {},
+      );
+      if(match.score !== null) {
+        match.profile = clean(candidate);
+        all.push(match);
+      }
+    }
+    all.sort(compareReciprocal);
+    const currentPage = Math.max(1, Math.min(1000, Math.floor(Number(page)||1)));
+    const pageSize = Math.max(1, Math.min(24, Math.floor(Number(limit)||12)));
+    return { source: { _id:source._id,userId:source.userId,name:source.name },
+      profiles:all.slice((currentPage-1)*pageSize,currentPage*pageSize),
+      total:all.length,page:currentPage,limit:pageSize,
+      message:'Scores compare both members\' stated preferences, not marriage compatibility.' };
+  }
+
+  /** Admin can recommend to the searched member only, or to both members.
+   * Both actions preserve independent per-recipient records and SMS eligibility. */
+  async recommendPair(actor: string, memberId: string, candidateId: string,
+    recipientScope:'both'|'source'='both') {
+    if(recipientScope!=='both' && recipientScope!=='source')
+      throw new BadRequestException('Invalid recommendation recipient scope');
+    if(memberId === candidateId || !Types.ObjectId.isValid(memberId) ||
+      !Types.ObjectId.isValid(candidateId))
+      throw new BadRequestException('Select two different valid members');
+    const members: any[] = await this.users.find({
+      _id:{$in:[this.oid(memberId),this.oid(candidateId)]},
+      role:UserType.USER,biodataStatus:{$ne:'deleted'},
+    }).lean();
+    if(members.length!==2 || members.some(m=>m.verificationStatus==='suspended'))
+      throw new BadRequestException('Both members must have active accounts');
+    const [a,b] = [members.find(m=>String(m._id)===memberId),members.find(m=>String(m._id)===candidateId)];
+    if(!a || !b || a.gender===b.gender || !['male','female'].includes(a.gender) ||
+      !['male','female'].includes(b.gender))
+      throw new BadRequestException('Select members of opposite genders');
+    if(![a,b].every(m=>m.isPublished && m.isPublishFromAdmin &&
+      m.verificationStatus!=='rejected'))
+      throw new BadRequestException('Both biodata must be published before recommendations');
+    const now = new Date();
+    const operations = [
+      {updateOne:{filter:{recipientId:memberId,candidateId},
+        update:{$set:{updatedAt:now,actor},$setOnInsert:{createdAt:now}},upsert:true}},
+      ...(recipientScope==='both' ? [{updateOne:{filter:{recipientId:candidateId,candidateId:memberId},
+        update:{$set:{updatedAt:now,actor},$setOnInsert:{createdAt:now}},upsert:true}}] : []),
+    ];
+    const write = await this.db.collection('member_recommendations').bulkWrite(operations);
+    await this.audit(actor,recipientScope==='both'?'matching.admin.recommend':'matching.admin.recommend.source_only',
+      memberId,candidateId);
+    // Only a newly inserted recommendation to an active subscriber triggers SMS.
+    // For source-only, the candidate is neither written nor notified.
+    const upserts = write.upsertedIds || {};
+    const targets = premiumRecommendationSmsTargets([
+      {...a,isNew:Object.prototype.hasOwnProperty.call(upserts,'0')},
+      ...(recipientScope==='both' ? [{...b,isNew:Object.prototype.hasOwnProperty.call(upserts,'1')}] : []),
+    ]);
+    const publicUrl = (process.env.FRONTEND_URL || 'https://niqaha.com').replace(/\/$/,'');
+    const notified = await Promise.allSettled((this.sms ? targets : []).map(async recipient => {
+      const other = recipient.id === memberId ? b : a;
+      await this.sms!.sendSms({
+        number:recipient.number,
+        message:`Niqaha: Apnar jonno notun biodata suparish ache. Dekhun: ${publicUrl}/profile/recommendations (Biodata: ${other.userId || 'new'})`,
+      });
+    }));
+    if (notified.some(result=>result.status==='rejected'))
+      this.logger.warn('One or more premium recommendation SMS notifications failed');
+    return {message:recipientScope==='both'
+        ? 'Recommendations saved for both members'
+        : 'Recommendation saved for the searched member only',
+      recipientScope,
+      smsSent:notified.filter(result=>result.status==='fulfilled').length,
+      smsFailed:targets.length-notified.filter(result=>result.status==='fulfilled').length};
+  }
+
+  /** Hide a recommendation only for the authenticated recipient. Keep the
+   * original record for audits/sent-counts and the other member's list. */
+  async dismissRecommendation(actor:string,candidateId:string) {
+    this.oid(candidateId);
+    const result=await this.db.collection('member_recommendations').updateOne(
+      {recipientId:actor,candidateId,dismissedAt:{$exists:false}},
+      {$set:{dismissedAt:new Date()}},
+    );
+    if(!result.matchedCount)throw new NotFoundException('Recommendation not found');
+    return {message:'Recommendation removed from your list'};
+  }
+
+  async myRecommendations(actor:string) {
+    const docs = await this.db.collection('member_recommendations')
+      .find({recipientId:actor,dismissedAt:{$exists:false}}).sort({updatedAt:-1}).limit(50).toArray();
+    const ids = docs.map(d=>this.oid(d.candidateId));
+    const profiles:any[] = await this.users.find({
+      _id:{$in:ids},...visibleFilter,role:UserType.USER,
+      biodataStatus:{$ne:'deleted'},
+    }).lean();
+    const schema=await this.questionConfig.get();
+    const byId = new Map(profiles.map(p=>[String(p._id),p]));
+    return {recommendations:docs.flatMap(doc=>{
+      const profile=byId.get(doc.candidateId);
+      if(!profile)return [];
+      const safe=publicProfile(profile);
+      this.questionConfig.applyPublicVisibility(safe,schema);
+      return [{profile:safe,createdAt:doc.createdAt,updatedAt:doc.updatedAt}];
+    })};
+  }
+
   async matches(actor: string, page = 1, limit = 12) {
     const currentPage = Number.isFinite(page) ? Math.max(1, Math.min(100, Math.floor(page))) : 1;
     const pageSize = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.floor(limit))) : 12;
@@ -907,18 +1102,32 @@ export class PlatformService implements OnModuleInit {
       recent: selection.recent.map(safe),
     };
   }
+  /** Finance overview: only confirmed settled orders are revenue; pending and credits are not. */
+  async adminIncome() {
+    const projection={_id:0,id:1,status:1,amount:1,currency:1,paidAt:1,refundedAt:1,paymentId:1,transactionId:1,refundReference:1};
+    const [connections,premium]=await Promise.all([
+      this.db.collection('connection_orders').find({status:{$in:['paid','refunded']}},{projection}).toArray(),
+      this.db.collection('premium_orders').find({status:{$in:['paid','refunded']}},{projection}).toArray(),
+    ]);
+    return buildIncomeReport(connections as unknown as SettledOrder[],premium as unknown as SettledOrder[]);
+  }
   async summary(actor: string) {
     const u: any = await this.users.findById(actor).lean();
     if (!u) throw new NotFoundException('Account unavailable');
     const config=await this.questionConfig.get();
-    const profileCompletion=completion(u,config.questions);
+    const profileCompletion=describeProfileCompletion(u,config).completion;
     const stage=biodataStage(u,profileCompletion.percentage);
     return {
       completion: profileCompletion,
       biodataStage: stage,
       alreadySubmitted: hasSubmittedBiodata(u),
       submittedAt: u.submittedAt || null,
-      accountType: u.isSubscriber ? 'premium' : 'general',
+      accountType: premiumIsActive(u) ? 'premium' : 'general',
+      premiumService: u.premiumService ? {
+        stage:u.premiumService.stage,expiresAt:u.premiumService.expiresAt,
+        startedAt:u.premiumService.startedAt,assistedAllowance:u.premiumService.assistedAllowance,
+        assistedUsed:u.premiumService.assistedUsed,
+      } : null,
       verificationStatus:
         u.verificationStatus || (u.isPublishFromAdmin ? 'approved' : 'pending'),
       biodataStatus: u.biodataStatus || 'draft',

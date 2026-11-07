@@ -5,7 +5,7 @@
  */
 export const BIODATA_DRAFT_FIELDS = [
   "name", "gender", "maritalStatus", "age", "bloodGroup", "weight",
-  "nationality", "whatsapp", "guardianPhone", "fatherName", "motherName",
+  "nationality", "residenceCountry", "whatsapp", "guardianPhone", "fatherName", "motherName",
   "address", "educationInfo", "familyInfo", "personalInformation",
   "occupational", "marriageInformationWomen", "marriageInformationMan",
   "expectedLifePartner", "pledge", "customFields", "dynamicAnswers",

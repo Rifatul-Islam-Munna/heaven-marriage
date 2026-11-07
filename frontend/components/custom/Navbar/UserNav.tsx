@@ -43,7 +43,7 @@ import { User as UserType, UserInfo } from "@/@types/user";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { currentBiodataStage, biodataStageLabels, deletionStatusLabels, type DeletionRequest } from "@/lib/biodata-status";
+import { currentBiodataStage, biodataStageLabels, deletionStatusLabels, profileCompletion as completionPercentage, type DeletionRequest } from "@/lib/biodata-status";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 
@@ -67,7 +67,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
 
   // Backend dynamic-question completion is the only source of truth.
   // Never inflate 55% to 100%, and never nudge submitted members to start again.
-  const profileCompletion = Math.max(0, Math.min(100, Number(users?.completion?.percentage) || 0));
+  const profileCompletion=completionPercentage(users);
   const biodataStage = currentBiodataStage(users);
   const isProfileIncomplete = profileCompletion < 100 && biodataStage === "draft";
 

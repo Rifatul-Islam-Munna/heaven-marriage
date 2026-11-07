@@ -9,7 +9,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProfileStore } from "@/zustan/useProfileStore";
-import { countries, marriedStatus } from "@/staticData/all-data";
+import { marriedStatus } from "@/staticData/all-data";
+import { countries } from "@/staticData/countries";
 import {
   Popover,
   PopoverContent,

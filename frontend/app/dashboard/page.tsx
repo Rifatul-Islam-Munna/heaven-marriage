@@ -10,7 +10,7 @@ export default async function DashboardHomePage() {
   ];
   return (
     <Suspense>
-      <AdminUsersTable quickLinks={quickLinks} />
+      <AdminUsersTable quickLinks={quickLinks} isAdmin={session.isAdmin} />
     </Suspense>
   );
 }

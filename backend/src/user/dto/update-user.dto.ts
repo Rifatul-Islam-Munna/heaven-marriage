@@ -274,6 +274,10 @@ export class UserFilterDto {
   @IsOptional()
   @IsString()
   upazilaId?: string;
+  @IsOptional() @IsString() @MaxLength(120)
+  cityCorporation?: string;
+  @IsOptional() @IsString() @MaxLength(120)
+  area?: string;
   @ApiPropertyOptional({
     description: 'Upazila ID',
     example: '507f1f77bcf86cd799439012',
@@ -341,6 +345,7 @@ export class AdminUserDto extends UserFilterDto {
  @IsOptional() @IsString() accountType?:string;
  @IsOptional() @IsString() verificationStatus?:string;
  @IsOptional() @IsString() biodataStatus?:string;
+ @IsOptional() @IsIn(['signed_up','in_progress','submitted','published']) memberJourney?:string;
 }
 
 export class OtpstringDto{

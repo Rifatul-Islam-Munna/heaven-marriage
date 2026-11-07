@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Eye, GripVertical, Loader2, Plus, RefreshCw, Save, Search, TriangleAlert, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { defaultQuestions, type ProfileQuestion, type ProfileQuestionSchema } from '@/lib/profile-questions';
+import { defaultQuestions, isProtectedLocationQuestion, type ProfileQuestion, type ProfileQuestionSchema } from '@/lib/profile-questions';
 import { profileQuestionOptions } from '@/lib/profile-question-options';
 import { cn } from '@/lib/utils';
+
 import {
   DashboardHeader, DashboardPage, DashButton, KpiCard, KpiRow, Panel, PlainHeader, SortHeader, StatusPill,
   Toggle, type SortState,
@@ -224,6 +225,10 @@ export default function QuestionBuilder() {
     toast.success('Copy added below the original');
   };
   const removeNew = (id: string) => {
+    if(isProtectedLocationQuestion(schema.questions.find(q=>q.id===id))){
+      toast.error('Essential Country, City and Area fields cannot be deleted.');
+      return;
+    }
     const index = schema.questions.findIndex(q => q.id === id);
     const remaining = schema.questions.filter(q => q.id !== id);
     setSchema(s => ({ ...s, questions: s.questions.filter(q => q.id !== id) }));
@@ -277,8 +282,8 @@ export default function QuestionBuilder() {
 
   return <DashboardPage className="pb-4">
     <DashboardHeader
-      title="Profile questions"
-      description="Decide what members are asked, who is asked, and what visitors see on public biodata. Answers members already gave are never deleted."
+      title="ডায়নামিক প্রশ্ন বিল্ডার"
+      description="সদস্যদের বায়োডাটার প্রশ্ন, উত্তর দেওয়ার নিয়ম ও পাবলিক তথ্য সহজে নিয়ন্ত্রণ করুন।"
       meta={<>
         {ready && <StatusPill tone="neutral">Revision {schema.revision}</StatusPill>}
         {dirty ? <StatusPill tone="warning">{changedIds.size} unsaved</StatusPill>
@@ -290,6 +295,9 @@ export default function QuestionBuilder() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : undefined} /> Reload
         </DashButton>
         <DashButton tone="primary" disabled={!ready} onClick={add}><Plus size={14} /> Add question</DashButton>
+        <DashButton tone="primary" disabled={!dirty || saving || blockingQuestions.length > 0} onClick={() => void save()}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14}/>} সংরক্ষণ ও প্রকাশ করুন
+        </DashButton>
       </>}>
       <label className="relative w-full sm:w-auto sm:min-w-[220px] sm:flex-1 lg:max-w-xs">
         <span className="sr-only">Search questions</span>
@@ -324,6 +332,22 @@ export default function QuestionBuilder() {
       {filtersActive && <button type="button" onClick={clearFilters} className="text-[12px] font-medium text-white/80 underline hover:text-white">Clear filters</button>}
     </DashboardHeader>
 
+    <section aria-label="প্রশ্ন সম্পাদনার তিনটি ধাপ"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-100 bg-white p-3.5 shadow-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-slate-700">
+        <span className="inline-flex items-center gap-2"><b className="flex size-6 items-center justify-center rounded-full bg-rose-100 text-rose-800">১</b> নিচে Section বেছে নিন</span>
+        <span className="inline-flex items-center gap-2"><b className="flex size-6 items-center justify-center rounded-full bg-rose-100 text-rose-800">২</b> প্রশ্নের লেখা ও সেটিংস বদলান</span>
+        <span className="inline-flex items-center gap-2"><b className="flex size-6 items-center justify-center rounded-full bg-rose-100 text-rose-800">৩</b> সংরক্ষণ ও প্রকাশ করুন</span>
+      </div>
+      <a href="/dashboard/locations"
+        className="inline-flex min-h-9 items-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-[12px] font-semibold text-rose-800 hover:bg-rose-100">
+        Country / City / Area তালিকা পরিচালনা
+      </a>
+      <p className="basis-full text-[11px] leading-5 text-slate-500">
+        শুধু এডিট করলেই পরিবর্তন লাইভ হয় না। উপর বা নিচের “সংরক্ষণ ও প্রকাশ করুন” চাপলে নতুন Revision প্রকাশিত হবে।
+        Location তালিকায় নতুন আইটেম যোগ করা আলাদা সংরক্ষণ ব্যবস্থা।
+      </p>
+    </section>
     <KpiRow>
       <KpiCard label="Questions" value={kpi(total)} hint={ready ? `${total - activeCount} hidden from the form` : 'Loading…'} />
       <KpiCard label="In the form" value={kpi(activeCount)} tone="positive" hint="Members are asked these" />
@@ -349,7 +373,7 @@ export default function QuestionBuilder() {
             const active = sectionFilter === String(section.id);
             const percent = questions.length ? Math.round((on / questions.length) * 100) : 0;
             return <button key={section.id} type="button" aria-pressed={active}
-              onClick={() => { setSectionFilter(active ? 'all' : String(section.id)); setMobileView('list'); }}
+              onClick={() => { setSectionFilter(active ? 'all' : String(section.id)); setMobileView('list'); scrollToWorkspace(); }}
               className={cn('min-w-[168px] shrink-0 snap-start rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-rose-600 sm:min-w-0',
                 active ? 'border-rose-300 bg-rose-50' : 'border-[#e9ecef] hover:bg-[#f8f9fa]')}>
               <span className="flex items-baseline justify-between gap-2">
@@ -399,7 +423,7 @@ export default function QuestionBuilder() {
                     onDrop={event => { event.preventDefault(); if (dragId) dropOn(dragId, q.id); setDragId(null); setDropId(null); }}
                     onDragEnd={() => { setDragId(null); setDropId(null); }}
                     className={cn('rounded-md', dropId === q.id && 'ring-2 ring-rose-400', dragId === q.id && 'opacity-40')}>
-                    <button type="button" onClick={() => openQuestion(q.id)} aria-current={current ? 'true' : undefined}
+                    <button type="button" data-question-id={q.id} onClick={() => openQuestion(q.id)} aria-current={current ? 'true' : undefined}
                       className={cn('flex w-full items-start gap-2 rounded-md px-2 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-rose-600 xl:py-2',
                         current ? 'bg-rose-50 ring-1 ring-inset ring-rose-200' : 'hover:bg-[#f8f9fa]')}>
                       <GripVertical size={14} aria-hidden className="mt-0.5 hidden shrink-0 cursor-grab text-[#ced4da] xl:block" />
@@ -446,15 +470,25 @@ export default function QuestionBuilder() {
             onSectionChange={next => changeSection(selected.id, next)}
             onMove={direction => moveTo(selected.id, selIndex + direction)}
             onDuplicate={() => duplicate(selected)}
-            onToggleArchive={() => update(selected.id, { enabled: !selected.enabled })}
+            onToggleArchive={() => {
+              if(isProtectedLocationQuestion(selected))return;
+              update(selected.id, { enabled: !selected.enabled });
+            }}
             onDelete={() => removeNew(selected.id)}
             onRevert={() => revert(selected.id)}
             onBack={() => { setMobileView('list'); scrollToWorkspace(); }}
+            onSave={() => void save()}
+            canSave={dirty && !saving && blockingQuestions.length === 0}
           /> : <Panel><p className="py-16 text-center text-[13px] text-[#6c757d]">Choose a question, or add a new one.</p></Panel>}
         </div>
       </div>
 
-      <Panel title="All questions" bodyClassName="p-0" className="hidden md:block"
+      <details className="hidden rounded-xl border border-slate-200 bg-white md:block">
+        <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-2 rounded-xl px-4 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
+          <span>বিস্তারিত প্রশ্ন তালিকা ও একসঙ্গে সেটিংস পরিবর্তন</span>
+          <span className="text-[11px] font-medium text-slate-500">{tableRows.length}টি প্রশ্ন · খুলতে ক্লিক করুন</span>
+        </summary>
+      <Panel title="All questions" bodyClassName="p-0"
         description={`${tableRows.length} of ${total} · switch settings here, or click a question to edit it`}>
         <div className="max-h-[620px] overflow-auto">
           <table className="w-full min-w-[880px] border-collapse text-[13px]">
@@ -482,6 +516,7 @@ export default function QuestionBuilder() {
                         {changedIds.has(q.id) && <StatusPill tone="warning">Unsaved</StatusPill>}
                         {issues.length > 0 && <StatusPill tone={issues.some(issue => issue.blocking) ? 'negative' : 'warning'}>{issues[0].message}</StatusPill>}
                         {q.locked && <StatusPill tone="info">Login field</StatusPill>}
+                        {isProtectedLocationQuestion(q) && <StatusPill tone="info">Protected location</StatusPill>}
                       </span>
                     </button>
                   </td>
@@ -490,7 +525,7 @@ export default function QuestionBuilder() {
                   <td className="whitespace-nowrap px-3 py-2 text-[#495057]">{TYPE_LABEL[q.type]}</td>
                   <td className="px-3 py-2 text-center">
                     <label className="inline-flex"><span className="sr-only">Show in form</span>
-                      <Toggle checked={q.enabled} disabled={q.locked} onChange={value => update(q.id, { enabled: value })} /></label>
+                      <Toggle checked={q.enabled} disabled={q.locked||isProtectedLocationQuestion(q)} onChange={value => update(q.id, { enabled: value })} /></label>
                   </td>
                   <td className="px-3 py-2 text-center">
                     <label className="inline-flex"><span className="sr-only">Required</span>
@@ -507,13 +542,14 @@ export default function QuestionBuilder() {
           </table>
         </div>
       </Panel>
+      </details>
     </>}
 
     {/* Always within reach: the save bar follows you while you scroll. */}
-    {ready && (dirty || saving || justSaved) && <div role="region" aria-label="Save changes"
+    {ready && <div role="region" aria-label="Save changes"
       className="sticky bottom-3 z-30 flex flex-col gap-2 rounded-lg bg-[#1a1a2e] px-4 py-3 text-white shadow-[0_8px_24px_rgba(0,0,0,0.25)] sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0 text-[13px]" aria-live="polite">
-        {justSaved && !dirty ? <span className="inline-flex items-center gap-1.5 text-emerald-300"><Check size={15} /> All changes saved</span> : <>
+        {!dirty ? <span className="inline-flex items-center gap-1.5 text-emerald-300"><Check size={15} /> সব প্রশ্ন সংরক্ষিত · Revision {schema.revision}</span> : <>
           <span className="font-medium">{changedIds.size} unsaved change{changedIds.size === 1 ? '' : 's'}</span>
           {blockingQuestions.length > 0 ? <button type="button" onClick={showProblems}
             className="ml-2 inline-flex items-center gap-1 text-red-300 underline hover:text-red-200">
@@ -523,8 +559,8 @@ export default function QuestionBuilder() {
       </div>
       {dirty && <div className="flex gap-2">
         <DashButton tone="ghost-dark" className="flex-1 sm:flex-none" disabled={saving} onClick={discard}><Undo2 size={14} /> Discard</DashButton>
-        <DashButton tone="primary" className="flex-1 sm:flex-none" disabled={saving} onClick={() => void save()}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {saving ? 'Saving…' : 'Save changes'}
+        <DashButton tone="primary" className="flex-1 sm:flex-none" disabled={saving || blockingQuestions.length>0} onClick={() => void save()}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {saving ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ ও প্রকাশ করুন'}
         </DashButton>
       </div>}
     </div>}

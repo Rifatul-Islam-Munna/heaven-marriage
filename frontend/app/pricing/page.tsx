@@ -8,6 +8,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import PremiumOfferCard from "@/components/custom/profile/PremiumOfferCard";
 
 interface Pricing {
   _id: string;
@@ -95,6 +96,7 @@ const PricingPage = () => {
             </Button>
           </Link>
 
+          <PremiumOfferCard source="pricing" />
           <div className="text-center py-20">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
               কোনো প্যাকেজ পাওয়া যায়নি
@@ -133,6 +135,7 @@ const PricingPage = () => {
           </p>
         </div>
 
+        <div className="mb-10"><PremiumOfferCard source="pricing" /></div>
         {/* Pricing Cards */}
         <div
           className={`grid grid-cols-1 ${getGridClass()} gap-6 md:gap-6 lg:gap-8`}

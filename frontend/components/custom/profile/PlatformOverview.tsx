@@ -3,9 +3,9 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+
 import Link from "next/link";
-import { formatPremiumFee, resolvePremiumSettings, type PremiumSettings } from "@/lib/premium-settings";
+import { formatPremiumFee,premiumTotal, resolvePremiumSettings, type PremiumSettings } from "@/lib/premium-settings";
 import VerifyContact from "./VerifyContact";
 import { useState } from "react";
 type Summary = {
@@ -18,6 +18,7 @@ type Summary = {
   };
   completion: { percentage: number; remaining: string[]; nextStep: number };
   accountType: string;
+  premiumService?:{stage?:string;startedAt?:string;expiresAt?:string;assistedAllowance?:number;assistedUsed?:number}|null;
   verificationStatus: string;
   biodataStatus: string;
   statusReason: string;
@@ -142,29 +143,45 @@ export default function PlatformOverview() {
           ))}
         </CardContent>
       </Card>
-      {showPremium && (premium.enabled || premiumCases.length > 0) && <Card data-premium-card className="shadow-none border-pink-100">
+      {showPremium && (premium.enabled || premiumCases.length > 0 || data.accountType==='premium') && <Card data-premium-card data-premium-offer={data.accountType!=='premium'?'true':undefined}
+        className="shadow-none border-blue-200 bg-gradient-to-br from-white via-white to-blue-50/60">
         <CardHeader>
-          <CardTitle>{premium.title}</CardTitle>
+          <CardTitle>{data.accountType==='premium'?'আপনার Premium সার্ভিসের অগ্রগতি':premium.title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {premium.enabled && <>
-          <p>রেজিস্ট্রেশন ফি {formatPremiumFee(premium.fee)}। {premium.summary}</p>
+          {premium.enabled && data.accountType!=='premium' && <>
+          <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[13px] font-medium text-blue-900">
+            Premium সম্পূর্ণ ঐচ্ছিক। ফ্রি বায়োডাটা তৈরি করতে কোনো টাকা লাগে না।
+          </p>
+          <p className="text-[14px] leading-6 text-slate-800">{premium.summary}</p>
+          <p className="text-sm font-semibold text-blue-900">
+            মোট প্যাকেজ মূল্য: {formatPremiumFee(premiumTotal(premium))}
+            <span className="ml-1 text-xs font-normal text-slate-600">(সার্ভিস {formatPremiumFee(premium.fee)} + চার্জ {formatPremiumFee(premium.serviceCharge)})</span>
+          </p>
+          <p className="text-sm text-slate-600">{premium.durationDays} days · {premium.assistedConnections} assisted connections · {premium.includedConnections} wallet connections included.</p>
           <Link className="text-pink-600 underline" href="/premium">
             {premium.detailsLabel}
           </Link>
-          {data.accountType !== "premium" && (
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={checkout.isPending || data.completion.percentage < 100}
+          <div className="flex flex-wrap gap-2">
+              <Button disabled={checkout.isPending}
                 onClick={() => checkout.mutate({})}>
-                {checkout.isPending ? 'পেমেন্ট চালু হচ্ছে…' : `bKash-এ ${formatPremiumFee(premium.fee)} পেমেন্ট করুন`}
+                {checkout.isPending ? 'পেমেন্ট চালু হচ্ছে…' : `bKash-এ ${formatPremiumFee(premiumTotal(premium))} পেমেন্ট করুন`}
               </Button>
               <Button variant="outline" disabled={apply.isPending || data.completion.percentage < 100}
                 onClick={() => apply.mutate({})}>
                 {premium.requestLabel}
               </Button>
             </div>
-          )}
+          {data.completion.percentage < 100 && <p className="text-xs font-medium text-amber-800">
+            আপনি এখনই bKash দিয়ে Premium কিনতে পারবেন। বায়োডাটার বাকি তথ্য পরে সম্পূর্ণ করতে পারবেন।
+          </p>}
           </>}
+          {data.accountType==='premium' && data.premiumService && <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <p className="font-bold">Blue Premium Verified · {data.premiumService.stage || 'active'}</p>
+            <p className="mt-1">Team assisted connections: {data.premiumService.assistedUsed||0} of {data.premiumService.assistedAllowance||0}</p>
+            {data.premiumService.expiresAt && <p className="mt-1">Service expires: {new Date(data.premiumService.expiresAt).toLocaleDateString('en-BD')}</p>}
+            <p className="mt-1 text-xs">A Premium badge shows active team service, not government identity verification.</p>
+          </div>}
           {premiumCases.map((c) => (
             <div key={c.id} className="rounded border p-3 text-sm">
               <p>
@@ -173,7 +190,7 @@ export default function PlatformOverview() {
               {c.status === "payment_pending" && (
                 <div className="space-y-2 mt-2">
                   <p>
-                    {formatPremiumFee(c.fee ?? premium.fee)} পেমেন্টের আগে বিস্তারিত জানুন।
+                    {formatPremiumFee(c.fee ?? premiumTotal(premium))} পেমেন্টের আগে বিস্তারিত জানুন।
                     {premium.contactPhone && <> কল: <a href={'tel:' + premium.contactPhone} className="underline">{premium.contactPhone}</a></>}
                   </p>
                   <select

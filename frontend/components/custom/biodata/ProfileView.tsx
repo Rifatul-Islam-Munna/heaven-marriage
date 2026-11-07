@@ -15,9 +15,10 @@ import { GetRequestNormal, PostRequestAxios } from "@/api-hooks/api-hooks";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import {
-  countries, economicStatusOptions, educationMediumOptions, fiqhOptions, marriedStatus, polygamyConsentOptions,
+  economicStatusOptions, educationMediumOptions, fiqhOptions, marriedStatus, polygamyConsentOptions,
   professionOptions, religiousEducationOptions, skinColorOptions,
 } from "@/staticData/all-data";
+import { countries } from "@/staticData/countries";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { useUser } from "@/lib/useUser";
@@ -203,7 +204,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const unlocked = !!userData.identityUnlocked;
   const a = userData.address, e = userData.educationInfo, f = userData.familyInfo, p = userData.personalInformation;
   const o = userData.occupational, w = userData.marriageInformationWomen, m = userData.marriageInformationMan, x = userData.expectedLifePartner;
-  const area = [bnUpazila(a?.upazila), bnDistrict(a?.district)].filter(Boolean).join(", ");
+  const area = [a?.area, a?.cityCorporation || bnUpazila(a?.upazila), bnDistrict(a?.district)].filter(Boolean).join(", ");
   const maritalLabel = configFor("maritalStatus")?.options.find(opt => opt.value === String(userData.maritalStatus))?.label
     || marriedStatus.find(item => item.en === userData.maritalStatus)?.bn || userData.maritalStatus;
 
@@ -233,13 +234,16 @@ export default function ProfileView({ id }: ProfileViewProps) {
       { path: "personalInformation.skinTone", label: "গাত্রবর্ণ", value: pick(skinColorOptions, p?.skinTone) },
       { path: "weight", label: "ওজন", value: userData.weight ? `${toBn(userData.weight)} কেজি` : undefined },
       { path: "bloodGroup", label: "রক্তের গ্রুপ", value: userData.bloodGroup },
-      { path: "nationality", label: "জাতীয়তা", value: countries.find(item => item.en.trim() === userData.nationality)?.bn || userData.nationality },
+      { path: "nationality", label: "জাতীয়তা", value: countries.find(item => item.en.trim() === userData.nationality)?.en || userData.nationality },
+      { path: "residenceCountry", label: "বর্তমান বসবাসের দেশ", value: userData.residenceCountry },
     ]), ...extras(0)] },
     { id: "address", title: "ঠিকানা", icon: MapPin, facts: [...shown([
-      { path: "address.permanentAddress", label: "স্থায়ী ঠিকানা", value: a?.permanentAddress || (area ? `${area}, বাংলাদেশ` : undefined) },
-      { path: "address.presentAddress", label: "বর্তমান ঠিকানা", value: a?.presentAddress || (area ? `${area}, বাংলাদেশ` : undefined) },
+      { path: "address.permanentAddress", label: "স্থায়ী ঠিকানা", value: a?.permanentAddress || (area ? `${area}, ${userData.residenceCountry || "Bangladesh"}` : undefined) },
+      { path: "address.presentAddress", label: "বর্তমান ঠিকানা", value: a?.presentAddress || (area ? `${area}, ${userData.residenceCountry || "Bangladesh"}` : undefined) },
       { path: "address.district", label: "জেলা", value: bnDistrict(a?.district) },
       { path: "address.upazila", label: "উপজেলা", value: bnUpazila(a?.upazila) },
+      { path: "address.cityCorporation", label: "সিটি কর্পোরেশন", value: a?.cityCorporation },
+      { path: "address.area", label: "এলাকা", value: a?.area },
       { path: "address.extraInfo", label: "কোথায় বড় হয়েছেন?", value: a?.extraInfo },
     ]), ...extras(1)] },
     { id: "education", title: "শিক্ষাগত যোগ্যতা", icon: GraduationCap, facts: [...shown([
@@ -478,8 +482,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {gender && <span className="rounded-full border border-pink-100 bg-white px-3 py-1 text-xs font-semibold text-gray-600">{gender === "male" ? "পাত্র" : "পাত্রী"}</span>}
-                {userData.isVerified && <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-gray-600"><BadgeCheck className="size-3.5" aria-hidden /> যাচাইকৃত</span>}
-                {showPremiumBadge && userData.isSubscriber && <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-gray-600"><Crown className="size-3.5" aria-hidden /> প্রিমিয়াম</span>}
+                {showPremiumBadge && userData.isSubscriber ? <span title="Active Premium assistance plan, not independent identity verification" className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800"><BadgeCheck className="size-4" aria-hidden /> Blue Premium Verified</span> :
+                  userData.isVerified && <span title="Biodata reviewed and published by Niqaha" className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-3 py-1 text-xs font-bold text-pink-800"><BadgeCheck className="size-4" aria-hidden /> Pink Biodata Verified</span>}
               </div>
 
               {keyFacts.length > 0 && <>

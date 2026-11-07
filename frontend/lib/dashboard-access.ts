@@ -1,6 +1,7 @@
 export const STAFF_SECTIONS=[
   {key:'users',label:'ব্যবহারকারী',url:'/dashboard'},
   {key:'faq',label:'প্রশ্নোত্তর',url:'/dashboard/faq'},
+  {key:'ai-training',label:'AI Training Center',url:'/dashboard/ai-training'},
   {key:'guidelines',label:'নির্দেশিকা',url:'/dashboard/guideline'},
   {key:'contact',label:'যোগাযোগ',url:'/dashboard/contact'},
   {key:'visual-editor',label:'ভিজ্যুয়াল পেজ এডিটর',url:'/dashboard/visual-editor'},

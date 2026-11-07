@@ -53,6 +53,7 @@ function InfoItem({ icon, label, value, action }: { icon: React.ReactNode; label
 }
 
 const quickLinks = [
+  { href: "/profile/recommendations", label: "Agency Recommendations", hint: "আপনার জন্য এজেন্সির বাছাই করা প্রস্তাব", icon: HeartHandshake },
   { href: "/profile/matches", label: "Find My Matches", hint: "আপনার প্রত্যাশা অনুযায়ী বায়োডাটা ও মিলের কারণ দেখুন", icon: Sparkles },
   { href: "/profile/ai-profile", label: "AI দিয়ে বায়োডাটা", hint: "প্রশ্নের উত্তর দিয়ে দ্রুত পূরণ করুন", icon: Sparkles },
   { href: "/profile/short-list", label: "My Favourites", hint: "আমি যাদের Favourite করেছি", icon: Heart },
@@ -85,8 +86,8 @@ const User = () => {
     void navigator.clipboard.writeText(String(user.userId)).then(() => toast.success("বায়োডাটা নম্বর কপি হয়েছে"), () => toast.error("কপি করা যায়নি"));
   };
 
-  return <div className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-    <div className="mx-auto max-w-6xl space-y-6">
+  return <div className="min-h-screen min-w-0 bg-gray-50 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <div className="mx-auto min-w-0 max-w-6xl space-y-4 sm:space-y-6">
       <section className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
         <div className="h-16 bg-pink-50 sm:h-20" aria-hidden />
         <div className="-mt-10 flex flex-col gap-4 px-5 pb-5 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between sm:px-6">
@@ -130,10 +131,10 @@ const User = () => {
 
       <PlatformOverview />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-gray-900">অ্যাকাউন্টের তথ্য</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <InfoItem icon={<UserIcon className="h-5 w-5" />} label="নাম" value={user.name || <span className="text-gray-400">দেওয়া হয়নি</span>} />
             <InfoItem icon={<IdCard className="h-5 w-5" />} label="বায়োডাটা নম্বর" value={user.userId ? <span className="font-mono">#{user.userId}</span> : <span className="text-gray-400">নেই</span>}
               action={user.userId ? <button type="button" onClick={copyId} aria-label="বায়োডাটা নম্বর কপি করুন" className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><Copy className="h-4 w-4" /></button> : undefined} />
@@ -149,14 +150,14 @@ const User = () => {
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">দ্রুত যান</h2>
           <ul className="space-y-1">
-            {quickLinks.filter(item => user.role === UserType.USER || !["/profile/matches", "/profile/short-list", "/profile/favourited-me"].includes(item.href)).map(item => {
+            {quickLinks.filter(item => user.role === UserType.USER || !["/profile/matches", "/profile/recommendations", "/profile/short-list", "/profile/favourited-me"].includes(item.href)).map(item => {
               const Icon = item.icon;
               return <li key={item.href}>
                 <Link href={item.href as Route} className="group flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-pink-50">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 group-hover:bg-white group-hover:text-pink-600"><Icon className="h-4.5 w-4.5" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-gray-900">{item.label}</span>
-                    <span className="block truncate text-xs text-gray-500">{item.hint}</span>
+                    <span className="block text-xs leading-5 text-gray-500">{item.hint}</span>
                   </span>
                   <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-pink-600" />
                 </Link>

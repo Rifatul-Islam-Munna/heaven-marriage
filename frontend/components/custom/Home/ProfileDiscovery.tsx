@@ -59,6 +59,7 @@ function DiscoveryRow({ title, description, profiles, ranking }: {
               profession={profile.occupational?.profession || ""}
               skinTone={profile.personalInformation?.skinTone || ""}
               isVerified={profile.isVerified}
+              isSubscriber={profile.isSubscriber}
               className="h-auto border-pink-100 shadow-sm"
             />
             {ranking && profile.engagement && (

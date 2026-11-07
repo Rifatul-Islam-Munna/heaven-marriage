@@ -22,6 +22,8 @@ import virtuals from "mongoose-lean-virtuals"
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CustomQuestionModule } from './custom-question/custom-question.module';
 import { Request } from 'express';
+import {SupportModule} from './support/support.module';
+import {MemberAdminColumnsModule} from './member-admin-columns/member-admin-columns.module';
 @Module({
   imports: [
       ThrottlerModule.forRoot([{
@@ -70,6 +72,8 @@ import { Request } from 'express';
     StaffAccessModule,
     PricingModule,
     CustomQuestionModule,
+    SupportModule,
+    MemberAdminColumnsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -41,6 +41,16 @@ class AddressDto {
   @IsOptional()
   upazila?: string;
 
+  @ApiPropertyOptional({ example: 'Dhaka North City Corporation' })
+  @IsString()
+  @IsOptional()
+  cityCorporation?: string;
+
+  @ApiPropertyOptional({ example: 'Gulshan' })
+  @IsString()
+  @IsOptional()
+  area?: string;
+
   @ApiPropertyOptional({ example: 'Near city hospital' })
   @IsString()
   @IsOptional()
@@ -540,6 +550,11 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   nationality?: string;
+
+  @ApiPropertyOptional({ example: 'Bangladesh' })
+  @IsString()
+  @IsOptional()
+  residenceCountry?: string;
 
   @ApiPropertyOptional({ example: false, default: false })
   @IsBoolean()

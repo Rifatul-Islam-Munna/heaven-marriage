@@ -46,7 +46,9 @@ export async function GET(req:NextRequest){
  try{
   const questions=await cachedQuestions(process.env.BASE_URL||'');
   return Response.json(questions,{headers:noStore});
- }catch{return Response.json(defaultQuestions,{headers:noStore});}
+ }catch{return Response.json(defaultQuestions,{
+    headers:{...noStore,'X-Profile-Schema-Fallback':'true'},
+  });}
 }
 export async function PUT(req:NextRequest){
  if(!originAllowed(req))return Response.json({message:'Invalid origin'},{status:403,headers:noStore});

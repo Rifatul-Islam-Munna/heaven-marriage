@@ -12,6 +12,8 @@ export interface Address {
   permanentAddress: string;
   district: string;
   upazila: string;
+  cityCorporation?: string;
+  area?: string;
   extraInfo: string;
 }
 
@@ -116,7 +118,8 @@ export interface Pledge {
 }
 
 export interface User {
- completion?:{percentage:number,remaining:string[],nextStep:number};
+ completion?:{percentage:number;remaining:string[];nextStep:number;requiredCount?:number;answeredCount?:number;schemaRevision?:number};
+ completionPercentage?:number;completionRequiredCount?:number;completionAnsweredCount?:number;completionSchemaRevision?:number;
  fatherName?:string;
  motherName?:string;
  guardianPhone?:string;
@@ -142,6 +145,7 @@ export interface User {
   bloodGroup?: string;
   weight?: number;
   nationality?: string;
+  residenceCountry?: string;
   isOtpVerified?: boolean;
   otpNumber?: string;
   otpValidatedAt?: Date;

@@ -203,6 +203,14 @@ export class UserController {
   AdminSetPassword( @Body() dto: AdminSetPasswordDto,@Req() req:ExpressRequest) {
     return this.userService.adminSetPassword( dto,req.user.id,req.user.role);
   }
+  @Patch('publish-user-admin')
+  @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
+  @Throttle({default:{limit:100,ttl:3600000}})
+  @DashboardPermission('users')
+  publishUserAdmin(@Body() body:FindOneDto,@Req() req:ExpressRequest) {
+    return this.userService.publishUserAdmin(body.id,req.user.id,req.user.role);
+  }
+
   @Patch('update-user-subscriber')
     @UseGuards(AuthGuard,RolesGuard)
   @DashboardPermission('users')

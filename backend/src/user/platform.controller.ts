@@ -65,6 +65,36 @@ export class PlatformController {
   matches(@Req() r: ExpressRequest, @Query('page') page?: string, @Query('limit') limit?: string) {
     return this.service.matches(r.user.id, Number(page || 1), Number(limit || 12));
   }
+  @Get('admin/matches')
+  @UseGuards(RolesGuard)
+  @DashboardPermission('users')
+  @Throttle({default:{limit:30,ttl:60000}})
+  adminMatches(@Query('member') member:string,@Query('page') page?:string,@Query('limit') limit?:string) {
+    if(!member || member.length>80)throw new BadRequestException('Member ID is required');
+    return this.service.adminMatches(member,Number(page||1),Number(limit||12));
+  }
+  @Post('admin/recommend')
+  @UseGuards(RolesGuard)
+  @DashboardPermission('users')
+  @Throttle({default:{limit:30,ttl:60000}})
+  recommendPair(@Req() r:ExpressRequest,
+    @Body() p:{memberId:string;candidateId:string;recipientScope?:'both'|'source'}) {
+    return this.service.recommendPair(r.user.id,p?.memberId,p?.candidateId,p?.recipientScope);
+  }
+  @Get('recommendations')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  myRecommendations(@Req() r:ExpressRequest) {
+    return this.service.myRecommendations(r.user.id);
+  }
+  @Patch('recommendations/:candidateId/dismiss')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  @Throttle({default:{limit:15,ttl:60000}})
+  dismissRecommendation(@Req() r:ExpressRequest,@Param('candidateId') candidateId:string) {
+    return this.service.dismissRecommendation(r.user.id,candidateId);
+  }
+
   @Get('requests') requests(@Req() r: ExpressRequest) {
     return this.service.myCases(r.user.id);
   }
@@ -157,13 +187,17 @@ export class PlatformController {
   remind(@Req() r: ExpressRequest, @Param('id') id: string, @Body() p: any) {
     return this.service.remind(r.user.id, id, p);
   }
+  @Get('admin/income')
+  @UseGuards(RolesGuard)
+  @DashboardPermission('upgrades')
+  income(){return this.service.adminIncome();}
   @Get('admin/summary')
   @UseGuards(RolesGuard)
   @DashboardPermission('upgrades')
   async stats() {
     const [users, cases, orders] = await Promise.all([
       this.users
-        .find({ role: UserType.USER })
+        .find({ role: UserType.USER, biodataStatus: { $ne: 'deleted' } })
         .select(
           'createdAt gender isSubscriber isPublished isPublishFromAdmin verificationStatus biodataStatus numberOfConnections connectionUnlocks name maritalStatus age weight nationality address educationInfo personalInformation occupational expectedLifePartner pledge familyInfo dynamicAnswers customFields',
         )
