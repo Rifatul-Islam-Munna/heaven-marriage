@@ -53,7 +53,7 @@ const noopSubscribe = () => () => {};
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState("bn");
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const pathname = usePathname();
   const visualEditHref = `${pathname}?visualEdit=1`;
   // Hide the shortcut inside the dashboard visual-editor preview frame.
@@ -196,15 +196,38 @@ export default function Navbar() {
                     </Link>
                   ))}
 
-                  {/* Mobile Login Button */}
-                  <Button
-                    className="mt-6 w-full bg-primary font-heading text-base font-semibold hover:bg-primary/90"
-                    asChild
-                  >
-                    <Link href="/login" onClick={() => setIsOpen(false)}>
-                      লগইন
-                    </Link>
-                  </Button>
+                  {/* Show account actions only after session state has loaded. */}
+                  {!loading && (user ? (
+                    <div className="mt-6 flex flex-col gap-3">
+                      <Button className="w-full bg-primary font-heading text-base font-semibold hover:bg-primary/90" asChild>
+                        <Link
+                          href={(["admin", "seo", "blog", "manager"].includes(user.role) ? "/dashboard" : "/profile") as Route}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          {(["admin", "seo", "blog", "manager"].includes(user.role) ? "ড্যাশবোর্ড" : "আমার প্রোফাইল")}
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full font-heading text-base font-semibold"
+                        onClick={async () => {
+                          const success = await logOutUser();
+                          if (success) {
+                            setIsOpen(false);
+                            window.location.assign("/");
+                          }
+                        }}
+                      >
+                        লগ আউট
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button className="mt-6 w-full bg-primary font-heading text-base font-semibold hover:bg-primary/90" asChild>
+                      <Link href="/login" onClick={() => setIsOpen(false)}>
+                        লগইন
+                      </Link>
+                    </Button>
+                  ))}
                 </div>
               </SheetContent>
             </Sheet>
