@@ -115,6 +115,11 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
     {error&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
     {message&&<p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-800">{message}</p>}
 
+    <p role="note" className="rounded-lg border border-rose-100 bg-rose-50/60 px-4 py-2.5 text-[13px] leading-6 text-[#495057]">
+      <strong>Publishing guide:</strong> Write your article → <strong>Save draft</strong> (private) →{' '}
+      <strong>Publish</strong> (visible on the website). For edits, save again and click Publish update.
+    </p>
+
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-4">
         <Panel title="Article details" description="Title, web address and the summary shown on blog cards.">

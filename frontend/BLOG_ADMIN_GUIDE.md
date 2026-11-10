@@ -53,7 +53,7 @@ Do not change a published URL slug: published slugs are locked to protect existi
 - Only authenticated administrators can create, edit, publish, unpublish, restore and archive articles. The shared role guard enforces both controller-level and method-level permissions.
 - Public endpoints return only published content; admin endpoints reject unsigned requests.
 - Rich text is stored as validated Tiptap JSON. Server rendering uses controlled React nodes, not arbitrary HTML from the editor. HTML/script/event handlers, unsafe links and unsupported embeds are rejected.
-- Public API data is cached for 20 minutes per request (list/category/article/sitemap); publish/unpublish/archive invalidates cache immediately. Browser responses do not need to query MongoDB on every visit.
+- Blog listing, categories and sitemap data are cached for 20 minutes; publish/unpublish/archive invalidates these caches immediately. Individual article URLs are fetched fresh (with request-local deduplication) so an old 404 never remains cached after publishing. Temporary backend errors show a retry page rather than an incorrect 404.
 - Original website pages and user profiles remain unchanged.
 
 ## Verification

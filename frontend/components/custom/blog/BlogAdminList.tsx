@@ -97,6 +97,18 @@ export default function BlogAdminList(){
       <KpiCard label="Archived" value={loading&&!items.length?'—':counts.archived} hint="Hidden from the website"/>
     </KpiRow>
 
+    <div role="note" aria-label="How to publish an article"
+      className="rounded-lg border border-rose-100 bg-rose-50/60 px-4 py-3 text-[13px] text-[#495057]">
+      <p className="flex items-center gap-2 font-semibold text-[#212529]">
+        <BookOpen size={15} className="text-rose-700" aria-hidden/> How to publish a blog
+      </p>
+      <p className="mt-1 leading-6">
+        <strong>1.</strong> Click New article and fill in the title, summary and content.{' '}
+        <strong>2.</strong> Click Save draft to keep it private.{' '}
+        <strong>3.</strong> Click Publish to make it public, then use View live to check the article.
+      </p>
+    </div>
+
     <Panel title="Articles" bodyClassName="p-0"
       actions={<Segmented size="sm" label="Filter by status" value={status} onChange={setStatus} options={[
         {value:'all',label:`All ${counts.all}`},

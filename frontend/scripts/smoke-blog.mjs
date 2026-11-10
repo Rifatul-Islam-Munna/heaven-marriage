@@ -198,6 +198,25 @@ try{
   assert.match(page.html,/BlogPosting/);
   assert.match(page.html,/Marriage guide for couples/);
   assert.match(page.html,/https:\/\/example.com\/cover.webp/);
+  // A Bangla slug requested before publication must work immediately afterwards.
+  // It must also resolve when a hosting/router layer passes an encoded slug param.
+  const banglaSlug='হালাল-বিবাহ-বিষয়ে-ইসলামে-প্রকৃত-বিধান-গুরুত্ব-ও-অপব্যবহার';
+  const banglaTitle='হালাল বিবাহ বিষয়ে ইসলামের প্রকৃত বিধান ও গুরুত্ব';
+  const banglaUrl='/blog/'+encodeURIComponent(banglaSlug);
+  assert.equal((await get(banglaUrl)).status,404);
+  let bangla=(await admin('POST','',{})).body;
+  r=await admin('PATCH','/'+bangla.id,{revision:bangla.revision,
+    draft:{...draft,slug:banglaSlug,title:banglaTitle}});
+  assert.equal(r.status,200,r.body?.message);
+  bangla=r.body;
+  r=await admin('POST','/'+bangla.id+'/publish',{revision:bangla.revision});
+  assert.equal(r.status,200,r.body?.message);
+  page=await get(banglaUrl);
+  assert.equal(page.status,200,'Published Bangla URL must not return 404');
+  assert.ok(page.html.includes(banglaTitle));
+  assert.equal((await get('/blog/'+encodeURIComponent(encodeURIComponent(banglaSlug)))).status,200,
+    'Double-encoded Bangla URL must also resolve');
+  console.log('PASS: Bangla slug works immediately after publishing, including encoded URLs.');
   const feed=await get('/blog/feed.xml'),sitemap=await get('/sitemap.xml');
   assert.ok(feed.html.includes('Thoughtful Marriage Guidance'));
   assert.ok(sitemap.html.includes('/blog/thoughtful-marriage-guidance'));
