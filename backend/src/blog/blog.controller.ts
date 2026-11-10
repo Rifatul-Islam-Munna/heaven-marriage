@@ -64,4 +64,8 @@ export class AdminBlogController{
   archive(@Req()req:ExpressRequest,@Param('id')id:string,@Body()input:unknown){
     return this.blog.archive(req.user.id,id,input);
   }
+  @Delete(':id/permanent')
+  remove(@Req()req:ExpressRequest,@Param('id')id:string,@Body()input:unknown){
+    return this.blog.remove(req.user.id,id,input);
+  }
 }

@@ -27,16 +27,32 @@ describe('Blog safety and rich text',()=>{
     expect(slugify('How to marry well 2026')).toBe('how-to-marry-well-2026');
     expect(slugify('ইসলামিক বিবাহ নির্দেশিকা')).toMatch(/ইসলামিক/);
   });
-  it('rejects script links, unsupported rich blocks and missing image alt',()=>{
+  it('rejects unsafe media and blocks while stripping script links without losing text',()=>{
     expect(()=>safeBlogUrl('javascript:alert(1)','image')).toThrow(BadRequestException);
     expect(()=>safeBlogUrl('//bad.example/path','image')).toThrow(BadRequestException);
     expect(()=>validateBlogDocument({type:'doc',content:[{type:'iframe',attrs:{src:'https://bad.com'}}]}))
       .toThrow(BadRequestException);
-    expect(()=>validateBlogDocument({type:'doc',content:[
+    const sanitized=validateBlogDocument({type:'doc',content:[
       {type:'paragraph',content:[{type:'text',text:'example',marks:[{type:'link',
-        attrs:{href:'javascript:alert(1)'}}]}]}]})).toThrow(BadRequestException);
+        attrs:{href:'javascript:alert(1)'}}]}]}]});
+    expect(articleText(sanitized)).toBe('example');
+    expect(sanitized.content[0].content![0].marks).toEqual([]);
     expect(()=>validateDraft({...draft(),cover:{url:'https://example.com/a.webp',alt:''}}))
       .toThrow(BadRequestException);
+  });
+  it('accepts pasted HTTP, anchor, bare-domain and query links; preserves formatting around invalid links',()=>{
+    const links=['http://example.com/a#section','#section','www.example.com','https://example.com/?utm_source=chatgpt.com#section','not a URL'];
+    const doc=validateBlogDocument({type:'doc',content:[{type:'paragraph',content:links.map(href=>({
+      type:'text',text:'Read this ',marks:[{type:'bold'},{type:'link',attrs:{href}}],
+    }))}]});
+    expect(doc.content[0].content!.map(node=>node.marks)).toEqual([
+      [{type:'bold'},{type:'link',attrs:{href:links[0]}}],
+      [{type:'bold'},{type:'link',attrs:{href:links[1]}}],
+      [{type:'bold'},{type:'link',attrs:{href:'https://www.example.com/'}}],
+      [{type:'bold'},{type:'link',attrs:{href:links[3]}}],
+      [{type:'bold'}],
+    ]);
+    expect(articleText(doc)).toContain('Read this ');
   });
   it('retains whitespace between rich-marked text',()=>{
     expect(articleText(validateBlogDocument(original))).toContain('preserved across changes. ');
@@ -143,5 +159,26 @@ describe('MongoDB blog draft/publish and SEO workflow',()=>{
     await expect(service.save('admin',second.id,{revision:1,draft:draft()}))
       .rejects.toBeInstanceOf(ConflictException);
     expect((await service.onePublished('first-article')).slug).toBe('first-article');
+  });
+  it('publishes short content without summary and permanently removes any post status',async()=>{
+    for(const status of ['draft','published','archived']){
+      let post=await service.create('admin');
+      post=await service.save('admin',post.id,{revision:post.revision,draft:{...draft(),
+        slug:status+'-post',title:'',excerpt:'',content:{type:'doc',content:[
+          {type:'paragraph',content:[{type:'text',text:'Hi'}]},
+        ]}}});
+      if(status!=='draft')post=await service.publish('admin',post.id,{revision:post.revision});
+      if(status==='archived')post=await service.archive('admin',post.id,{revision:post.revision});
+      if(status==='published'){
+        expect((await service.onePublished(post.slug)).excerpt).toBe('Hi');
+        expect((await service.onePublished(post.slug)).title).toBe('Hi');
+      }
+      await expect(service.remove('admin',post.id,{revision:post.revision-1})).rejects.toBeInstanceOf(ConflictException);
+      expect(await service.remove('admin',post.id,{revision:post.revision})).toEqual({deleted:true});
+      await expect(service.adminOne(post.id)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.onePublished(post.slug)).rejects.toBeInstanceOf(NotFoundException);
+      expect(await service.sitemap()).toEqual([]);
+    }
+    expect((await service.listAdmin()).total).toBe(0);
   });
 });

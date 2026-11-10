@@ -53,6 +53,24 @@ export function safeBlogUrl(value:unknown,label:string,email=false):string {
 const permitted=new Set(['doc','paragraph','heading','text','bulletList','orderedList',
   'listItem','blockquote','codeBlock','horizontalRule','hardBreak','image','video']);
 const formats=new Set(['bold','italic','underline','strike','code','link']);
+// Pasted hyperlinks must never prevent saving the surrounding article text.
+export function normalizeBlogLink(value:unknown):string{
+  if(typeof value!=='string')return '';
+  let raw=value.trim();
+  if(raw.length>2048||/[\x00-\x20\\<>"']/.test(raw))return '';
+  if(raw.startsWith('#'))return raw;
+  if(raw.startsWith('//'))raw='https:'+raw;
+  if(!/^[a-z][a-z\d+.-]*:/i.test(raw)&&/^[^/?#]+\.[^/?#]+(?:[/?#]|$)/.test(raw))raw='https://'+raw;
+  if(raw.startsWith('/'))return raw;
+  try{
+    const url=new URL(raw);
+    if(url.username||url.password)return '';
+    if(['http:','https:'].includes(url.protocol)&&url.hostname)return url.toString();
+    if(url.protocol==='mailto:'&&/^[^@\s]+@[^@\s]+$/.test(url.pathname))return url.toString();
+    if(url.protocol==='tel:'&&/^\+?[\d(). -]+$/.test(url.pathname))return url.toString();
+  }catch{/* Keep the text, discard the invalid link. */}
+  return '';
+}
 function validateNode(value:unknown,depth:number,budget:{nodes:number;chars:number}):BlogNode{
   if(depth>14||++budget.nodes>3500)throw new BadRequestException('Article exceeds editor complexity limit');
   const input=obj(value,'article node'),type=str(input.type,'node type',30);
@@ -67,11 +85,15 @@ function validateNode(value:unknown,depth:number,budget:{nodes:number;chars:numb
     if(budget.chars>180000)throw new BadRequestException('Article text is too long');
     if(input.marks!==undefined){
       if(!Array.isArray(input.marks)||input.marks.length>10)throw new BadRequestException('Too many text marks');
-      node.marks=input.marks.map(mark=>{
+      node.marks=input.marks.flatMap(mark=>{
         const data=obj(mark,'text mark'),name=str(data.type,'mark type',20);
         if(!formats.has(name))throw new BadRequestException('Unsupported text formatting');
-        if(name==='link')return {type:name,attrs:{href:safeBlogUrl(obj(data.attrs,'link').href,'link',true)}};
-        return {type:name};
+        if(name==='link'){
+          const attrs=data.attrs as Record<string,unknown>|undefined;
+          const href=normalizeBlogLink(attrs?.href);
+          return href?[{type:name,attrs:{href}}]:[];
+        }
+        return [{type:name}];
       });
     }
     return node;
@@ -372,11 +394,12 @@ export class BlogService implements OnModuleInit{
     if(!item)throw new NotFoundException('Article not found');
     if(item.revision!==revision)throw new ConflictException('Article changed elsewhere; refresh');
     const draft=validateDraft(item.draft,item.slug);
-    if(draft.title.length<3||draft.excerpt.length<20||articleText(draft.content).trim().length<30)
-      throw new BadRequestException('Publish requires a title, a 20+ character excerpt and meaningful article content');
+    const text=articleText(draft.content).trim();
+    draft.title=draft.title||text.slice(0,180)||'Untitled article';
+    draft.excerpt=draft.excerpt||text.slice(0,600)||draft.title;
     const now=new Date();
     const result=await this.posts.updateOne({_id:oid,revision},{
-      $set:{status:'published',published:draft,actorId,
+      $set:{status:'published',draft,published:draft,actorId,
         publishedAt:item.publishedAt||now,modifiedAt:now,updatedAt:now,
         readMinutes:readingMinutes(draft.content)},
       $inc:{revision:1},
@@ -390,6 +413,15 @@ export class BlogService implements OnModuleInit{
   }
   async archive(actorId:string,id:unknown,input:unknown){
     return this.changeStatus(actorId,id,input,'archived','archive');
+  }
+  async remove(actorId:string,id:unknown,input:unknown){
+    const revision=expectedRevision(obj(input,'article delete').revision),oid=objectId(id);
+    const item=await this.posts.findOne({_id:oid});
+    if(!item)throw new NotFoundException('Article not found');
+    const result=await this.posts.deleteOne({_id:oid,revision});
+    if(!result.deletedCount)throw new ConflictException('Article changed elsewhere; refresh');
+    await this.audit(actorId,'delete',item.slug);
+    return {deleted:true};
   }
   async restore(actorId:string,id:unknown,input:unknown){
     const state=await this.adminOne(id);

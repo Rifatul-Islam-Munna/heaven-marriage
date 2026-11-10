@@ -22,7 +22,7 @@ function marked(value:ReactNode,marks?:BlogNode['marks']){
       case 'code':return <code key={index} className="rounded-md bg-pink-50 px-1.5 py-0.5 font-mono text-sm text-pink-700">{child}</code>;
       case 'link':{
         const href=mark.attrs?.href||'';
-        if(!((href.startsWith('/')&&!href.startsWith('//'))||/^https:\/\//.test(href)||/^mailto:/.test(href)))return child;
+        if(!((href.startsWith('/')&&!href.startsWith('//'))||href.startsWith('#')||/^https?:\/\//.test(href)||/^(mailto|tel):/.test(href)))return child;
         return <a key={index} href={href} rel="noopener noreferrer"
           className="font-semibold text-primary underline decoration-pink-300 underline-offset-4 transition-colors hover:text-pink-700">{child}</a>;
       }

@@ -12,7 +12,7 @@ function validParts(parts:string[]){
     (parts.length===1&&(parts[0]==='categories'||/^[a-f0-9]{24}$/i.test(parts[0])))||
     (parts.length===2&&(
       (parts[0]==='categories'&&/^[a-f0-9]{24}$/i.test(parts[1]))||
-      (/^[a-f0-9]{24}$/i.test(parts[0])&&['publish','unpublish','restore'].includes(parts[1]))));
+      (/^[a-f0-9]{24}$/i.test(parts[0])&&['publish','unpublish','restore','permanent'].includes(parts[1]))));
 }
 function allowedOrigin(req:NextRequest){
   const origin=req.headers.get('origin');

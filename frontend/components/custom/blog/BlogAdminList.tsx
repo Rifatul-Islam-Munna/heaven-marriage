@@ -4,7 +4,7 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
-import {BookOpen,ExternalLink,FileText,Loader2,PenLine,Plus,RefreshCw,Search,X} from 'lucide-react';
+import {BookOpen,ExternalLink,FileText,Loader2,PenLine,Plus,RefreshCw,Search,Trash2,X} from 'lucide-react';
 import {publicBlogPath,type BlogAdminRow} from '@/lib/blog-types';
 import {
   DashButton,DashboardHeader,DashboardPage,KpiCard,KpiRow,Panel,PlainHeader,Segmented,StatusPill,fieldClass,formatWhen,
@@ -44,6 +44,7 @@ export default function BlogAdminList(){
   const [creating,setCreating]=useState(false);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
+  const [deleting,setDeleting]=useState<string|null>(null);
   // Wait for a pause in typing instead of hitting the API on every keystroke.
   useEffect(()=>{const t=window.setTimeout(()=>setSearch(query.trim()),300);return()=>window.clearTimeout(t);},[query]);
   const load=useCallback(async()=>{
@@ -58,6 +59,23 @@ export default function BlogAdminList(){
     finally{setLoading(false);}
   },[search]);
   useEffect(()=>{void load();},[load]);
+  async function remove(item:BlogAdminRow){
+    if(!window.confirm(`Permanently delete "${item.title||'Untitled draft'}"? This cannot be undone.`))return;
+    setDeleting(item.id);setError('');
+    try{
+      const response=await fetch('/api/blog/admin/'+item.id+'/permanent',{
+        method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:item.revision}),
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(blogErrorMessage(result,'Article could not be deleted.'));
+      await load();router.refresh();
+    }catch(e){setError(e instanceof Error?e.message:'Article could not be deleted.');}
+    finally{setDeleting(null);}
+  }
+  const deleteButton=(item:BlogAdminRow)=><DashButton tone="danger" disabled={deleting!==null}
+    aria-label={'Permanently delete '+(item.title||'Untitled draft')} onClick={()=>void remove(item)}>
+    {deleting===item.id?<Loader2 size={13} className="animate-spin"/>:<Trash2 size={13}/>} Delete
+  </DashButton>;
   async function create(){
     setCreating(true);setError('');
     try{
@@ -175,6 +193,7 @@ export default function BlogAdminList(){
               <td className="py-2.5 pl-3 pr-4">
                 <div className="flex items-center justify-end gap-1">
                   <LiveLink item={item}/>
+                  {deleteButton(item)}
                   <Link href={editHref(item.id)} className="inline-flex items-center gap-1 rounded-md border border-[#dee2e6] bg-white px-2.5 py-1.5 text-[12px] font-medium text-[#212529] hover:bg-[#f1f3f5]">
                     <PenLine size={13} aria-hidden/> Edit
                   </Link>
@@ -198,6 +217,7 @@ export default function BlogAdminList(){
               </span>
             </Link>
             <LiveLink item={item}/>
+            {deleteButton(item)}
           </li>)}
         </ul>
       </>}

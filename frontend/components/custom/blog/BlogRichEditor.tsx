@@ -140,11 +140,15 @@ export default function BlogRichEditor({initial,onChange}:{initial:BlogDocument;
   function editLink(){
     if(!editor)return;
     const previous=editor.getAttributes('link').href as string||'';
-    const href=window.prompt('Enter an HTTPS or internal link:',previous||'https://');
-    if(href===null)return;
+    const value=window.prompt('Enter a website, email or internal link:',previous||'https://');
+    if(value===null)return;
+    let href=value.trim();
     if(!href){editor.chain().focus().unsetLink().run();return;}
-    if(!/^https:\/\//.test(href)&&!/^mailto:/.test(href)&&!(href.startsWith('/')&&!href.startsWith('//'))){
-      setError('Use an HTTPS URL, a relative site URL or mailto:');return;
+    if(href.startsWith('//'))href='https:'+href;
+    if(!/^[a-z][a-z\d+.-]*:/i.test(href)&&/^[^/?#]+\.[^/?#]+(?:[/?#]|$)/.test(href))href='https://'+href;
+    if(/[\x00-\x20\\<>"']/.test(href)||!(/^https?:\/\//i.test(href)||/^(mailto|tel):/i.test(href)||href.startsWith('#')||(href.startsWith('/')&&!href.startsWith('//')))){
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      setError('Link removed; your text is kept.');return;
     }
     editor.chain().focus().extendMarkRange('link').setLink({href}).run();
   }

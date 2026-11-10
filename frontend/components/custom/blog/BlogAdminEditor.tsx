@@ -65,13 +65,22 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
   },[draft.content]);
   const minutes=Math.max(1,Math.ceil(words/190));
 
-  async function perform(method:'PATCH'|'POST'|'DELETE',action?:'publish'|'unpublish'|'restore'){
+  async function perform(method:'PATCH'|'POST'|'DELETE',action?:'publish'|'unpublish'|'restore'|'permanent'){
     setBusy(true);setError('');setMessage('');
     try{
-      if(action==='publish'&&dirty)throw Error('Save your edits as a draft before publishing.');
+      let revision=post.revision;
+      if(action==='publish'&&dirty){
+        const saved=await fetch('/api/blog/admin/'+post.id,{
+          method:'PATCH',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({revision,draft}),
+        });
+        const result=await saved.json().catch(()=>({}));
+        if(!saved.ok)throw Error(blogErrorMessage(result,'Draft could not be saved.'));
+        setPost(result);setDraft(result.draft);revision=result.revision;
+      }
       const response=await fetch('/api/blog/admin/'+post.id+(action?'/'+action:''),{
         method,headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({revision:post.revision,...(method==='PATCH'?{draft}:{})}),
+        body:JSON.stringify({revision,...(method==='PATCH'?{draft}:{})}),
       });
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw Error(blogErrorMessage(result,'That action could not be completed.'));
@@ -117,7 +126,7 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
 
     <p role="note" className="rounded-lg border border-rose-100 bg-rose-50/60 px-4 py-2.5 text-[13px] leading-6 text-[#495057]">
       <strong>Publishing guide:</strong> Write your article → <strong>Save draft</strong> (private) →{' '}
-      <strong>Publish</strong> (visible on the website). For edits, save again and click Publish update.
+      <strong>Publish</strong> (visible on the website). Publishing automatically saves your latest edits.
     </p>
 
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -141,7 +150,7 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
               <p className="mt-1 break-all font-mono text-[11px] text-[#868e96]">niqaha.com{slugPreview}</p>
             </Field>
             <Field id="blog-excerpt" label="Summary *" hint={<span className="flex justify-between gap-2">
-              <span>At least 20 characters to publish. Shown on blog cards and used for Google when the SEO description is empty.</span>
+              <span>Optional. Leave empty to use the article text. Shown on blog cards.</span>
               <Counter value={draft.excerpt.length} max={600}/></span>}>
               <textarea id="blog-excerpt" dir="auto" maxLength={600} rows={3} value={draft.excerpt}
                 onChange={e=>update('excerpt',e.target.value)} placeholder="এই লেখাটি কী নিয়ে? কয়েক লাইনে বর্ণনা করুন..."
@@ -241,6 +250,9 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
             {post.status!=='archived'&&<DashButton tone="danger" className="w-full" disabled={busy} onClick={()=>{
               if(window.confirm('Archive this article? It disappears from the website, but you can restore it later.'))void perform('DELETE');
             }}><Trash2 size={14}/> Archive article</DashButton>}
+            <DashButton tone="danger" className="w-full" disabled={busy} onClick={()=>{
+              if(window.confirm('Permanently delete this article and its saved draft? This cannot be undone.'))void perform('DELETE','permanent');
+            }}><Trash2 size={14}/> Delete permanently</DashButton>
           </div>
         </Panel>
       </aside>
@@ -253,8 +265,7 @@ export default function BlogAdminEditor({initial,canEditSeo=false}:{initial:Blog
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <DashButton tone="ghost-dark" disabled={busy||!dirty} onClick={()=>void perform('PATCH')}><Save size={14}/> Save draft</DashButton>
-        <DashButton tone="primary" disabled={busy||dirty||post.status==='archived'} onClick={()=>void perform('POST','publish')}
-          title={dirty?'Save your edits first':undefined}>
+        <DashButton tone="primary" disabled={busy||uploading||post.status==='archived'} onClick={()=>void perform('POST','publish')}>
           {busy?<Loader2 size={14} className="animate-spin"/>:<Send size={14}/>} {live?'Publish update':'Publish'}
         </DashButton>
       </div>
