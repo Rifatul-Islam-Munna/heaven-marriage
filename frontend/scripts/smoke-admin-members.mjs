@@ -100,7 +100,6 @@ try{
    {timeout:30000});
  await tab.waitForFunction(()=>document.querySelector('tbody')?.textContent?.includes('অবিবাহিত'),
    {timeout:20000});
- await tab.screenshot({path:path.join(root,'.next','admin-users-ux-desktop.png')});
  const result=await tab.evaluate(()=>{
    const head=[...document.querySelectorAll('table thead th')].map(th=>th.textContent?.trim());
    const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('Fatima Example'));
@@ -147,54 +146,31 @@ try{
  assert.match(result.progress||'',/সর্বশেষ সেভ/);
  assert.ok(memberQueries.some(q=>new URLSearchParams(q).get('reviewQueue')==='true'&&new URLSearchParams(q).get('limit')!=='1'),
    'Default member table must request the saved unpublished review queue');
- const viewTabs=await tab.evaluate(()=>[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button[aria-pressed]')]
+ const stageOptions=await tab.$$eval('select[aria-label="বায়োডাটা অগ্রগতি"] option',
+   options=>options.map(option=>option.value));
+ assert.deepEqual(stageOptions,['','signed_up','submitted','published'],
+   'Keep the original status dropdown, but remove only the marked in-progress option');
+ assert.ok(await tab.$('select[aria-label="প্রকাশ"]'),
+   'Keep the original publish filter and dashboard layout');
+ console.log('PASS: Original dashboard filters are restored; only the marked draft option is removed.');
+ const reviewButtons=await tab.evaluate(()=>[...document.querySelectorAll('button[aria-pressed]')]
    .map(el=>({text:el.textContent?.trim()||'',pressed:el.getAttribute('aria-pressed')})));
- assert.equal(viewTabs.length,3,'Only three clear list choices should appear');
- assert.ok(viewTabs.some(b=>b.text.startsWith('অপ্রকাশিত')&&b.pressed==='true'));
- assert.ok(viewTabs.some(b=>b.text.startsWith('প্রকাশিত')));
- assert.ok(viewTabs.some(b=>b.text.startsWith('সব সদস্য')));
- assert.equal(await tab.$('select[aria-label="বায়োডাটা অগ্রগতি"]'),null,
-   'Redundant profile-stage dropdown must be removed');
- assert.equal(await tab.$('select[aria-label="প্রকাশ"]'),null,
-   'Redundant published-status dropdown must be removed');
- assert.equal(await tab.$('div[aria-label="সদস্য তালিকার ধরন"]'),null,
-   'Duplicate secondary view switch must be removed');
+ assert.ok(reviewButtons.some(b=>b.text.includes('সেভ করা অপ্রকাশিত বায়োডাটা')&&b.pressed==='true'));
  await tab.evaluate(()=>{
-   const b=[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-     .find(el=>el.textContent?.trim().startsWith('প্রকাশিত'));
-   if(!b)throw Error('Published tab missing');b.click();
+   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='সব সদস্য দেখুন');
+   if(!b)throw Error('All members view button missing');b.click();
  });
- await tab.waitForFunction(()=>new URL(location.href).searchParams.get('view')==='published',{timeout:10000});
- await tab.waitForFunction(()=>[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-   .some(b=>b.textContent?.trim().startsWith('প্রকাশিত')&&b.getAttribute('aria-pressed')==='true'),{timeout:10000});
- await tab.waitForFunction(()=>document.querySelectorAll('table').length>0,{timeout:10000});
- assert.ok(memberQueries.some(q=>new URLSearchParams(q).get('isPublished')==='true'),
-   'Published tab must filter in the backend');
+ await tab.waitForFunction(()=>new URL(location.href).searchParams.get('reviewQueue')==='false',{timeout:10000});
+ await tab.waitForFunction(()=>[...document.querySelectorAll('button[aria-pressed]')]
+   .some(b=>b.textContent?.trim()==='সব সদস্য দেখুন'&&b.getAttribute('aria-pressed')==='true'),{timeout:10000});
  await tab.evaluate(()=>{
-   const b=[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-     .find(el=>el.textContent?.trim().startsWith('সব সদস্য'));
-   if(!b)throw Error('All members tab missing');b.click();
+   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.includes('সেভ করা অপ্রকাশিত বায়োডাটা'));
+   if(!b)throw Error('Saved biodata review view button missing');b.click();
  });
- await tab.waitForFunction(()=>new URL(location.href).searchParams.get('view')==='all',{timeout:10000});
- await tab.waitForFunction(()=>[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-   .some(b=>b.textContent?.trim().startsWith('সব সদস্য')&&b.getAttribute('aria-pressed')==='true'),{timeout:10000});
- for(let i=0;i<30&&!memberQueries.some(q=>
-   new URLSearchParams(q).get('reviewQueue')==='false'&&new URLSearchParams(q).get('isPublished')==='all');i++)
-   await new Promise(resolve=>setTimeout(resolve,100));
- assert.ok(memberQueries.some(q=>new URLSearchParams(q).get('reviewQueue')==='false'
-   &&new URLSearchParams(q).get('isPublished')==='all'),
-   'All members tab must request every account from the backend');
- await tab.evaluate(()=>{
-   const b=[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-     .find(el=>el.textContent?.trim().startsWith('অপ্রকাশিত'));
-   if(!b)throw Error('Unpublished tab missing');b.click();
- });
- await tab.waitForFunction(()=>new URL(location.href).searchParams.get('view')==='unpublished',{timeout:10000});
- await tab.waitForFunction(()=>[...document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button')]
-   .some(b=>b.textContent?.trim().startsWith('অপ্রকাশিত')&&b.getAttribute('aria-pressed')==='true'),{timeout:10000});
+ await tab.waitForFunction(()=>new URL(location.href).searchParams.get('reviewQueue')==='true',{timeout:10000});
  await tab.waitForFunction(()=>document.querySelector('tbody button[aria-label*="প্রোফাইল এডিট করুন"]')!==null,
    {timeout:15000});
- console.log('PASS: Three simple list tabs, last saved time, backend view filtering, and no confusing stage dropdowns.');
+ console.log('PASS: Default review queue, last-saved timestamp, and view-all toggle render correctly.');
  assert.match(result.progress||'',/অবিবাহিত/);
  assert.doesNotMatch(result.progress||'',/Follow-up/);
  const visibleActions=[
@@ -245,13 +221,9 @@ try{
  console.log('PASS: All seven member actions are visible without a More menu; delete confirmation and WhatsApp share open correctly.');
  console.log('PASS: Real biodata field shown, hidden Hot Data, merged progress/connection/subscriber and grouped sidebar.');
  await tab.click('button[aria-controls="member-quick-filters"]');
- for(const quick of ['মেম্বারশিপ','যাচাই অবস্থা','বৈবাহিক অবস্থা','জেলা'])
-   assert.ok(await tab.$('select[aria-label="'+quick+'"]'),'Missing quick filter '+quick);
- assert.equal(await tab.$('select[aria-label="সাজানোর ক্রম"]'),null,
-   'Sort should not complicate the quick filters; it belongs in advanced filters');
- assert.ok(await tab.$('section[aria-label="দ্রুত মেম্বার ফিল্টার"] button[aria-expanded="false"]'),
-   'Advanced filter controls must remain accessible');
- console.log('PASS: Four useful quick filters with optional advanced filtering.');
+ for(const quick of ['মেম্বারশিপ','যাচাই অবস্থা','বৈবাহিক অবস্থা','জেলা','সাজানোর ক্রম'])
+   assert.ok(await tab.$('select[aria-label="'+quick+'"]'),'Missing advanced filter '+quick);
+ console.log('PASS: Five quick filters remain available on demand.');
  await tab.evaluate(()=>{
    const button=[...document.querySelectorAll('button')].find(el=>el.textContent?.includes('টেবিলের কলাম সাজান'));
    if(!button)throw Error('Biodata column manager missing');button.click();
@@ -351,12 +323,9 @@ try{
  await tab.setViewport({width:390,height:844,isMobile:true});
  await tab.reload({waitUntil:'domcontentloaded',timeout:30000});
  await tab.waitForFunction(()=>document.body.textContent?.includes('Fatima Example'),{timeout:20000});
- await tab.screenshot({path:path.join(root,'.next','admin-users-ux-mobile.png')});
  const mobile=await tab.evaluate(()=>({
    text:document.querySelector('ul.md\\:hidden')?.textContent||'',
    filterButton:!!document.querySelector('button[aria-controls="member-quick-filters"]'),
-   tabCount:document.querySelectorAll('section[aria-label="সদস্য তালিকা বেছে নিন"] button[aria-pressed]').length,
-   hasStageDropdown:!!document.querySelector('select[aria-label="বায়োডাটা অগ্রগতি"]'),
    buttons:[...document.querySelectorAll('ul.md\\:hidden button[aria-label]')]
      .map(el=>el.getAttribute('aria-label')||''),
    actions:[...document.querySelectorAll('ul.md\\:hidden li:first-child div[aria-label$=" এর অ্যাকশন"] button')]
@@ -377,8 +346,6 @@ try{
  assert.match(mobile.text,/fatima@example.com/);
  assert.match(mobile.text,/6 \/ 10/);
  assert.ok(mobile.filterButton);
- assert.equal(mobile.tabCount,3,'Mobile must show the same simple list tabs');
- assert.equal(mobile.hasStageDropdown,false);
  for(const action of ['WhatsApp-এ পাঠান','ফোন ছাড়া বায়োডাটা কপি','যোগাযোগসহ কপি','সদস্য মুছুন'])
    assert.ok(mobile.buttons.some(label=>label.includes(action)),
      'Mobile member action must be visible: '+action);
