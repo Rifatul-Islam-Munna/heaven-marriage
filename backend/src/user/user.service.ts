@@ -716,7 +716,7 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
 .select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds')
       .skip(skip)
       .limit(limit)
-      .sort(adminSort(query.sort))
+      .sort(adminSort(query.sort, query.reviewQueue === 'true'))
       .lean()
       .exec(),
     this.userModel.countDocuments(filter).exec(),

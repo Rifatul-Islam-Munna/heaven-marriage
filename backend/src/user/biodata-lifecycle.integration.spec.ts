@@ -57,6 +57,62 @@ describe('Biodata deletion requests and submission lifecycle (isolated MongoDB)'
     for (const collection of Object.values(db.collections)) await collection.deleteMany({});
   });
 
+  it('shows saved unpublished profiles first, moves them to the top after every save, and excludes signups',async()=>{
+    (writer as any).questions={get:async()=>({revision:80,
+      questions:BUILTINS.filter(question=>question.path==='age')})};
+    const oldTime=new Date(Date.now()-120000);
+    const recentTime=new Date(Date.now()-60000);
+    const signup=await account({phoneNumber:'01711111110',email:'review-signup@example.com',
+      age:undefined,maritalStatus:undefined,address:undefined,
+      biodataStatus:'draft',isPublished:false,isPublishFromAdmin:false,
+      verificationStatus:'pending',draftSavedAt:undefined,submittedAt:undefined,
+    });
+    const olderDraft=await account({phoneNumber:'01711111111',email:'review-old@example.com',
+      biodataStatus:'draft',isPublished:false,
+      isPublishFromAdmin:false,verificationStatus:'pending',draftSavedAt:oldTime});
+    const newerDraft=await account({phoneNumber:'01711111112',email:'review-new@example.com',
+      biodataStatus:'draft',isPublished:false,
+      isPublishFromAdmin:false,verificationStatus:'pending',draftSavedAt:recentTime});
+    const published=await account({phoneNumber:'01711111113',email:'review-published@example.com',
+      draftSavedAt:new Date(),isPublished:true,
+      isPublishFromAdmin:true,verificationStatus:'approved',biodataStatus:'approved'});
+    const legacySubmitted=await account({phoneNumber:'01711111114',email:'review-legacy@example.com',
+      biodataStatus:'submitted',
+      isPublished:false,isPublishFromAdmin:false,verificationStatus:'pending',
+      draftSavedAt:undefined,submittedAt:new Date(Date.now()-180000)});
+
+    const query:any={page:1,limit:2,reviewQueue:'true',verificationStatus:'pending'};
+    const first=await writer.getUserForAdmin(query);
+    expect(first.totalItems).toBe(3);
+    expect(first.totalPages).toBe(2);
+    expect(first.data.map((item:any)=>String(item._id))).toEqual([
+      String(newerDraft._id),String(olderDraft._id),
+    ]);
+    const second=await writer.getUserForAdmin({...query,page:2});
+    expect(second.data.map((item:any)=>String(item._id))).toEqual([String(legacySubmitted._id)]);
+
+    const saved=await writer.updatedFullUserInformation({age:29} as any,String(olderDraft._id));
+    expect(saved.data.draftSavedAt.getTime()).toBeGreaterThan(recentTime.getTime());
+    const afterSave=await writer.getUserForAdmin(query);
+    expect(afterSave.data.map((item:any)=>String(item._id))).toEqual([
+      String(olderDraft._id),String(newerDraft._id),
+    ]);
+    await users.updateOne({_id:olderDraft._id},{$set:{
+      biodataStatus:'approved',isPublished:true,isPublishFromAdmin:true,verificationStatus:'approved',
+    }});
+    const afterPublish=await writer.getUserForAdmin({...query,verificationStatus:undefined});
+    expect(afterPublish.totalItems).toBe(2);
+    expect(afterPublish.data.some((item:any)=>String(item._id)===String(olderDraft._id))).toBe(false);
+
+    const all=await writer.getUserForAdmin({
+      page:1,limit:10,reviewQueue:'false',
+    } as any);
+    expect(all.totalItems).toBe(5);
+    expect(all.data.map((item:any)=>String(item._id))).toEqual(
+      expect.arrayContaining([String(signup._id),String(published._id)]),
+    );
+  });
+
   it('request is non-destructive, tracks Pending and deduplicates repeated requests', async () => {
     const member = await account();
     const id = String(member._id);

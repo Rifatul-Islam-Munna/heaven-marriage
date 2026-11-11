@@ -286,6 +286,17 @@ export function adminFilter(q: any) {
   // The admin cards and table must use the same rule as public discovery.
   if (q.isPublished === 'true') Object.assign(f, visibleFilter);
   else if (q.isPublished === 'false') f.$nor = [visibleFilter];
+  // A signup alone is not a biodata review candidate. A profile enters the
+  // queue on its first save and leaves when it is publicly published.
+  // Keep already submitted legacy profiles that predate draftSavedAt.
+  if (q.reviewQueue === 'true') {
+    f.$nor = [...(f.$nor || []), visibleFilter];
+    f.$and = [...(f.$and || []), { $or: [
+      { draftSavedAt: { $type: 'date' } },
+      { submittedAt: { $type: 'date' } },
+      { biodataStatus: { $in: ['submitted', 'approved'] } },
+    ] }];
+  }
   for (const [key, path] of Object.entries({
     districtId: 'address.district',
     upazilaId: 'address.upazila',
@@ -405,8 +416,11 @@ export function adminFilter(q: any) {
   }
   return f;
 }
-export function adminSort(sort?: string): Record<string, 1 | -1> {
+export function adminSort(sort?: string, reviewQueue = false): Record<string, 1 | -1> {
+  // Sort before skip/limit so a new biodata save rises to page one globally.
+  if (!sort && reviewQueue) return { draftSavedAt: -1, submittedAt: -1, _id: -1 };
   const fields: Record<string, Record<string, 1 | -1>> = {
+    recentlySaved: { draftSavedAt: -1, submittedAt: -1, _id: -1 },
     newest: { createdAt: -1, _id: -1 },
     oldest: { createdAt: 1, _id: 1 },
     ageAsc: { age: 1, _id: 1 },

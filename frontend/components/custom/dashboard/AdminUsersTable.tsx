@@ -40,7 +40,7 @@ interface User {
   isPublishFromAdmin?: boolean; userId: string;
   biodataStage?: string; memberJourney?: string; completionPercentage?: number;
   completionRequiredCount?:number; completionAnsweredCount?:number; completionSchemaRevision?:number;
-  submittedAt?: string; verificationStatus?: string;
+  submittedAt?: string; draftSavedAt?: string; verificationStatus?: string;
 }
 interface Paginated<T> {
   data: T[]; page: number; limit: number; totalItems: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean;
@@ -121,6 +121,11 @@ function MemberProgress({ user,onConnections,onSubscriber,subscriberBusy }:{
       {typeof user.completionRequiredCount==='number' && user.completionRequiredCount>0
         ? 'আবশ্যক উত্তর: '+(user.completionAnsweredCount??0)+' / '+user.completionRequiredCount
         : 'আবশ্যক প্রশ্ন অনুযায়ী হিসাব'}
+      <span className="block truncate font-semibold text-slate-700" title={user.draftSavedAt||undefined}>
+        সর্বশেষ সেভ: {user.draftSavedAt
+          ?new Date(user.draftSavedAt).toLocaleString('bn-BD',{dateStyle:'medium',timeStyle:'short'})
+          :'এখনো সেভ করেনি'}
+      </span>
       <span className="block truncate" title={user.submittedAt||undefined}>
         প্রথম জমা: {user.submittedAt
           ?new Date(user.submittedAt).toLocaleString('bn-BD',{dateStyle:'medium',timeStyle:'short'})
@@ -205,7 +210,14 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tableFilters.query !== debouncedSearch) setSearch(tableFilters.query); }, [tableFilters.query]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Default dashboard view: saved, unpublished biodatas needing attention.
+  // Explicit 'all' mode and signup/published views remain accessible.
+  const wantsReviewQueue = params.get("reviewQueue") !== "false";
+  const reviewQueue = wantsReviewQueue && tableFilters.publish !== "true" &&
+    !["signed_up","published"].includes(params.get("memberJourney") || "");
   const query = new URLSearchParams(params.toString());
+  query.delete("reviewQueue");
+  query.set("reviewQueue", reviewQueue ? "true" : "false");
   query.set("page", tableFilters.page.toString());
   query.set("query", tableFilters.query);
   query.set("gender", tableFilters.gender);
@@ -213,8 +225,9 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   query.delete("publish");
 
   const { data, isLoading, isFetching, error, refetch } = useQueryWrapper<Paginated<User>>(
-    ["admin-users", tableFilters.page, tableFilters.query, tableFilters.gender, tableFilters.publish, params.toString()],
+    ["admin-users", tableFilters.page, tableFilters.query, tableFilters.gender, tableFilters.publish, params.toString(), reviewQueue],
     `/user/get-all-user-for-admin?${query.toString()}`,
+    { refetchInterval: reviewQueue ? 30000 : false, refetchOnWindowFocus: true },
   );
   const memberIds=(data?.data||[]).map(member=>member._id).join(',');
   const {data:customData,isLoading:customLoading,error:customError}=useQueryWrapper<MemberAdminColumnsResponse>(
@@ -228,7 +241,8 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   const totalCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "all"], countUrl("isPublished=all"));
   const publishedCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "published"], countUrl("isPublished=true"));
   const premiumCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "premium"], countUrl("isPublished=all&accountType=premium"));
-  const pendingCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "pending"], countUrl("isPublished=all&verificationStatus=pending"));
+  const pendingCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "pending"], countUrl("reviewQueue=true&verificationStatus=pending"));
+  const reviewCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "review"], countUrl("reviewQueue=true"));
 
   const { data: shareProfile, isLoading: isShareProfileLoading } = useQueryWrapper<BiodataUser>(
     ["admin-share-profile", selectedShareUser?._id],
@@ -293,7 +307,7 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   const limit = data?.limit ?? (Number(params.get("limit")) || 10);
   const firstRow = data?.totalItems ? (page - 1) * limit + 1 : 0;
   const lastRow = data ? Math.min(page * limit, data.totalItems) : 0;
-  const noFilters = !tableFilters.query && tableFilters.gender === 'all' && tableFilters.publish === 'all' && !params.get('memberJourney') && !ADVANCED_KEYS.some(key=>key!=='limit'&&key!=='sort'&&params.get(key));
+  const noFilters = !reviewQueue && !tableFilters.query && tableFilters.gender === 'all' && tableFilters.publish === 'all' && !params.get('memberJourney') && !ADVANCED_KEYS.some(key=>key!=='limit'&&key!=='sort'&&params.get(key));
   const connectionNumber = Number(connectionValue);
   const connectionOk = connectionValue !== "" && Number.isInteger(connectionNumber) && connectionNumber >= 0;
 
@@ -382,6 +396,7 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
       .map(x=>({value:x.en,label:x.bn}))},
     {key:'districtId',label:'জেলা',options:districts.map(x=>({value:x.name,label:x.bn_name}))},
     {key:'sort',label:'সাজানোর ক্রম',options:[
+      {value:'recentlySaved',label:'সর্বশেষ সেভ আগে'},
       {value:'newest',label:'নতুন আগে'},{value:'oldest',label:'পুরোনো আগে'},
       {value:'ageAsc',label:'বয়স: কম আগে'},{value:'ageDesc',label:'বয়স: বেশি আগে'},
       {value:'connectionsAsc',label:'কানেকশন: কম আগে'},{value:'connectionsDesc',label:'কানেকশন: বেশি আগে'}]},
@@ -553,9 +568,12 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
           {value:'submitted',label:'জমা হয়েছে'},
           {value:'published',label:'প্রকাশিত'},
         ].map(step=>{
-          const active=(params.get('memberJourney')||'')===step.value;
+          const active=step.value?(params.get('memberJourney')||'')===step.value:(!params.get('memberJourney')&&!reviewQueue);
           return <button type="button" key={step.value} aria-pressed={active}
-            onClick={()=>push(q=>{if(step.value)q.set('memberJourney',step.value);else q.delete('memberJourney');})}
+            onClick={()=>push(q=>{if(step.value)q.set('memberJourney',step.value);else q.delete('memberJourney');
+              if(!step.value||step.value==='signed_up'||step.value==='published'){
+                q.set('reviewQueue','false'); q.delete('verificationStatus');
+              }})}
             className={cn('rounded-full border px-3 py-1.5 text-[12px] font-semibold transition',
               active?'border-rose-600 bg-rose-600 text-white':'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50')}>
             {step.label}
@@ -565,20 +583,39 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     </section>}
     <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <StatCard label="মূল সদস্য" value={totalCount.data?.totalItems} hint="সক্রিয় সদস্য অ্যাকাউন্ট (মুছে ফেলা বাদ)" active={noFilters}
-        onClick={() => push((q) => { [...ADVANCED_KEYS, "query", "gender", "publish", "memberJourney"].forEach((k) => { if (k !== "limit" && k !== "sort") q.delete(k); }); })} />
+        onClick={() => push((q) => { [...ADVANCED_KEYS, "query", "gender", "publish", "memberJourney"].forEach((k) => { if (k !== "limit" && k !== "sort") q.delete(k); }); q.set("reviewQueue","false"); })} />
       <StatCard label="প্রকাশিত" value={publishedCount.data?.totalItems} hint="বায়োডাটা সবাই দেখতে পায়" active={tableFilters.publish === "true"}
-        onClick={() => void setTableFilters({ publish: tableFilters.publish === "true" ? "all" : "true", page: 1 })} />
+        onClick={() => push((q) => { if(q.get("publish")==="true") q.delete("publish"); else {
+          q.set("publish","true"); q.set("reviewQueue","false");
+          q.delete("verificationStatus"); q.delete("memberJourney");
+        } })} />
       <StatCard label="প্রিমিয়াম" value={premiumCount.data?.totalItems} hint="বর্তমান Premium/Subscriber flag" active={params.get("accountType") === "premium"}
         onClick={() => push((q) => { if (q.get("accountType") === "premium") q.delete("accountType"); else q.set("accountType", "premium"); })} />
-      <StatCard label="যাচাই অপেক্ষমাণ" value={pendingCount.data?.totalItems} hint="যাদের যাচাই অবস্থা pending" active={params.get("verificationStatus") === "pending"}
-        onClick={() => push((q) => { if (q.get("verificationStatus") === "pending") q.delete("verificationStatus"); else q.set("verificationStatus", "pending"); })} />
+      <StatCard label="যাচাই অপেক্ষমাণ" value={pendingCount.data?.totalItems} hint="সেভ করা অপ্রকাশিত, যাচাই pending (শুধু সাইনআপ নয়)" active={params.get("verificationStatus") === "pending" && reviewQueue}
+        onClick={() => push((q) => { q.set("reviewQueue","true"); if (q.get("verificationStatus") === "pending") q.delete("verificationStatus"); else q.set("verificationStatus", "pending"); q.delete("publish"); q.delete("memberJourney"); })} />
     </section>
 
     {isAdmin&&customError&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Internal member columns could not load. Refresh to retry.</p>}
     {filtersOpen && <AdminUserFilters onClose={() => setFiltersOpen(false)} />}
     <ActiveFilterChips onEdit={() => setFiltersOpen(true)} />
 
-    <Panel bodyClassName="p-0" title="সদস্য তালিকা"
+    <div className="flex flex-wrap items-center gap-2" aria-label="সদস্য তালিকার ধরন">
+      <button type="button" aria-pressed={reviewQueue}
+        onClick={() => push((q) => { q.set("reviewQueue","true"); q.delete("memberJourney"); q.delete("publish"); q.delete("verificationStatus"); q.delete("sort"); })}
+        className={cn('min-h-10 rounded-lg border px-3 py-2 text-[12px] font-bold transition',
+          reviewQueue?'border-rose-600 bg-rose-600 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-rose-50')}>
+        সেভ করা অপ্রকাশিত বায়োডাটা {reviewCount.data ? '('+reviewCount.data.totalItems.toLocaleString()+')' : ''}
+      </button>
+      <button type="button" aria-pressed={!reviewQueue}
+        onClick={() => push((q) => { q.set("reviewQueue","false"); q.delete("memberJourney"); q.delete("publish"); q.delete("verificationStatus"); })}
+        className={cn('min-h-10 rounded-lg border px-3 py-2 text-[12px] font-bold transition',
+          !reviewQueue?'border-slate-900 bg-slate-900 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}>
+        সব সদস্য দেখুন
+      </button>
+      {reviewQueue && <span className="text-[12px] text-slate-600">শুধু প্রোফাইল সেভ করেছে, কিন্তু এখনো প্রকাশিত নয় · {params.get('sort')&&params.get('sort')!=='recentlySaved'?'নির্বাচিত ক্রমে সাজানো':'সর্বশেষ সেভ আগে'} · ৩০ সেকেন্ড পরপর আপডেট</span>}
+    </div>
+
+    <Panel bodyClassName="p-0" title={reviewQueue?"অপ্রকাশিত সেভ করা বায়োডাটা":"সদস্য তালিকা"}
       description={data ? `দেখানো হচ্ছে ${firstRow.toLocaleString()}–${lastRow.toLocaleString()}, মোট ${data.totalItems.toLocaleString()} জন` : "লোড হচ্ছে…"}
       actions={isFetching && !isLoading ? <span className="inline-flex items-center gap-1.5 text-[12px] text-[#6c757d]"><Loader2 size={13} className="animate-spin" /> আপডেট হচ্ছে</span> : undefined}>
       {error ? <div className="px-4 py-14 text-center">
@@ -618,7 +655,7 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
                 <td className="sticky right-0 z-10 w-[220px] min-w-[220px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
               </tr>)}
               {!isLoading && !users.length && <tr><td colSpan={4+visibleColumns.length+profileColumns.length} className="px-3 py-14 text-center text-[13px] text-[#6c757d]">
-                কোনো ব্যবহারকারী পাওয়া যায়নি।
+                {reviewQueue ? 'এখনো কোনো অপ্রকাশিত সেভ করা বায়োডাটা পাওয়া যায়নি।' : 'কোনো ব্যবহারকারী পাওয়া যায়নি।'}
                 {!noFilters && <button type="button" className="ml-1 font-medium text-rose-700 underline"
                   onClick={() => push((q) => { q.delete("query"); q.delete("gender"); q.delete("publish"); })}>খোঁজ ও প্রধান ফিল্টার মুছুন</button>}
               </td></tr>}

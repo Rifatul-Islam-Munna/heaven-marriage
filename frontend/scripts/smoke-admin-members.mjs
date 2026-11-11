@@ -19,6 +19,7 @@ const member={
  maritalStatus:'single',numberOfConnections:2,completionPercentage:60,
  completionRequiredCount:10,completionAnsweredCount:6,completionSchemaRevision:16,
  memberJourney:'in_progress',biodataStage:'draft',isSubscriber:false,
+ draftSavedAt:'2026-11-11T11:50:00.000Z',
  isOtpVerified:true,isPublishFromAdmin:false,verificationStatus:'pending',
 };
 const maritalField='builtin_1111111111111111';
@@ -28,6 +29,7 @@ const allProfileFields=[
  {id:maritalField,label:'বৈবাহিক অবস্থা',section:'ব্যক্তিগত তথ্য',type:'select'},
  {id:workField,label:'পেশা',section:'কর্মজীবন',type:'text'},
 ];
+const memberQueries=[];
 const permissions=['users','faq','ai-training','guidelines','contact','visual-editor',
  'seo','blog','images','pricing','questions','settings','upgrades'];
 function reply(res,status,data){
@@ -39,6 +41,7 @@ const backend=http.createServer(async(req,res)=>{
  const route=url.pathname;
  if(route==='/staff-access/me')return reply(res,200,{role:'admin',isAdmin:true,permissions});
  if(route==='/user/get-all-user-for-admin'){
+   memberQueries.push(url.searchParams.toString());
    const one=[member];const limit=Number(url.searchParams.get('limit')||10);
    return reply(res,200,{data:one,totalItems:1,page:1,limit,totalPages:1,
      hasNextPage:false,hasPreviousPage:false});
@@ -140,6 +143,25 @@ try{
  console.log('PASS: Name, clickable biodata ID, email and phone display larger bold text.');
  assert.match(result.progress||'',/60%/);
  assert.match(result.progress||'',/6 \/ 10/);
+ assert.match(result.progress||'',/সর্বশেষ সেভ/);
+ assert.ok(memberQueries.some(q=>new URLSearchParams(q).get('reviewQueue')==='true'&&new URLSearchParams(q).get('limit')!=='1'),
+   'Default member table must request the saved unpublished review queue');
+ const reviewButtons=await tab.evaluate(()=>[...document.querySelectorAll('button[aria-pressed]')]
+   .map(el=>({text:el.textContent?.trim()||'',pressed:el.getAttribute('aria-pressed')})));
+ assert.ok(reviewButtons.some(b=>b.text.includes('সেভ করা অপ্রকাশিত বায়োডাটা')&&b.pressed==='true'));
+ await tab.evaluate(()=>{
+   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.trim()==='সব সদস্য দেখুন');
+   if(!b)throw Error('All members view button missing');b.click();
+ });
+ await tab.waitForFunction(()=>new URL(location.href).searchParams.get('reviewQueue')==='false',{timeout:10000});
+ await tab.waitForFunction(()=>[...document.querySelectorAll('button[aria-pressed]')]
+   .some(b=>b.textContent?.trim()==='সব সদস্য দেখুন'&&b.getAttribute('aria-pressed')==='true'),{timeout:10000});
+ await tab.evaluate(()=>{
+   const b=[...document.querySelectorAll('button')].find(el=>el.textContent?.includes('সেভ করা অপ্রকাশিত বায়োডাটা'));
+   if(!b)throw Error('Saved biodata review view button missing');b.click();
+ });
+ await tab.waitForFunction(()=>new URL(location.href).searchParams.get('reviewQueue')==='true',{timeout:10000});
+ console.log('PASS: Default review queue, last-saved timestamp, and view-all toggle render correctly.');
  assert.match(result.progress||'',/অবিবাহিত/);
  assert.doesNotMatch(result.progress||'',/Follow-up/);
  const visibleActions=[

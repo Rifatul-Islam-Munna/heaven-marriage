@@ -338,12 +338,14 @@ export class AdminUserDto extends UserFilterDto {
  @IsOptional() @IsDateString() registeredTo?:string;
  @IsOptional() @Type(()=>Number) @IsInt() @Min(0) connectionsMin?:number;
  @IsOptional() @Type(()=>Number) @IsInt() @Min(0) connectionsMax?:number;
- @IsOptional() @IsIn(['newest','oldest','ageAsc','ageDesc','connectionsAsc','connectionsDesc']) sort?:string;
+ @IsOptional() @IsIn(['recentlySaved','newest','oldest','ageAsc','ageDesc','connectionsAsc','connectionsDesc']) sort?:string;
 
  @IsOptional() @Type(()=>Number) @IsInt() @Min(1) @Max(200) limit?:number=10;
  @IsOptional() @IsString() isPublished?:string;
  @IsOptional() @IsString() accountType?:string;
  @IsOptional() @IsString() verificationStatus?:string;
+ // Review queue is opt-in for this API so other consumers can still list all members.
+ @IsOptional() @IsIn(['true','false']) reviewQueue?:string;
  @IsOptional() @IsString() biodataStatus?:string;
  @IsOptional() @IsIn(['signed_up','in_progress','submitted','published']) memberJourney?:string;
 }

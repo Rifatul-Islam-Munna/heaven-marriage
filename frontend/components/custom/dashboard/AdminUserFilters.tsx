@@ -58,6 +58,7 @@ const rangePairs = [
   { min: "connectionsMin", max: "connectionsMax", label: "কানেকশন", lower: 0, step: 1 },
 ];
 const sortOptions: Option[] = [
+  { value: "recentlySaved", label: "সর্বশেষ বায়োডাটা সেভ আগে" },
   { value: "newest", label: "নতুন আগে" },
   { value: "oldest", label: "পুরোনো আগে" },
   { value: "ageAsc", label: "বয়স: কম থেকে বেশি" },
