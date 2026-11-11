@@ -10,7 +10,7 @@ import { adminFilter, adminSort } from './profile-rules';
 import { UpdateUserDto, ReqForDto, NewPasswordResetWithOtp } from './dto/update-user.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { SmsService } from './sms.service';
 import { MessagingService, normalizePhone } from './messaging.service';
 describe('OTP challenge security', () => {
@@ -503,39 +503,88 @@ describe('OTP request validation and SMS submission', () => {
   const config = new ConfigService({
     BULKSMSBD_API_KEY: 'fake-key',
     BULKSMSBD_SENDER_ID: 'fake-sender',
-    BULKSMSBD_API_URL: 'https://example.invalid/sms',
   });
-  it('does not report success for provider errors returned over HTTP 200', async () => {
-    const get = jest
-      .fn()
-      .mockReturnValue(
-        of({
-          data: { response_code: 1007, error_message: 'Balance Insufficient' },
-        }),
-      );
-    const sms = new SmsService({ get } as any, config);
+  it.each([
+    [1002, 'Sender ID'],
+    [1007, 'Insufficient SMS balance'],
+    [1012, 'Bengali'],
+    [1032, 'not whitelisted'],
+  ])('reports actionable BulkSMSBD response code %s without exposing provider data', async (code, explanation) => {
+    const post = jest.fn().mockReturnValue(of({
+      data: { response_code: code, error_message: 'Secret provider details' },
+    }));
+    const sms = new SmsService({ post } as any, config);
     await expect(
-      sms.sendSms({ number: '01712345678', message: 'synthetic test' }),
-    ).rejects.toMatchObject({ status: 503 });
+      sms.sendSms({ number: '01712345678', message: 'Test code 123456' }),
+    ).rejects.toThrow(explanation as string);
+    expect(post).toHaveBeenCalledTimes(1);
   });
-  it('accepts the provider success code and normalizes the destination', async () => {
-    const get = jest.fn().mockReturnValue(of({ data: { response_code: 202 } }));
-    const sms = new SmsService({ get } as any, config);
+  it.each([
+    '01712345678',
+    '1712345678',
+    '8801712345678',
+    '+8801712345678',
+    '০১৭১২৩৪৫৬৭৮',
+  ])('submits %s only through BulkSMSBD as a POST with Bangla-safe encoding', async (phone) => {
+    const post = jest.fn().mockReturnValue(of({
+      data: { response_code: '202', message_id: 'synthetic' },
+    }));
+    const sms = new SmsService({ post } as any, config);
     await expect(
-      sms.sendSms({ number: '01712345678', message: 'synthetic test' }),
+      sms.sendSms({ number: phone, message: 'আপনার OTP: 123456' }),
     ).resolves.toMatchObject({ success: true });
-    expect(get.mock.calls[0][1].params.number).toBe('8801712345678');
-    expect(get.mock.calls[0][1].timeout).toBe(15000);
+    const [url, rawBody, opts] = post.mock.calls[0];
+    const body = new URLSearchParams(rawBody);
+    expect(url).toBe('https://bulksmsbd.net/api/smsapi');
+    expect(body.get('number')).toBe('8801712345678');
+    expect(body.get('message')).toBe('আপনার OTP: 123456');
+    expect(body.get('api_key')).toBe('fake-key');
+    expect(body.get('senderid')).toBe('fake-sender');
+    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+    expect(opts.timeout).toBe(15000);
+    expect(url).not.toContain('fake-key');
   });
-  it('routes Bangladesh SMS, email and international SMS without real network calls', async () => {
+  it('rejects international and invalid numbers without contacting BulkSMSBD', async () => {
+    const post = jest.fn();
+    const sms = new SmsService({ post } as any, config);
+    for (const phone of ['+14155550123', '017123', '001712345678']) {
+      await expect(sms.sendSms({ number: phone, message: 'Test' }))
+        .rejects.toMatchObject({ status: 400 });
+    }
+    expect(post).not.toHaveBeenCalled();
+  });
+  it('reports a safe provider rejection sent with HTTP 403 and never leaks credentials', async () => {
+    const post = jest.fn().mockReturnValue(throwError(() => ({
+      response: { status: 403, data: { response_code: 1032, message: 'Server IP 203.0.113.5' } },
+      config: { data: 'api_key=fake-key&message=Test+code+123456' },
+    })));
+    const sms = new SmsService({ post } as any, config);
+    let message = '';
+    try {
+      await sms.sendSms({ number: '01712345678', message: 'Test code 123456' });
+    } catch (e) {
+      message = String((e as Error).message);
+    }
+    expect(message).toContain('1032');
+    expect(message).not.toContain('fake-key');
+    expect(message).not.toContain('203.0.113.5');
+    expect(message).not.toContain('123456');
+  });
+  it('reads the official BulkSMSBD balance endpoint with no SMS submission', async () => {
+    const post = jest.fn().mockReturnValue(of({ data: { response_code: 202, balance: '496' } }));
+    const sms = new SmsService({ post } as any, config);
+    await expect(sms.checkBalance()).resolves.toEqual({ success: true, balance: 496 });
+    const [url, rawBody] = post.mock.calls[0];
+    expect(url).toBe('https://bulksmsbd.net/api/getBalanceApi');
+    expect(new URLSearchParams(rawBody).get('api_key')).toBe('fake-key');
+    expect(url).not.toContain('fake-key');
+  });
+  it('routes Bangladesh OTP only to BulkSMSBD, leaves email separate and rejects international SMS', async () => {
     const sms = { sendSms: jest.fn().mockResolvedValue({ success: true }) };
     const gateway = new MessagingService(
       new ConfigService({
         RESEND_API_KEY: 'fake',
         EMAIL_FROM: 'test@example.com',
-        TWILIO_ACCOUNT_SID: 'fake',
-        TWILIO_AUTH_TOKEN: 'fake',
-        TWILIO_FROM: '+14155550100',
       }),
       sms as any,
     );
@@ -543,18 +592,22 @@ describe('OTP request validation and SMS submission', () => {
       Response.json({ id: 'test-resend-email-id' }, { status: 200 }),
     );
     try {
-      await gateway.send('01712345678', 'synthetic');
-      expect(sms.sendSms).toHaveBeenCalledTimes(1);
+      await gateway.send('+8801712345678', 'synthetic');
+      expect(sms.sendSms).toHaveBeenCalledWith({
+        number: '01712345678', message: 'synthetic',
+      });
       await gateway.send('test@example.com', 'synthetic');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0]).toBe('https://api.resend.com/emails');
-      await gateway.send('+14155550123', 'synthetic');
-      expect(String(fetchMock.mock.calls[1][0])).toContain('api.twilio.com');
+      await expect(gateway.send('+14155550123', 'synthetic'))
+        .rejects.toThrow('Bangladesh mobile numbers only');
+      expect(sms.sendSms).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
       fetchMock.mockResolvedValueOnce(
         Response.json({ name: 'validation_error', message: 'sender not verified', statusCode: 403 }, { status: 403 }),
       );
-      await expect(
-        gateway.send('test@example.com', 'synthetic'),
-      ).rejects.toMatchObject({ status: 503 });
+      await expect(gateway.send('test@example.com', 'synthetic'))
+        .rejects.toMatchObject({ status: 503 });
     } finally {
       fetchMock.mockRestore();
     }

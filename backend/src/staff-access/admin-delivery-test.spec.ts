@@ -20,10 +20,6 @@ describe('Admin delivery diagnostic security and test OTP', () => {
     EMAIL_FROM: 'Niqaha <test@example.com>',
     BULKSMSBD_API_KEY: 'testing-bangladesh-key',
     BULKSMSBD_SENDER_ID: 'testing-sender',
-    BULKSMSBD_API_URL: 'https://sms.example.test',
-    TWILIO_ACCOUNT_SID: '',
-    TWILIO_AUTH_TOKEN: '',
-    TWILIO_FROM: '',
   });
 
   beforeAll(async () => {
@@ -48,8 +44,8 @@ describe('Admin delivery diagnostic security and test OTP', () => {
     expect(response.email).toEqual({
       provider: 'Resend', configured: true, sender: 'Niqaha <test@example.com>',
     });
-    expect(response.bangladeshSms.configured).toBe(true);
-    expect(response.internationalSms.configured).toBe(false);
+    expect(response.bangladeshSms).toEqual({ provider: 'BulkSMSBD', configured: true });
+    expect(response).not.toHaveProperty('internationalSms');
     expect(JSON.stringify(response)).not.toContain('testing-key');
     expect(JSON.stringify(response)).not.toContain('testing-only');
   });
@@ -104,12 +100,13 @@ describe('Admin delivery diagnostic security and test OTP', () => {
     })).rejects.toThrow(BadRequestException);
   });
 
-  it('uses the same SMS dispatch route, and blocks unconfigured international SMS', async () => {
-    await service.sendOtp(actor, { channel: 'sms', to: '01712345678' });
+  it('uses only BulkSMSBD for Bangladesh OTP and rejects international SMS', async () => {
+    await service.sendOtp(actor, { channel: 'sms', to: '+8801712345678' });
     expect(messages.send.mock.calls[0][0]).toBe('01712345678');
     await expect(service.sendOtp('another-admin', {
       channel: 'sms', to: '+447123456789',
-    })).rejects.toThrow('SMS settings');
+    })).rejects.toThrow('Bangladesh mobile numbers only');
+    expect(messages.send).toHaveBeenCalledTimes(1);
   });
 
   it('requires an admin role, never grants access to a manager', () => {

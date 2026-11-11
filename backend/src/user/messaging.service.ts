@@ -119,35 +119,11 @@ export class MessagingService {
     }
 
     const phone = normalizePhone(subject);
-    if (phone.startsWith('01')) {
-      await this.sms.sendSms({ number: phone, message: text });
-      return;
+    if (!/^01[3-9]\d{8}$/.test(phone)) {
+      throw new BadRequestException(
+        'SMS verification supports Bangladesh mobile numbers only (01XXXXXXXXX).',
+      );
     }
-    const sid = this.config.get<string>('TWILIO_ACCOUNT_SID'),
-      token = this.config.get<string>('TWILIO_AUTH_TOKEN'),
-      from = this.config.get<string>('TWILIO_FROM');
-    if (!sid || !token || !from)
-      throw new ServiceUnavailableException(
-        'International SMS is not configured. Please use email verification.',
-      );
-    const r = await fetch(
-      'https://api.twilio.com/2010-04-01/Accounts/' +
-        encodeURIComponent(sid) +
-        '/Messages.json',
-      {
-        method: 'POST',
-        headers: {
-          Authorization:
-            'Basic ' + Buffer.from(sid + ':' + token).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ To: phone, From: from, Body: text }),
-        signal: AbortSignal.timeout(15000),
-      },
-    );
-    if (!r.ok)
-      throw new ServiceUnavailableException(
-        'SMS delivery failed. Please retry.',
-      );
+    await this.sms.sendSms({ number: phone, message: text });
   }
 }

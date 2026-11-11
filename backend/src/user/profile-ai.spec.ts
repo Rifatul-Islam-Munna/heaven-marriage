@@ -309,13 +309,13 @@ describe('Authenticated Gemini profile assistant', () => {
 });
 
 describe('Optional OTP delivery configuration',()=>{
- it('keeps email and international SMS disabled when credentials are empty while retaining Bangladesh SMS',async()=>{
+ it('keeps email unavailable without credentials and routes only Bangladesh numbers to BulkSMSBD',async()=>{
   const sms={sendSms:jest.fn().mockResolvedValue({success:true})};
-  const service=new MessagingService(new ConfigService({RESEND_API_KEY:'',EMAIL_FROM:'',TWILIO_ACCOUNT_SID:'',TWILIO_AUTH_TOKEN:'',TWILIO_FROM:''}),sms as any);
+  const service=new MessagingService(new ConfigService({RESEND_API_KEY:'',EMAIL_FROM:''}),sms as any);
   const network=jest.spyOn(global,'fetch');
   try{
    await expect(service.send('test@example.com','synthetic')).rejects.toMatchObject({status:503});
-   await expect(service.send('+14155550123','synthetic')).rejects.toMatchObject({status:503});
+   await expect(service.send('+14155550123','synthetic')).rejects.toMatchObject({status:400});
    expect(network).not.toHaveBeenCalled();
    await service.send('01712345678','synthetic');
    expect(sms.sendSms).toHaveBeenCalledTimes(1);

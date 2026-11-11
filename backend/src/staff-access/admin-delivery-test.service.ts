@@ -35,11 +35,7 @@ export class AdminDeliveryTestService implements OnModuleInit {
       },
       bangladeshSms: {
         provider: 'BulkSMSBD',
-        configured: configured('BULKSMSBD_API_KEY') && configured('BULKSMSBD_SENDER_ID') && configured('BULKSMSBD_API_URL'),
-      },
-      internationalSms: {
-        provider: 'Twilio',
-        configured: configured('TWILIO_ACCOUNT_SID') && configured('TWILIO_AUTH_TOKEN') && configured('TWILIO_FROM'),
+        configured: configured('BULKSMSBD_API_KEY') && configured('BULKSMSBD_SENDER_ID'),
       },
     };
   }
@@ -58,7 +54,11 @@ export class AdminDeliveryTestService implements OnModuleInit {
     if (channel !== 'sms' || typeof value !== 'string' || value.length > 30) {
       throw new BadRequestException('Choose email or SMS and enter a valid destination.');
     }
-    return normalizePhone(value);
+    const phone = normalizePhone(value);
+    if (!/^01[3-9]\d{8}$/.test(phone)) {
+      throw new BadRequestException('BulkSMSBD supports Bangladesh mobile numbers only.');
+    }
+    return phone;
   }
 
   private digest(id: string, code: string): Buffer {
@@ -114,8 +114,8 @@ export class AdminDeliveryTestService implements OnModuleInit {
     const to = this.destination(input.to, channel);
     const status = this.status();
     if (channel === 'email' && !status.email.configured) throw new ServiceUnavailableException('Email settings are incomplete.');
-    if (channel === 'sms' && !(to.startsWith('01') ? status.bangladeshSms.configured : status.internationalSms.configured)) {
-      throw new ServiceUnavailableException('SMS settings for that number are incomplete.');
+    if (channel === 'sms' && !status.bangladeshSms.configured) {
+      throw new ServiceUnavailableException('BulkSMSBD API key or sender ID is missing.');
     }
     const lock = await this.acquire(actorId, 'otp');
     const challengeId = randomUUID();

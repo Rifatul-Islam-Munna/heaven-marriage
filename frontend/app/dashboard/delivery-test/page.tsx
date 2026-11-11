@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Provider = { provider: string; configured: boolean; sender?: string | null };
-type Status = { email: Provider; bangladeshSms: Provider; internationalSms: Provider };
+type Status = { email: Provider; bangladeshSms: Provider };
 type TestResponse = {
   accepted?: boolean;
   challengeId?: string;
@@ -154,11 +154,10 @@ export default function DeliveryTestPage() {
 
   const providers = [
     { key: "email" as const, label: "ইমেইল", note: "Resend · ইমেইল OTP" },
-    { key: "bangladeshSms" as const, label: "বাংলাদেশ SMS", note: "BulkSMSBD · 01 নম্বর" },
-    { key: "internationalSms" as const, label: "আন্তর্জাতিক SMS", note: "Twilio · +Country code" },
+    { key: "bangladeshSms" as const, label: "বাংলাদেশ SMS", note: "BulkSMSBD · 01 নম্বর, দেশের কোড প্রয়োজন নেই" },
   ];
   const otpConfigured = channel === "email" ? !!status?.email.configured
-    : !!(status?.bangladeshSms.configured || status?.internationalSms.configured);
+    : !!status?.bangladeshSms.configured;
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -181,7 +180,7 @@ export default function DeliveryTestPage() {
         <CardContent className="space-y-3">
           {loadingStatus && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> সেটআপ পরীক্ষা হচ্ছে...</p>}
           {statusError && <Result status={{ ok: false, text: statusError }} />}
-          {status && <div className="grid gap-3 sm:grid-cols-3">
+          {status && <div className="grid gap-3 sm:grid-cols-2">
             {providers.map((item) => {
               const provider = status[item.key];
               return (
