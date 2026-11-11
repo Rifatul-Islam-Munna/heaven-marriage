@@ -118,21 +118,35 @@ try{
  assert.match(result.progress||'',/6 \/ 10/);
  assert.match(result.progress||'',/অবিবাহিত/);
  assert.doesNotMatch(result.progress||'',/Follow-up/);
- assert.ok(await tab.$('button[aria-label*="প্রোফাইল এডিট করুন"]'));
- assert.ok(await tab.$('button[aria-label*="বায়োডাটা প্রকাশ করুন"]'));
+ const visibleActions=[
+   'প্রোফাইল এডিট করুন','বায়োডাটা প্রকাশ করুন','স্মার্ট ম্যাচিং খুলুন',
+   'WhatsApp-এ পাঠান','ফোন ছাড়া বায়োডাটা কপি','যোগাযোগসহ কপি','সদস্য মুছুন',
+ ];
+ for(const action of visibleActions)
+   assert.ok(await tab.$('tbody button[aria-label*="'+action+'"]'),
+     'Member action must be visible: '+action);
+ assert.equal(await tab.$('tbody button[aria-label*="অন্যান্য অ্যাকশন"]'),null,
+   'No More menu should be present in member rows');
  assert.equal(result.quick.includes('মেম্বারশিপ'),false,'Advanced filters must start collapsed');
- await tab.click('button[aria-label*="অন্যান্য অ্যাকশন"]');
- await tab.waitForSelector('[data-slot="dropdown-menu-content"]',{timeout:7000});
- const menu=await tab.$eval('[data-slot="dropdown-menu-content"]',el=>el.textContent||'');
- assert.doesNotMatch(menu,/স্মার্ট ম্যাচিং/);
- assert.ok(await tab.$('button[aria-label*="স্মার্ট ম্যাচিং খুলুন"]'),
-   'Smart matching must be visible outside three-dot menu');
- assert.match(menu,/সদস্য মুছুন/);
+ await tab.click('tbody button[aria-label*="সদস্য মুছুন"]');
+ await tab.waitForSelector('[role="alertdialog"]',{timeout:7000});
+ assert.match(await tab.$eval('[role="alertdialog"]',el=>el.textContent||''),/Fatima Example/);
+ await tab.evaluate(()=>{
+   const cancel=[...document.querySelectorAll('[role="alertdialog"] button')]
+     .find(el=>el.textContent?.trim()==='বাতিল');
+   if(!cancel)throw Error('Delete cancel action missing');
+   cancel.click();
+ });
+ await tab.waitForFunction(()=>!document.querySelector('[role="alertdialog"]'));
+ await tab.click('tbody button[aria-label*="WhatsApp-এ পাঠান"]');
+ await tab.waitForSelector('[role="dialog"]',{timeout:7000});
+ assert.match(await tab.$eval('[role="dialog"]',el=>el.textContent||''),/WhatsApp/);
  await tab.keyboard.press('Escape');
+ await tab.waitForFunction(()=>!document.querySelector('[role="dialog"]'));
  const categories=await tab.evaluate(()=>[...document.querySelectorAll('button[aria-label$=" নেভিগেশন"]')]
    .map(el=>el.getAttribute('aria-label')));
  assert.ok(categories.length>=5,'Expected grouped admin sidebar navigation');
- console.log('PASS: Edit, Publish and Smart Matching are visible; less-common actions are in the three-dot menu.');
+ console.log('PASS: All seven member actions are visible without a More menu; delete confirmation and WhatsApp share open correctly.');
  console.log('PASS: Real biodata field shown, hidden Hot Data, merged progress/connection/subscriber and grouped sidebar.');
  await tab.click('button[aria-controls="member-quick-filters"]');
  for(const quick of ['মেম্বারশিপ','যাচাই অবস্থা','বৈবাহিক অবস্থা','জেলা','সাজানোর ক্রম'])
@@ -158,7 +172,7 @@ try{
    .some(el=>el.textContent?.includes('পেশা')&&el.querySelector('input[type="checkbox"]')?.checked),
    {timeout:6000});
  await tab.evaluate(()=>{
-   const btn=[...document.querySelectorAll('section[aria-label="কলাম এডিট"] button')]
+   const btn=[...document.querySelectorAll('[role="dialog"] footer button')]
      .find(el=>el.textContent?.includes('কলাম আপডেট'));
    if(!btn)throw Error('Column update missing');btn.click();
  });
@@ -196,7 +210,7 @@ try{
    if(!item)throw Error('Field missing');item.querySelector('input[type="checkbox"]')?.click();
  });
  await tab.evaluate(()=>{
-   const btn=[...document.querySelectorAll('section[aria-label="কলাম এডিট"] button')]
+   const btn=[...document.querySelectorAll('[role="dialog"] footer button')]
      .find(el=>el.textContent?.includes('তালিকায় যোগ করুন'));
    if(!btn)throw Error('Add to layout missing');btn.click();
  });
@@ -240,11 +254,18 @@ try{
  const mobile=await tab.evaluate(()=>({
    text:document.querySelector('ul.md\\:hidden')?.textContent||'',
    filterButton:!!document.querySelector('button[aria-controls="member-quick-filters"]'),
+   buttons:[...document.querySelectorAll('ul.md\\:hidden button[aria-label]')]
+     .map(el=>el.getAttribute('aria-label')||''),
  }));
  assert.match(mobile.text,/fatima@example.com/);
  assert.match(mobile.text,/6 \/ 10/);
  assert.ok(mobile.filterButton);
- console.log('PASS: Mobile member card retains combined contact, progress, service controls, and collapsible filters.');
+ for(const action of ['WhatsApp-এ পাঠান','ফোন ছাড়া বায়োডাটা কপি','যোগাযোগসহ কপি','সদস্য মুছুন'])
+   assert.ok(mobile.buttons.some(label=>label.includes(action)),
+     'Mobile member action must be visible: '+action);
+ assert.ok(!mobile.buttons.some(label=>label.includes('অন্যান্য অ্যাকশন')),
+   'No More menu should be present on mobile');
+ console.log('PASS: Mobile member card retains contact, progress, service controls and all member actions.');
 }finally{
  if(browser)await browser.close().catch(()=>{});
  if(next)next.kill();

@@ -115,6 +115,12 @@ export class IdentityService {
   async register(p: any) {
     const subject = this.subject(p),
       email = subject.includes('@');
+    // Phone registrations use only Bangladesh mobile OTP (no international SMS).
+    if (!email && !/^01[3-9]\d{8}$/.test(subject)) {
+      throw new BadRequestException(
+        'শুধু বাংলাদেশের মোবাইল নম্বর দিয়ে নিবন্ধন করুন (যেমন 01712345678)।',
+      );
+    }
     if (
       !p.name ||
       !['male', 'female'].includes(p.gender) ||

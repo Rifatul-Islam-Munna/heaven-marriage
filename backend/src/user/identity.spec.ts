@@ -93,6 +93,42 @@ describe('OTP challenge security', () => {
     ).rejects.toThrow();
   });
 
+  it.each([
+    '01712345678',
+    '1712345678',
+    '+8801712345678',
+    '8801712345678',
+    '০১৭১২৩৪৫৬৭৮',
+  ])('registers %s using Bangladesh mobile OTP without requiring a country code', async (input) => {
+    const result = await service.register({
+      name: 'Bangladesh Test',
+      gender: 'female',
+      phoneNumber: input,
+      password: 'Password123',
+    });
+    expect(messages.send).toHaveBeenCalledWith(
+      '01712345678',
+      expect.stringContaining('Niqaha.com OTP'),
+    );
+    const code = messages.send.mock.calls[0][1].match(/\d{6}/)[0];
+    const verified = await service.verify({ challengeId: result.challengeId, otp: code });
+    expect(verified.data.phoneNumber).toBe('01712345678');
+    expect(verified.data.isPhoneVerified).toBe(true);
+    expect(verified.data.isEmailVerified).not.toBe(true);
+    const loggedIn = await service.login({ phoneNumber: input, password: 'Password123' });
+    expect(loggedIn.user.phoneNumber).toBe('01712345678');
+  });
+
+  it('rejects international mobile numbers during registration', async () => {
+    await expect(service.register({
+      name: 'Not Bangladesh',
+      gender: 'male',
+      phoneNumber: '+14155550123',
+      password: 'Password123',
+    })).rejects.toThrow('শুধু বাংলাদেশের');
+    expect(messages.send).not.toHaveBeenCalled();
+  });
+
   const deliveredCode = () =>
     messages.send.mock.calls.at(-1)![1].match(/\d{6}/)[0];
   async function verifiedAccount(email = 'reset@example.com') {

@@ -14,6 +14,8 @@ export function normalizePhone(value: string) {
     .replace(/[০-৯]/g, (n) => String('০১২৩৪৫৬৭৮৯'.indexOf(n)))
     .replace(/[\s()-]/g, '');
   if (/^01[3-9]\d{8}$/.test(v)) return v;
+  if (/^1[3-9]\d{8}$/.test(v)) return '0' + v;
+  if (/^8801[3-9]\d{8}$/.test(v)) return '0' + v.slice(3);
   if (/^\+8801[3-9]\d{8}$/.test(v)) return '0' + v.slice(4);
   if (!/^\+[1-9]\d{6,14}$/.test(v))
     throw new BadRequestException(

@@ -18,6 +18,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { toast } from "sonner";
+import { normalizeBangladeshMobile } from "@/lib/bangladesh-mobile";
 
 export default function SignUp() {
   const router = useRouter();
@@ -44,8 +46,16 @@ export default function SignUp() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate({...formData,phoneNumber:mode==="phone"?formData.phoneNumber:undefined,email:mode==="email"?formData.email:undefined});
-
+    const phoneNumber = mode === "phone" ? normalizeBangladeshMobile(formData.phoneNumber) : undefined;
+    if (mode === "phone" && !phoneNumber) {
+      toast.error("বাংলাদেশের সঠিক মোবাইল নম্বর লিখুন (যেমন 01712345678)।");
+      return;
+    }
+    mutate({
+      ...formData,
+      phoneNumber: mode === "phone" ? phoneNumber : undefined,
+      email: mode === "email" ? formData.email : undefined,
+    });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,18 +125,26 @@ export default function SignUp() {
                 htmlFor="phoneNumber"
                 className="text-gray-700 font-medium"
               >
-                {mode==="email"?"ইমেইল":"মোবাইল (+country code)"}
+                {mode==="email"?"ইমেইল":"বাংলাদেশি মোবাইল নম্বর"}
               </Label>
               <Input
                 id="phoneNumber"
                 name={mode==="email"?"email":"phoneNumber"}
                 type={mode==="email"?"email":"tel"}
-                placeholder={mode==="email"?"name@example.com":"+8801712345678"}
+                placeholder={mode==="email"?"name@example.com":"01712345678"}
+                inputMode={mode==="phone"?"numeric":undefined}
+                autoComplete={mode==="phone"?"tel-national":"email"}
+                maxLength={mode==="phone"?20:undefined}
                 value={mode==="email"?formData.email:formData.phoneNumber}
                 onChange={handleChange}
                 required
                 className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
               />
+              {mode === "phone" && (
+                <p className="text-xs text-gray-500">
+                  শুধু বাংলাদেশের নম্বর (01XXXXXXXXX) লিখুন। +880 বা দেশের কোড লাগবে না।
+                </p>
+              )}
             </div>
 
             {/* Gender Field */}

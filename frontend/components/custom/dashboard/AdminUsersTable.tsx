@@ -8,7 +8,7 @@ import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Copy, Filter, Loader2, Mail, Pencil, Phone, RefreshCw, Search, Send, Share2,
-  Trash2, Wallet, X, Globe2, Sparkles, MoreHorizontal,
+  Trash2, Wallet, X, Globe2, Sparkles,
 } from "lucide-react";
 import { GetRequestNormal,PatchRequestAxios } from "@/api-hooks/api-hooks";
 import MemberDynamicColumnManager,{MemberValueButton,type MemberAdminColumn,type MemberAdminColumnsResponse} from "./MemberDynamicColumnManager";
@@ -27,7 +27,6 @@ import {
   copyBiodataWhatsappText, openBiodataWhatsappGroupShare,
 } from "@/lib/biodata-whatsapp-share";
 import MemberBiodataColumnPicker,{type ProfileTableColumn,type BiodataFieldColumn} from './MemberBiodataColumnPicker';
-import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem,DropdownMenuSeparator} from '@/components/ui/dropdown-menu';
 import {marriedStatus} from '@/staticData/all-data';
 import {districts} from '@/staticData/districts';
 import AdminUserFilters, { ADVANCED_KEYS, ActiveFilterChips, useActiveFilterCount, useAdminFilterNavigation } from "./AdminUserFilters";
@@ -389,9 +388,9 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     push(q=>{[...ADVANCED_KEYS,'query','gender','publish','memberJourney'].forEach(k=>q.delete(k));});
   };
 
-  const actions = (user:User,compact=false):ReactNode => <div className={cn(
-    'grid w-max grid-cols-[auto_auto] gap-1',compact?'justify-start':'ml-auto justify-end',
-  )}>
+  const actions = (user:User,compact=false):ReactNode => <div
+    aria-label={user.name+' এর অ্যাকশন'}
+    className={cn('grid grid-cols-2 gap-1.5',compact?'w-full':'ml-auto w-[260px]')}>
     <button type="button" onClick={()=>editProfile(user)}
       aria-label={user.name+' এর প্রোফাইল এডিট করুন'}
       className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[12px] font-semibold text-rose-800 transition hover:bg-rose-100">
@@ -410,34 +409,30 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
       className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 text-[11px] font-semibold text-violet-800 transition hover:bg-violet-100">
       <Sparkles size={14}/> ম্যাচিং
     </button>
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={user.name+' এর অন্যান্য অ্যাকশন'}
-          title="আরও অ্যাকশন"
-          className="inline-flex min-h-8 w-full shrink-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-600">
-          <MoreHorizontal size={18}/> আরও
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={6}
-        className="z-[80] w-[230px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-        <DropdownMenuItem onSelect={()=>openShare(user)} className="min-h-10 gap-2.5 text-[13px]">
-          <Share2 size={15} className="text-sky-600"/> WhatsApp-এ পাঠান
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={copyingUserId===user._id} onSelect={()=>void copyProfile(user)}
-          className="min-h-10 gap-2.5 text-[13px]">
-          <Copy size={15} className="text-amber-600"/> ফোন ছাড়া বায়োডাটা কপি
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={copyingUserId===user._id} onSelect={()=>void copyWithContact(user)}
-          className="min-h-10 gap-2.5 text-[13px]">
-          <Phone size={15} className="text-slate-600"/> যোগাযোগসহ কপি
-        </DropdownMenuItem>
-        <DropdownMenuSeparator/>
-        <DropdownMenuItem variant="destructive" onSelect={()=>setDeleteTarget(user)}
-          className="min-h-10 gap-2.5 text-[13px] font-semibold">
-          <Trash2 size={15}/> সদস্য মুছুন
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <button type="button" onClick={()=>openShare(user)}
+      aria-label={user.name+' এর WhatsApp-এ পাঠান'}
+      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-sky-800 transition hover:bg-sky-100">
+      <Share2 size={14} className="shrink-0"/> <span>WhatsApp-এ পাঠান</span>
+    </button>
+    <button type="button" disabled={copyingUserId===user._id}
+      onClick={()=>void copyProfile(user)}
+      aria-label={user.name+' এর ফোন ছাড়া বায়োডাটা কপি'}
+      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-amber-800 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={14} className="shrink-0 animate-spin"/>:<Copy size={14} className="shrink-0"/>}
+      <span>ফোন ছাড়া বায়োডাটা কপি</span>
+    </button>
+    <button type="button" disabled={copyingUserId===user._id}
+      onClick={()=>void copyWithContact(user)}
+      aria-label={user.name+' এর যোগাযোগসহ কপি'}
+      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={14} className="shrink-0 animate-spin"/>:<Phone size={14} className="shrink-0"/>}
+      <span>যোগাযোগসহ কপি</span>
+    </button>
+    <button type="button" onClick={()=>setDeleteTarget(user)}
+      aria-label={user.name+' এর সদস্য মুছুন'}
+      className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition hover:bg-red-100">
+      <Trash2 size={14}/> সদস্য মুছুন
+    </button>
   </div>;
 
   const skeletonRows = Array.from({ length: 6 }, (_, i) => <tr key={i} className="border-b border-[#f0f0f0]">
@@ -614,7 +609,7 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
                     onClick={()=>openMemberCell(user,column)}/>
                 </td>)}
                 <td className="px-3 py-2.5"><StatusPills user={user} /></td>
-                <td className="sticky right-0 z-10 min-w-[178px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
+                <td className="sticky right-0 z-10 w-[276px] min-w-[276px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
               </tr>)}
               {!isLoading && !users.length && <tr><td colSpan={4+visibleColumns.length+profileColumns.length} className="px-3 py-14 text-center text-[13px] text-[#6c757d]">
                 কোনো ব্যবহারকারী পাওয়া যায়নি।
