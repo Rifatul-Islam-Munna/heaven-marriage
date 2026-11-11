@@ -8,7 +8,7 @@ import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Copy, Filter, Loader2, Mail, Pencil, Phone, RefreshCw, Search, Send, Share2,
-  Trash2, Wallet, X, Globe2, Sparkles,
+  Trash2, Wallet, X, Globe2, Sparkles, FileClock, Users,
 } from "lucide-react";
 import { GetRequestNormal,PatchRequestAxios } from "@/api-hooks/api-hooks";
 import MemberDynamicColumnManager,{MemberValueButton,type MemberAdminColumn,type MemberAdminColumnsResponse} from "./MemberDynamicColumnManager";
@@ -59,16 +59,12 @@ function pageList(current: number, total: number): (number | "gap")[] {
   return result;
 }
 
-function StatCard({ label, value, hint, active, onClick }: {
-  label: string; value?: number; hint: string; active: boolean; onClick: () => void;
-}) {
-  return <button type="button" onClick={onClick} aria-pressed={active}
-    className={cn("rounded-lg bg-white px-4 py-4 text-left shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-rose-600 sm:px-5",
-      active && "ring-2 ring-rose-400")}>
-    <p className="text-[12px] font-medium uppercase tracking-[0.5px] text-[#6c757d]">{label}</p>
-    <p className="mt-1 text-[26px] font-bold leading-tight tabular-nums">{value === undefined ? "—" : value.toLocaleString()}</p>
-    <p className="mt-1 text-[12px] text-[#6c757d]">{hint}</p>
-  </button>;
+function SummaryCount({ label, value }: { label: string; value?: number }) {
+  return <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-slate-600">
+    {label}: <strong className="text-[13px] font-bold tabular-nums text-slate-900">
+      {value === undefined ? "—" : value.toLocaleString()}
+    </strong>
+  </span>;
 }
 
 function MemberIdentity({user,onEdit,compact=false}:{
@@ -182,7 +178,6 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     page: parseAsInteger.withDefault(1),
     query: parseAsString.withDefault(""),
     gender: parseAsString.withDefault("all"),
-    publish: parseAsString.withDefault("all"),
   });
   const [search, setSearch] = useState(tableFilters.query);
   const [debouncedSearch] = useDebounce(search, 450);
@@ -210,22 +205,33 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tableFilters.query !== debouncedSearch) setSearch(tableFilters.query); }, [tableFilters.query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Default dashboard view: saved, unpublished biodatas needing attention.
-  // Explicit 'all' mode and signup/published views remain accessible.
-  const wantsReviewQueue = params.get("reviewQueue") !== "false";
-  const reviewQueue = wantsReviewQueue && tableFilters.publish !== "true" &&
-    !["signed_up","published"].includes(params.get("memberJourney") || "");
+  // One clear list mode, not overlapping publish/stage/review dropdown filters.
+  // Honour legacy dashboard links but use a single 'view' parameter going forward.
+  const requestedView = params.get("view");
+  type MemberView = "unpublished" | "published" | "all";
+  const memberView: MemberView =
+    requestedView === "unpublished" || requestedView === "published" || requestedView === "all"
+      ? requestedView
+      : params.get("publish") === "true" || params.get("memberJourney") === "published"
+        ? "published"
+        : params.get("reviewQueue") === "false" || params.get("memberJourney") === "signed_up"
+          ? "all" : "unpublished";
+  const reviewQueue = memberView === "unpublished";
+  const selectMemberView = (view: MemberView) => push(q => {
+    q.set("view", view);
+    for (const key of ["reviewQueue", "publish", "isPublished", "memberJourney",
+      "verificationStatus", "biodataStatus", "sort"]) q.delete(key);
+  });
   const query = new URLSearchParams(params.toString());
-  query.delete("reviewQueue");
+  for (const key of ["view", "reviewQueue", "publish", "isPublished", "memberJourney"]) query.delete(key);
   query.set("reviewQueue", reviewQueue ? "true" : "false");
+  query.set("isPublished", memberView === "published" ? "true" : "all");
   query.set("page", tableFilters.page.toString());
   query.set("query", tableFilters.query);
   query.set("gender", tableFilters.gender);
-  query.set("isPublished", tableFilters.publish || "all");
-  query.delete("publish");
 
   const { data, isLoading, isFetching, error, refetch } = useQueryWrapper<Paginated<User>>(
-    ["admin-users", tableFilters.page, tableFilters.query, tableFilters.gender, tableFilters.publish, params.toString(), reviewQueue],
+    ["admin-users", tableFilters.page, tableFilters.query, tableFilters.gender, params.toString(), memberView],
     `/user/get-all-user-for-admin?${query.toString()}`,
     { refetchInterval: reviewQueue ? 30000 : false, refetchOnWindowFocus: true },
   );
@@ -242,7 +248,9 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   const publishedCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "published"], countUrl("isPublished=true"));
   const premiumCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "premium"], countUrl("isPublished=all&accountType=premium"));
   const pendingCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "pending"], countUrl("reviewQueue=true&verificationStatus=pending"));
-  const reviewCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "review"], countUrl("reviewQueue=true"));
+  const reviewCount = useQueryWrapper<Paginated<User>>(["admin-user-count", "review"], countUrl("reviewQueue=true"), {
+    refetchInterval: 30000, refetchOnWindowFocus: true,
+  });
 
   const { data: shareProfile, isLoading: isShareProfileLoading } = useQueryWrapper<BiodataUser>(
     ["admin-share-profile", selectedShareUser?._id],
@@ -307,7 +315,8 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   const limit = data?.limit ?? (Number(params.get("limit")) || 10);
   const firstRow = data?.totalItems ? (page - 1) * limit + 1 : 0;
   const lastRow = data ? Math.min(page * limit, data.totalItems) : 0;
-  const noFilters = !reviewQueue && !tableFilters.query && tableFilters.gender === 'all' && tableFilters.publish === 'all' && !params.get('memberJourney') && !ADVANCED_KEYS.some(key=>key!=='limit'&&key!=='sort'&&params.get(key));
+  const noFilters = !tableFilters.query && tableFilters.gender === 'all' &&
+    !ADVANCED_KEYS.some(key=>key!=='limit'&&key!=='sort'&&params.get(key));
   const connectionNumber = Number(connectionValue);
   const connectionOk = connectionValue !== "" && Number.isInteger(connectionNumber) && connectionNumber >= 0;
 
@@ -395,11 +404,6 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     {key:'maritalStatus',label:'বৈবাহিক অবস্থা',options:marriedStatus.filter(x=>x.en!=='all')
       .map(x=>({value:x.en,label:x.bn}))},
     {key:'districtId',label:'জেলা',options:districts.map(x=>({value:x.name,label:x.bn_name}))},
-    {key:'sort',label:'সাজানোর ক্রম',options:[
-      {value:'recentlySaved',label:'সর্বশেষ সেভ আগে'},
-      {value:'newest',label:'নতুন আগে'},{value:'oldest',label:'পুরোনো আগে'},
-      {value:'ageAsc',label:'বয়স: কম আগে'},{value:'ageDesc',label:'বয়স: বেশি আগে'},
-      {value:'connectionsAsc',label:'কানেকশন: কম আগে'},{value:'connectionsDesc',label:'কানেকশন: বেশি আগে'}]},
   ];
   const clearFilters=()=>{
     setSearch('');
@@ -463,7 +467,10 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
   return <DashboardPage>
     <DashboardHeader
       title="ব্যবহারকারী"
-      description="সব সদস্য খুঁজুন, ফিল্টার করুন এবং পরিচালনা করুন।"
+      description={memberView === "unpublished"
+        ? "সদস্যের সেভ করা অপ্রকাশিত বায়োডাটা দেখুন ও প্রকাশের জন্য প্রস্তুত হলে যাচাই করুন।"
+        : memberView === "published" ? "যেসব বায়োডাটা প্রকাশিত হয়েছে সেগুলো দেখুন।"
+          : "সাইনআপসহ সব সদস্যের অ্যাকাউন্ট দেখুন।"}
       meta={data ? <StatusPill tone="neutral">{data.totalItems.toLocaleString()} জন পাওয়া গেছে</StatusPill> : null}
       actions={<>
         {quickLinks.map((link) => <a key={link.href} href={link.href} className={darkLink}>{link.label}</a>)}
@@ -479,28 +486,57 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
         {search && <button type="button" aria-label="খোঁজ মুছুন" onClick={() => setSearch("")}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/60 hover:text-white"><X size={14} /></button>}
       </label>
-      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-        <select aria-label="লিঙ্গ" value={tableFilters.gender} onChange={(e) => void setTableFilters({ gender: e.target.value, page: 1 })} className={darkField}>
-          <option value="all">সকল লিঙ্গ</option><option value="male">পুরুষ</option><option value="female">মহিলা</option>
-        </select>
-        <select aria-label="প্রকাশ" value={tableFilters.publish} onChange={(e) => void setTableFilters({ publish: e.target.value, page: 1 })} className={darkField}>
-          <option value="all">প্রকাশিত ও লুকানো</option><option value="true">প্রকাশিত</option><option value="false">অপ্রকাশিত</option>
-        </select>
-      </div>
-      <select aria-label="বায়োডাটা অগ্রগতি" value={params.get("memberJourney")||""}
-        onChange={e=>push(q=>{if(e.target.value)q.set("memberJourney",e.target.value);else q.delete("memberJourney");q.set("page","1");})}
-        className={darkField}>
-        <option value="">সব পর্যায়</option>
-        <option value="signed_up">শুধু সাইনআপ</option>
-        <option value="in_progress">খসড়া পূরণ করছে</option>
-        <option value="submitted">জমা হয়েছে, প্রকাশ বাকি</option>
-        <option value="published">প্রকাশিত</option>
+      <select aria-label="লিঙ্গ" value={tableFilters.gender}
+        onChange={(e) => void setTableFilters({ gender: e.target.value, page: 1 })}
+        className={cn(darkField, "w-full sm:w-auto")}>
+        <option value="all">সকল লিঙ্গ</option><option value="male">পুরুষ</option><option value="female">মহিলা</option>
       </select>
-      <DashButton tone={filtersOpen ? "primary" : "ghost-dark"} className="w-full sm:w-auto" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
-        <Filter size={14} /> আরও ফিল্টার
+      <DashButton tone={quickOpen ? "primary" : "ghost-dark"}
+        className="w-full sm:w-auto" aria-expanded={quickOpen}
+        aria-controls="member-quick-filters"
+        onClick={() => { if (quickOpen) setFiltersOpen(false); setQuickOpen(v => !v); }}>
+        <Filter size={14} /> {quickOpen ? "ফিল্টার বন্ধ" : "ফিল্টার"}
         {activeAdvanced > 0 && <span className="rounded-full bg-white px-1.5 text-[11px] font-semibold text-rose-700">{activeAdvanced}</span>}
       </DashButton>
     </DashboardHeader>
+
+    <section aria-label="সদস্য তালিকা বেছে নিন"
+      className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="grid grid-cols-3 gap-2 md:flex md:flex-wrap" role="group" aria-label="কোন সদস্যদের দেখবেন">
+        {([
+          {id:"unpublished" as const,label:"অপ্রকাশিত",count:reviewCount.data?.totalItems,Icon:FileClock},
+          {id:"published" as const,label:"প্রকাশিত",count:publishedCount.data?.totalItems,Icon:Globe2},
+          {id:"all" as const,label:"সব সদস্য",count:totalCount.data?.totalItems,Icon:Users},
+        ]).map(view=><button key={view.id} type="button" onClick={()=>selectMemberView(view.id)}
+          aria-pressed={memberView===view.id}
+          className={cn("flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[12px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 sm:gap-2 sm:px-3 sm:text-[13px]",
+            memberView===view.id
+              ?"border-rose-500 bg-rose-50 text-rose-800 shadow-sm"
+              :"border-slate-200 bg-white text-slate-700 hover:border-rose-300 hover:bg-rose-50/40")}>
+          <view.Icon size={17} aria-hidden="true" className="hidden shrink-0 sm:block"/>
+          <span className="min-w-0">{view.label}</span>
+          <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
+            memberView===view.id?"bg-white text-rose-800":"bg-slate-100 text-slate-600")}>
+            {view.count===undefined?"—":view.count.toLocaleString()}
+          </span>
+        </button>)}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
+        <p className="text-[12px] leading-5 text-slate-600">
+          {memberView==="unpublished"
+            ? params.get("sort") && params.get("sort") !== "recentlySaved"
+              ? "বায়োডাটা সেভ করেছেন, কিন্তু প্রকাশ হয়নি। আপনার বেছে নেওয়া সাজানোর ক্রম অনুযায়ী দেখাচ্ছে।"
+              : "যারা বায়োডাটা সেভ করেছেন কিন্তু প্রকাশ হয়নি, শুধু তারাই এখানে। নতুন সেভ আগে আসবে; শুধু সাইনআপ করলে নয়।"
+            : memberView==="published"
+              ? "শুধু প্রকাশিত বায়োডাটা দেখানো হচ্ছে।"
+              : "সাইনআপ করেছেন এমন সবাই এখানে আছেন, বায়োডাটা সেভ না করলেও।"}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <SummaryCount label="প্রিমিয়াম" value={premiumCount.data?.totalItems}/>
+          <SummaryCount label="যাচাই বাকি" value={pendingCount.data?.totalItems}/>
+        </div>
+      </div>
+    </section>
 
     <div className="flex flex-wrap items-center gap-2">
       {isAdmin&&<MemberBiodataColumnPicker
@@ -511,35 +547,27 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
         <summary className="cursor-pointer font-semibold">পুরোনো নোট কলাম</summary>
         <div className="pt-2"><MemberDynamicColumnManager columns={customData?.columns||[]} onSaved={refreshCustom}/></div>
       </details>}
-      <button type="button" onClick={()=>setQuickOpen(value=>!value)} aria-expanded={quickOpen}
-        aria-controls="member-quick-filters"
-        className={cn('inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 text-[12px] font-semibold transition',
-          quickOpen?'border-rose-300 bg-rose-50 text-rose-800':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}>
-        <Filter size={14}/> {quickOpen?'ফিল্টার লুকান':'দ্রুত ফিল্টার'}
-        {[...ADVANCED_KEYS,'memberJourney'].filter(key=>params.get(key)).length>0&&
-          <span className="rounded-full bg-rose-100 px-1.5 text-[11px] text-rose-800">
-            {[...ADVANCED_KEYS,'memberJourney'].filter(key=>params.get(key)).length}
-          </span>}
-      </button>
       <a href="/dashboard/matching" className="inline-flex items-center gap-2 rounded-lg bg-pink-600 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-pink-700"><Sparkles size={16}/> Admin Smart Matching</a>
-      <details className="max-w-3xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700">
-        <summary className="cursor-pointer font-semibold">স্ট্যাটাসগুলোর মানে কী?</summary>
-        <p className="mt-2 leading-6"><strong>মূল সদস্য:</strong> সাধারণ ইউজার অ্যাকাউন্ট, স্টাফ নয়। <strong>সাবস্ক্রাইবার ও প্রিমিয়াম:</strong> বর্তমানে একই isSubscriber flag; আলাদা পেমেন্ট-ভেরিফিকেশন স্ট্যাটাস নয়। <strong>প্রকাশিত:</strong> উভয় প্রকাশ অনুমতি এবং নিষিদ্ধ নয়। <strong>যাচাই বাকি:</strong> verification pending। <strong>খসড়া:</strong> বায়োডাটা লেখা শুরু হয়েছে কিন্তু জমা হয়নি। <strong>জমা হয়েছে:</strong> রিভিউ/প্রকাশের জন্য দেওয়া হয়েছে।</p>
-      </details>
     </div>
     {quickOpen&&<section id="member-quick-filters" aria-label="দ্রুত মেম্বার ফিল্টার"
       className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-[14px] font-bold text-slate-900">দ্রুত ফিল্টার</h2>
+          <h2 className="text-[14px] font-bold text-slate-900">সদস্য খুঁজতে ফিল্টার করুন</h2>
           <p className="text-[12px] leading-5 text-slate-500">
-            মেম্বারশিপ, যাচাই, বৈবাহিক অবস্থা বা জেলা বেছে নিলেই ফলাফল বদলে যাবে।
+            প্রয়োজন হলে সদস্যপদ, যাচাই অবস্থা, বৈবাহিক অবস্থা বা জেলা বেছে নিন।
           </p>
         </div>
-        <button type="button" onClick={clearFilters}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 hover:border-rose-200 hover:bg-rose-50">
-          সব ফিল্টার মুছুন
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setFiltersOpen(v => !v)} aria-expanded={filtersOpen}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 hover:bg-slate-50">
+            {filtersOpen ? "বিস্তারিত ফিল্টার লুকান" : "বিস্তারিত ফিল্টার"}
+          </button>
+          <button type="button" onClick={clearFilters}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 hover:border-rose-200 hover:bg-rose-50">
+            ফিল্টার মুছুন
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-5">
         {quickFilters.map(filter=><label key={filter.key} className="min-w-0 space-y-1">
@@ -559,63 +587,15 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
           </select>
         </label>)}
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-        <span className="mr-1 text-[12px] font-semibold text-slate-600">বায়োডাটা পর্যায়</span>
-        {[
-          {value:'',label:'সব সদস্য'},
-          {value:'signed_up',label:'শুধু সাইনআপ'},
-          {value:'in_progress',label:'খসড়া'},
-          {value:'submitted',label:'জমা হয়েছে'},
-          {value:'published',label:'প্রকাশিত'},
-        ].map(step=>{
-          const active=step.value?(params.get('memberJourney')||'')===step.value:(!params.get('memberJourney')&&!reviewQueue);
-          return <button type="button" key={step.value} aria-pressed={active}
-            onClick={()=>push(q=>{if(step.value)q.set('memberJourney',step.value);else q.delete('memberJourney');
-              if(!step.value||step.value==='signed_up'||step.value==='published'){
-                q.set('reviewQueue','false'); q.delete('verificationStatus');
-              }})}
-            className={cn('rounded-full border px-3 py-1.5 text-[12px] font-semibold transition',
-              active?'border-rose-600 bg-rose-600 text-white':'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50')}>
-            {step.label}
-          </button>;
-        })}
-      </div>
+
     </section>}
-    <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-      <StatCard label="মূল সদস্য" value={totalCount.data?.totalItems} hint="সক্রিয় সদস্য অ্যাকাউন্ট (মুছে ফেলা বাদ)" active={noFilters}
-        onClick={() => push((q) => { [...ADVANCED_KEYS, "query", "gender", "publish", "memberJourney"].forEach((k) => { if (k !== "limit" && k !== "sort") q.delete(k); }); q.set("reviewQueue","false"); })} />
-      <StatCard label="প্রকাশিত" value={publishedCount.data?.totalItems} hint="বায়োডাটা সবাই দেখতে পায়" active={tableFilters.publish === "true"}
-        onClick={() => push((q) => { if(q.get("publish")==="true") q.delete("publish"); else {
-          q.set("publish","true"); q.set("reviewQueue","false");
-          q.delete("verificationStatus"); q.delete("memberJourney");
-        } })} />
-      <StatCard label="প্রিমিয়াম" value={premiumCount.data?.totalItems} hint="বর্তমান Premium/Subscriber flag" active={params.get("accountType") === "premium"}
-        onClick={() => push((q) => { if (q.get("accountType") === "premium") q.delete("accountType"); else q.set("accountType", "premium"); })} />
-      <StatCard label="যাচাই অপেক্ষমাণ" value={pendingCount.data?.totalItems} hint="সেভ করা অপ্রকাশিত, যাচাই pending (শুধু সাইনআপ নয়)" active={params.get("verificationStatus") === "pending" && reviewQueue}
-        onClick={() => push((q) => { q.set("reviewQueue","true"); if (q.get("verificationStatus") === "pending") q.delete("verificationStatus"); else q.set("verificationStatus", "pending"); q.delete("publish"); q.delete("memberJourney"); })} />
-    </section>
 
     {isAdmin&&customError&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Internal member columns could not load. Refresh to retry.</p>}
     {filtersOpen && <AdminUserFilters onClose={() => setFiltersOpen(false)} />}
-    <ActiveFilterChips onEdit={() => setFiltersOpen(true)} />
+    <ActiveFilterChips onEdit={() => { setQuickOpen(true); setFiltersOpen(true); }} />
 
-    <div className="flex flex-wrap items-center gap-2" aria-label="সদস্য তালিকার ধরন">
-      <button type="button" aria-pressed={reviewQueue}
-        onClick={() => push((q) => { q.set("reviewQueue","true"); q.delete("memberJourney"); q.delete("publish"); q.delete("verificationStatus"); q.delete("sort"); })}
-        className={cn('min-h-10 rounded-lg border px-3 py-2 text-[12px] font-bold transition',
-          reviewQueue?'border-rose-600 bg-rose-600 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-rose-50')}>
-        সেভ করা অপ্রকাশিত বায়োডাটা {reviewCount.data ? '('+reviewCount.data.totalItems.toLocaleString()+')' : ''}
-      </button>
-      <button type="button" aria-pressed={!reviewQueue}
-        onClick={() => push((q) => { q.set("reviewQueue","false"); q.delete("memberJourney"); q.delete("publish"); q.delete("verificationStatus"); })}
-        className={cn('min-h-10 rounded-lg border px-3 py-2 text-[12px] font-bold transition',
-          !reviewQueue?'border-slate-900 bg-slate-900 text-white':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}>
-        সব সদস্য দেখুন
-      </button>
-      {reviewQueue && <span className="text-[12px] text-slate-600">শুধু প্রোফাইল সেভ করেছে, কিন্তু এখনো প্রকাশিত নয় · {params.get('sort')&&params.get('sort')!=='recentlySaved'?'নির্বাচিত ক্রমে সাজানো':'সর্বশেষ সেভ আগে'} · ৩০ সেকেন্ড পরপর আপডেট</span>}
-    </div>
-
-    <Panel bodyClassName="p-0" title={reviewQueue?"অপ্রকাশিত সেভ করা বায়োডাটা":"সদস্য তালিকা"}
+    <Panel bodyClassName="p-0"
+      title={memberView==="unpublished"?"অপ্রকাশিত বায়োডাটা":memberView==="published"?"প্রকাশিত বায়োডাটা":"সব সদস্য"}
       description={data ? `দেখানো হচ্ছে ${firstRow.toLocaleString()}–${lastRow.toLocaleString()}, মোট ${data.totalItems.toLocaleString()} জন` : "লোড হচ্ছে…"}
       actions={isFetching && !isLoading ? <span className="inline-flex items-center gap-1.5 text-[12px] text-[#6c757d]"><Loader2 size={13} className="animate-spin" /> আপডেট হচ্ছে</span> : undefined}>
       {error ? <div className="px-4 py-14 text-center">
@@ -655,9 +635,11 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
                 <td className="sticky right-0 z-10 w-[220px] min-w-[220px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
               </tr>)}
               {!isLoading && !users.length && <tr><td colSpan={4+visibleColumns.length+profileColumns.length} className="px-3 py-14 text-center text-[13px] text-[#6c757d]">
-                {reviewQueue ? 'এখনো কোনো অপ্রকাশিত সেভ করা বায়োডাটা পাওয়া যায়নি।' : 'কোনো ব্যবহারকারী পাওয়া যায়নি।'}
+                {memberView==="unpublished" ? 'এখনো কোনো সেভ করা অপ্রকাশিত বায়োডাটা নেই।'
+                  : memberView==="published" ? 'কোনো প্রকাশিত বায়োডাটা পাওয়া যায়নি।'
+                    : 'কোনো সদস্য পাওয়া যায়নি।'}
                 {!noFilters && <button type="button" className="ml-1 font-medium text-rose-700 underline"
-                  onClick={() => push((q) => { q.delete("query"); q.delete("gender"); q.delete("publish"); })}>খোঁজ ও প্রধান ফিল্টার মুছুন</button>}
+                  onClick={clearFilters}>ফিল্টার মুছুন</button>}
               </td></tr>}
             </tbody>
           </table>
