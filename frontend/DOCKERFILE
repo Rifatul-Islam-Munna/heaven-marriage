@@ -1,48 +1,40 @@
-# ===== Base =====
-FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat
+# Debian/glibc matches Next.js' native Linux SWC binary. Alpine's musl
+# compatibility layer can make Turbopack fall back to unsupported WASM.
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
-# ===== Build Stage (needs ALL dependencies including dev) =====
+# ===== Build (includes dev and platform-specific optional dependencies) =====
 FROM base AS builder
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps --include=optional
 
-# Install ALL dependencies (including devDependencies for build)
-RUN npm ci --legacy-peer-deps
+# Fail immediately if the native Linux compiler cannot load.
+RUN node -e "require('@next/swc-linux-x64-gnu'); console.log('Native Linux SWC loaded')"
 
+# Local Windows node_modules and build artifacts are excluded by .dockerignore.
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build the app
+# Public client variables must be passed at image build time (not runtime).
+ARG NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID}
+
 RUN npm run build
 
-# ===== Production Dependencies =====
-FROM base AS deps
-COPY package.json package-lock.json* ./
-
-# Install ONLY production dependencies
-RUN npm ci --legacy-peer-deps --omit=dev
-
-# ===== Runtime =====
-FROM node:22-alpine AS runner
-WORKDIR /app
-
+# ===== Minimal production runner =====
+FROM base AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=80
-ENV HOSTNAME="0.0.0.0"
+ENV HOSTNAME=0.0.0.0
 
-# Security: run as non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs --create-home nextjs
 
-# Copy only standalone output (minimal files)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
-
 EXPOSE 80
-
 CMD ["node", "server.js"]

@@ -74,24 +74,27 @@ function StatCard({ label, value, hint, active, onClick }: {
 function MemberIdentity({user,onEdit,compact=false}:{
   user:User;onEdit:()=>void;compact?:boolean;
 }){
-  return <div className="min-w-0 space-y-1.5">
+  return <div className="min-w-0 space-y-2">
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" onClick={onEdit}
-        className="max-w-full break-words text-left text-[15px] font-semibold leading-6 text-slate-900 hover:text-pink-700 hover:underline"
+        className="max-w-full break-words text-left text-[16px] font-bold leading-6 text-slate-900 hover:text-pink-700 hover:underline"
         title="সদস্যের বায়োডাটা খুলুন">{user.name||'নাম নেই'}</button>
     </div>
-    <p className="text-[12px] font-medium leading-5 text-slate-500">
-      <span className="font-mono">#{user.userId||'—'}</span>
-      {user.maritalStatus&&<> · {user.maritalStatus}</>}
+    <p className="flex flex-wrap items-center gap-x-1.5 text-[14px] font-bold leading-5 text-slate-700">
+      <button type="button" onClick={onEdit}
+        aria-label={user.name+' এর বায়োডাটা আইডি খুলুন'}
+        className="font-mono font-bold hover:text-pink-700 hover:underline"
+        title="বায়োডাটা খুলুন">#{user.userId||'—'}</button>
+      {user.maritalStatus&&<span>· {user.maritalStatus}</span>}
     </p>
-    <div className={cn('space-y-0.5 text-[12px] leading-5 text-slate-600',compact?'pt-0.5':'')}>
-      <p className="flex min-w-0 items-start gap-1.5">
-        <Mail size={13} className="mt-0.5 shrink-0 text-slate-400" aria-hidden/>
-        {user.email?<a href={'mailto:'+user.email} className="min-w-0 break-all hover:text-pink-700 hover:underline">{user.email}</a>:<span className="text-slate-400">ইমেইল নেই</span>}
+    <div className={cn('space-y-1 text-[14px] font-bold leading-5 text-slate-700',compact?'pt-0.5':'')}>
+      <p className="flex min-w-0 items-start gap-2">
+        <Mail size={15} className="mt-0.5 shrink-0 text-slate-500" aria-hidden/>
+        {user.email?<a href={'mailto:'+user.email} className="min-w-0 break-all hover:text-pink-700 hover:underline">{user.email}</a>:<span className="text-slate-500">ইমেইল নেই</span>}
       </p>
-      <p className="flex min-w-0 items-center gap-1.5">
-        <Phone size={13} className="shrink-0 text-slate-400" aria-hidden/>
-        {user.phoneNumber?<a href={'tel:'+user.phoneNumber} className="font-medium hover:text-pink-700 hover:underline">{user.phoneNumber}</a>:<span className="text-slate-400">ফোন নেই</span>}
+      <p className="flex min-w-0 items-center gap-2">
+        <Phone size={15} className="shrink-0 text-slate-500" aria-hidden/>
+        {user.phoneNumber?<a href={'tel:'+user.phoneNumber} className="font-bold hover:text-pink-700 hover:underline">{user.phoneNumber}</a>:<span className="text-slate-500">ফোন নেই</span>}
       </p>
     </div>
   </div>;

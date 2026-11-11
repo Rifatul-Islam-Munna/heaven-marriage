@@ -113,7 +113,31 @@ try{
  assert.match(result.firstCell||'',/Fatima Example/);
  assert.match(result.firstCell||'',/fatima@example.com/);
  assert.match(result.firstCell||'',/01711111111/);
+ const basicInfo = await tab.evaluate(()=>{
+   const cell = document.querySelector('tbody tr td:first-child');
+   const nodes = {
+     name:cell?.querySelector('button[title="সদস্যের বায়োডাটা খুলুন"]'),
+     id:cell?.querySelector('button[aria-label*="বায়োডাটা আইডি খুলুন"]'),
+     email:cell?.querySelector('a[href^="mailto:"]'),
+     phone:cell?.querySelector('a[href^="tel:"]'),
+   };
+   return Object.fromEntries(Object.entries(nodes).map(([key,node])=>[
+     key,node ? {
+       fontSize:parseFloat(getComputedStyle(node).fontSize),
+       fontWeight:Number(getComputedStyle(node).fontWeight),
+       text:node.textContent?.trim()||'',
+     } : null,
+   ]));
+ });
+ for(const key of ['name','id','email','phone']){
+   assert.ok(basicInfo[key], 'Missing basic member field: '+key);
+   assert.ok(basicInfo[key].fontSize>=14, 'Member field should be readable: '+key);
+   assert.ok(basicInfo[key].fontWeight>=700, 'Member field must be bold: '+key);
+ }
+ assert.ok(basicInfo.name.fontSize>=16);
+ assert.match(basicInfo.id.text,/000995/);
  assert.doesNotMatch(result.firstCell||'',/60%/);
+ console.log('PASS: Name, clickable biodata ID, email and phone display larger bold text.');
  assert.match(result.progress||'',/60%/);
  assert.match(result.progress||'',/6 \/ 10/);
  assert.match(result.progress||'',/অবিবাহিত/);
