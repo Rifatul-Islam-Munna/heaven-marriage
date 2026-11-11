@@ -393,48 +393,51 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
 
   const actions = (user:User,compact=false):ReactNode => <div
     aria-label={user.name+' এর অ্যাকশন'}
-    className={cn('grid grid-cols-2 gap-1.5',compact?'w-full':'ml-auto w-[260px]')}>
+    className={cn('grid grid-cols-4 gap-1.5',compact?'w-full max-w-[228px]':'ml-auto w-[204px]')}>
     <button type="button" onClick={()=>editProfile(user)}
       aria-label={user.name+' এর প্রোফাইল এডিট করুন'}
-      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-[12px] font-semibold text-rose-800 transition hover:bg-rose-100">
-      <Pencil size={14}/> এডিট
+      title="প্রোফাইল এডিট করুন"
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-800 transition hover:bg-rose-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600">
+      <Pencil size={17} aria-hidden="true"/>
     </button>
     <button type="button" disabled={user.biodataStage==='published'}
       onClick={()=>setPublishTarget(user)}
       aria-label={user.name+' এর বায়োডাটা প্রকাশ করুন'}
       title={user.biodataStage==='published'?'বায়োডাটা ইতিমধ্যে প্রকাশিত':'বায়োডাটা প্রকাশ করুন'}
-      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[12px] font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-default disabled:opacity-70">
-      <Globe2 size={14}/> {user.biodataStage==='published'?'প্রকাশিত':'প্রকাশ'}
+      className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2 text-[12px] font-bold text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-default disabled:opacity-70">
+      <Globe2 size={16} aria-hidden="true"/> {user.biodataStage==='published'?'প্রকাশিত':'প্রকাশ'}
     </button>
     <button type="button" aria-label={user.name+' এর স্মার্ট ম্যাচিং খুলুন'}
-      title="এই সদস্যের স্মার্ট ম্যাচিং"
+      title="স্মার্ট ম্যাচিং"
       onClick={()=>router.push((`/dashboard/matching?member=${encodeURIComponent(user._id)}`) as Parameters<typeof router.push>[0])}
-      className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 text-[11px] font-semibold text-violet-800 transition hover:bg-violet-100">
-      <Sparkles size={14}/> ম্যাচিং
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-800 transition hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
+      <Sparkles size={17} aria-hidden="true"/>
     </button>
     <button type="button" onClick={()=>openShare(user)}
       aria-label={user.name+' এর WhatsApp-এ পাঠান'}
-      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-sky-800 transition hover:bg-sky-100">
-      <Share2 size={14} className="shrink-0"/> <span>WhatsApp-এ পাঠান</span>
+      title="WhatsApp-এ পাঠান"
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-800 transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600">
+      <Share2 size={17} aria-hidden="true"/>
     </button>
     <button type="button" disabled={copyingUserId===user._id}
       onClick={()=>void copyProfile(user)}
       aria-label={user.name+' এর ফোন ছাড়া বায়োডাটা কপি'}
-      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-amber-800 transition hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60">
-      {copyingUserId===user._id?<Loader2 size={14} className="shrink-0 animate-spin"/>:<Copy size={14} className="shrink-0"/>}
-      <span>ফোন ছাড়া বায়োডাটা কপি</span>
+      title="ফোন ছাড়া বায়োডাটা কপি"
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-800 transition hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={17} aria-hidden="true" className="animate-spin"/>:<Copy size={17} aria-hidden="true"/>}
     </button>
     <button type="button" disabled={copyingUserId===user._id}
       onClick={()=>void copyWithContact(user)}
       aria-label={user.name+' এর যোগাযোগসহ কপি'}
-      className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
-      {copyingUserId===user._id?<Loader2 size={14} className="shrink-0 animate-spin"/>:<Phone size={14} className="shrink-0"/>}
-      <span>যোগাযোগসহ কপি</span>
+      title="যোগাযোগসহ কপি"
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={17} aria-hidden="true" className="animate-spin"/>:<Phone size={17} aria-hidden="true"/>}
     </button>
     <button type="button" onClick={()=>setDeleteTarget(user)}
       aria-label={user.name+' এর সদস্য মুছুন'}
-      className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] font-semibold text-red-700 transition hover:bg-red-100">
-      <Trash2 size={14}/> সদস্য মুছুন
+      title="সদস্য মুছুন"
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">
+      <Trash2 size={17} aria-hidden="true"/>
     </button>
   </div>;
 
@@ -612,7 +615,7 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
                     onClick={()=>openMemberCell(user,column)}/>
                 </td>)}
                 <td className="px-3 py-2.5"><StatusPills user={user} /></td>
-                <td className="sticky right-0 z-10 w-[276px] min-w-[276px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
+                <td className="sticky right-0 z-10 w-[220px] min-w-[220px] bg-white px-2 py-2 align-top shadow-[-8px_0_16px_-12px_rgba(15,23,42,.2)]">{actions(user)}</td>
               </tr>)}
               {!isLoading && !users.length && <tr><td colSpan={4+visibleColumns.length+profileColumns.length} className="px-3 py-14 text-center text-[13px] text-[#6c757d]">
                 কোনো ব্যবহারকারী পাওয়া যায়নি।

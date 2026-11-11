@@ -149,6 +149,23 @@ try{
  for(const action of visibleActions)
    assert.ok(await tab.$('tbody button[aria-label*="'+action+'"]'),
      'Member action must be visible: '+action);
+ const desktopActions=await tab.evaluate(()=>[...document.querySelectorAll('tbody tr:first-child td:last-child button')]
+   .map(button=>({
+     label:button.getAttribute('aria-label')||'',
+     title:button.getAttribute('title')||'',
+     text:button.textContent?.trim()||'',
+     hasIcon:!!button.querySelector('svg'),
+     height:Math.round(button.getBoundingClientRect().height),
+   })));
+ assert.equal(desktopActions.length,7);
+ for(const button of desktopActions){
+   assert.ok(button.hasIcon && button.title, 'Every action needs an icon and tooltip');
+   assert.ok(button.height>=40, 'Action buttons must be easy to click');
+   if(button.label.includes('বায়োডাটা প্রকাশ করুন'))
+     assert.match(button.text,/প্রকাশ/,'Publish must retain its text label');
+   else
+     assert.equal(button.text,'','Non-publish action must be icon-only: '+button.label);
+ }
  assert.equal(await tab.$('tbody button[aria-label*="অন্যান্য অ্যাকশন"]'),null,
    'No More menu should be present in member rows');
  assert.equal(result.quick.includes('মেম্বারশিপ'),false,'Advanced filters must start collapsed');
@@ -280,7 +297,21 @@ try{
    filterButton:!!document.querySelector('button[aria-controls="member-quick-filters"]'),
    buttons:[...document.querySelectorAll('ul.md\\:hidden button[aria-label]')]
      .map(el=>el.getAttribute('aria-label')||''),
+   actions:[...document.querySelectorAll('ul.md\\:hidden li:first-child div[aria-label$=" এর অ্যাকশন"] button')]
+     .map(el=>({
+       label:el.getAttribute('aria-label')||'',
+       text:el.textContent?.trim()||'',
+       title:el.getAttribute('title')||'',
+       hasIcon:!!el.querySelector('svg'),
+     })),
  }));
+ assert.equal(mobile.actions.length,7);
+ for(const action of mobile.actions){
+   assert.ok(action.title && action.hasIcon,'Mobile actions must have icons and tooltips');
+   if(action.label.includes('বায়োডাটা প্রকাশ করুন'))
+     assert.match(action.text,/প্রকাশ/);
+   else assert.equal(action.text,'','Mobile action must be icon-only: '+action.label);
+ }
  assert.match(mobile.text,/fatima@example.com/);
  assert.match(mobile.text,/6 \/ 10/);
  assert.ok(mobile.filterButton);
