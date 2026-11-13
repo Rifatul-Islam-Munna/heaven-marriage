@@ -1,8 +1,18 @@
 /* The floating support hub is deliberately independent of the page grid. */
 .avatarButton {
   isolation:isolate;
+  touch-action:none;
+  user-select:none;
+  cursor:grab;
   animation: arrive .35s cubic-bezier(.2,.8,.2,1) both;
 }
+.dragging .avatarButton {
+  cursor:grabbing;
+  transform:none;
+  transition:none;
+}
+.moved .avatarLabel { display:none; }
+.moved .avatarButton { animation:none; }
 .avatarButton::before {
   content:"";
   position:absolute;
@@ -43,6 +53,12 @@
   animation:chatReveal .24s cubic-bezier(.18,.75,.26,1) both;
   transform-origin:bottom right;
   overscroll-behavior:contain;
+}
+.positionedPanel {
+  position:fixed;
+  left:var(--chat-panel-left);
+  top:var(--chat-panel-top);
+  height:min(68dvh,540px,calc(100dvh - 16px));
 }
 @keyframes arrive {
   from { opacity:0; transform:translateY(12px) scale(.85); }

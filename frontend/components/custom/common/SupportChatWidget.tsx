@@ -1,6 +1,6 @@
 'use client';
 import {usePathname} from 'next/navigation';
-import {useRef,useState,useEffect,type CSSProperties} from 'react';
+import {useRef,useState,useEffect,useCallback,type CSSProperties,type PointerEvent as ReactPointerEvent} from 'react';
 import {Bot,Send,X,ShieldCheck,Loader2,Phone,Ellipsis} from 'lucide-react';
 import {FaFacebookMessenger} from 'react-icons/fa';
 import {useQueryWrapper} from '@/api-hooks/react-query-wrapper';
@@ -15,6 +15,8 @@ type Entry={id:string;role:'user'|'assistant';text:string;sources?:Source[]};
 type Reply={answer?:string;message?:string;sources?:Source[];remaining?:number;limit?:number};
 const suggestions=['কখন অফিসে ফোন করতে পারব?','Premium সেবায় কী কী সুবিধা আছে?','বায়োডাটা কীভাবে Submit করব?','Connection-এর জন্য কত টাকা লাগে?'];
 const allowed=['/faq','/guidelines','/contact','/signup','/biodata','/about','/premium','/pricing'];
+const positionKey='niqaha-support-position-v1';
+type Position={x:number;y:number};
 export default function SupportChatWidget(){
  const pathname=usePathname();
  const [open,setOpen]=useState(false);
@@ -31,6 +33,75 @@ export default function SupportChatWidget(){
  const [busy,setBusy]=useState(false);
  const [blocked,setBlocked]=useState(false);
  const [keyboardOverlap,setKeyboardOverlap]=useState(0);
+ const [position,setPosition]=useState<Position|null>(null);
+ const positionRef=useRef<Position|null>(null);
+ const controlsRef=useRef<HTMLDivElement>(null);
+ const drag=useRef<{id:number;startX:number;startY:number;x:number;y:number;moved:boolean}|null>(null);
+ const suppressClick=useRef(false);
+ const [dragging,setDragging]=useState(false);
+ const [viewport,setViewport]=useState({width:0,height:0});
+ const clampPosition=useCallback((x:number,y:number):Position=>{
+   const width=controlsRef.current?.offsetWidth||68;
+   const height=controlsRef.current?.offsetHeight||(showContactActions?124:68);
+   const bottom=window.innerWidth<1024?(biodataDetails?132:78):8;
+   return {x:Math.max(8,Math.min(x,window.innerWidth-width-8)),
+     y:Math.max(8,Math.min(y,window.innerHeight-height-bottom))};
+ },[showContactActions,biodataDetails]);
+ const moveTo=useCallback((next:Position)=>{positionRef.current=next;setPosition(next);},[]);
+ useEffect(()=>{
+   let saved:Position|null=null;
+   try{
+     const value:unknown=JSON.parse(window.localStorage.getItem(positionKey)||'null');
+     if(value&&typeof value==='object'&&'x' in value&&'y' in value&&
+       typeof value.x==='number'&&Number.isFinite(value.x)&&typeof value.y==='number'&&Number.isFinite(value.y))
+       saved={x:value.x*window.innerWidth,y:value.y*window.innerHeight};
+   }catch{/* Moving also works when browser storage is unavailable. */}
+   if(saved)moveTo(clampPosition(saved.x,saved.y));
+   const resize=()=>{
+     setViewport({width:window.innerWidth,height:window.innerHeight});
+     const current=positionRef.current;
+     if(current)moveTo(clampPosition(current.x,current.y));
+   };
+   resize();
+   window.addEventListener('resize',resize);
+   return ()=>window.removeEventListener('resize',resize);
+ },[clampPosition,moveTo]);
+ useEffect(()=>{
+   const current=positionRef.current;
+   if(current)moveTo(clampPosition(current.x,current.y));
+ },[contactsOpen,open,clampPosition,moveTo]);
+ const startDrag=(event:ReactPointerEvent<HTMLButtonElement>)=>{
+   if(event.button!==0||!event.isPrimary)return;
+   const rect=event.currentTarget.getBoundingClientRect();
+   const width=event.currentTarget.offsetWidth,height=event.currentTarget.offsetHeight;
+   suppressClick.current=false;
+   drag.current={id:event.pointerId,startX:event.clientX,startY:event.clientY,
+     x:event.clientX-(event.clientX-rect.left)*width/rect.width,
+     y:event.clientY-(event.clientY-rect.top)*height/rect.height,moved:false};
+   event.currentTarget.setPointerCapture(event.pointerId);
+ };
+ const moveDrag=(event:ReactPointerEvent<HTMLButtonElement>)=>{
+   const start=drag.current;
+   if(!start||start.id!==event.pointerId)return;
+   const dx=event.clientX-start.startX,dy=event.clientY-start.startY;
+   if(!start.moved&&Math.hypot(dx,dy)<6)return;
+   start.moved=true;
+   setDragging(true);
+   moveTo(clampPosition(start.x+dx,start.y+dy));
+ };
+ const finishDrag=(event:ReactPointerEvent<HTMLButtonElement>)=>{
+   const start=drag.current;
+   if(!start||start.id!==event.pointerId)return;
+   drag.current=null;
+   setDragging(false);
+   if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+   if(!start.moved)return;
+   suppressClick.current=true;
+   const current=positionRef.current;
+   if(current)try{window.localStorage.setItem(positionKey,JSON.stringify({
+     x:current.x/window.innerWidth,y:current.y/window.innerHeight,
+   }));}catch{/* Position is still retained for this visit. */}
+ };
  const messagesPane=useRef<HTMLDivElement>(null);
  // Keep the chat itself scrolled; scrollIntoView on a fixed panel can move the page.
  useEffect(()=>{
@@ -102,7 +173,15 @@ export default function SupportChatWidget(){
        sources:[{title:'Contact team',url:'/contact'}]}]);
    }finally{setBusy(false);}
  };
+ const panelWidth=Math.min(viewport.width*.94,390);
+ const panelHeight=Math.min(viewport.height*.68,540,viewport.height-16);
+ const panelAbove=(position?.y||0)-panelHeight-12;
+ const panelLeft=Math.max(8,Math.min((position?.x||0)+68-panelWidth,viewport.width-panelWidth-8));
+ const panelTop=Math.max(8,Math.min(panelAbove>=8?panelAbove:(position?.y||0)+80,viewport.height-panelHeight-8));
  const dockStyle={
+   ...(position?{left:position.x,top:position.y,right:'auto',bottom:'auto'}:{}),
+   '--chat-panel-left':`${panelLeft}px`,
+   '--chat-panel-top':`${panelTop}px`,
    '--chat-sheet-bottom': keyboardOverlap
       ? `${keyboardOverlap+12}px`
       : 'calc(78px + env(safe-area-inset-bottom))',
@@ -110,12 +189,12 @@ export default function SupportChatWidget(){
     ? 'calc(132px + env(safe-area-inset-bottom))'
     : 'calc(88px + env(safe-area-inset-bottom))',
  } as CSSProperties;
- return <div data-support-hub="true" data-chat-open={open}
+ return <div data-support-hub="true" data-chat-open={open} data-support-moved={!!position}
    style={dockStyle}
    className={cn('pointer-events-none fixed bottom-[var(--support-dock-bottom)] right-3 z-[65] flex flex-col items-end gap-3 sm:right-5 lg:bottom-6',
-     open&&styles.chatOpen)}> 
+     open&&styles.chatOpen,position&&styles.moved,dragging&&styles.dragging)}>
    {open&&<section id="niqaha-support-dialog" role="dialog" aria-modal="false" aria-label="Niqaha customer support assistant"
-     className={cn('pointer-events-auto flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-pink-200 bg-white shadow-[0_20px_70px_-28px_rgba(65,24,42,.6)]',styles.chatPanel)}> 
+     className={cn('pointer-events-auto flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-pink-200 bg-white shadow-[0_20px_70px_-28px_rgba(65,24,42,.6)]',styles.chatPanel,position&&styles.positionedPanel)}>
      <header className="flex items-center justify-between gap-2 bg-gradient-to-r from-pink-700 to-rose-700 px-4 py-3 text-white">
        <div className="flex items-center gap-2"><span className="flex size-9 items-center justify-center rounded-xl bg-white/20"><Bot size={19}/></span>
          <div><p className="text-sm font-bold">Niqaha Support AI</p><p className="text-[11px] text-white/85">Website questions only · 24-hour limit</p></div>
@@ -164,13 +243,19 @@ export default function SupportChatWidget(){
        <p className="mt-1.5 text-right text-[10px] text-gray-500">{message.length}/600 · 10 questions / rolling 24 hours</p>
      </form>
    </section>}
-   <div className={cn('pointer-events-auto flex flex-col items-center gap-2 self-end',styles.controls)}
+   <div ref={controlsRef} className={cn('pointer-events-auto flex flex-col items-center gap-2 self-end',styles.controls)}
      data-support-hub-controls="true">
      <button type="button" data-support-ai-avatar="true"
-       onClick={()=>{setContactsOpen(false);setOpen(value=>!value);}}
+       onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={finishDrag}
+       onPointerCancel={finishDrag} onLostPointerCapture={finishDrag}
+       onClick={event=>{
+         if(suppressClick.current&&event.detail!==0){suppressClick.current=false;event.preventDefault();return;}
+         setContactsOpen(false);setOpen(value=>!value);
+       }}
        aria-expanded={open} aria-controls="niqaha-support-dialog"
        aria-label={open?'Close Niqaha AI chat':'Open Niqaha free AI support'}
-       title="Free AI Help"
+       title="Drag to move · Tap for AI help"
+       aria-description="Drag to move this button. Tap to open AI support."
        className={cn('group relative inline-flex size-[68px] shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-pink-500 to-rose-700 shadow-[0_9px_26px_rgba(190,24,93,.34)] ring-[3px] ring-pink-100/85 motion-safe:transition-transform motion-safe:duration-200 hover:-translate-y-1 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pink-600',styles.avatarButton)}> 
        <SupportSmileAvatar/>
        <span aria-hidden="true" className={cn('pointer-events-none absolute right-[calc(100%+11px)] top-[19px] whitespace-nowrap rounded-full border border-pink-100 bg-white px-3 py-1.5 text-[11px] font-bold text-pink-700 shadow-[0_5px_18px_rgba(150,22,76,.15)]',styles.avatarLabel)}> 
