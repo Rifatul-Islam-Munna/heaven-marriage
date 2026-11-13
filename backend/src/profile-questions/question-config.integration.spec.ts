@@ -43,6 +43,16 @@ const custom: ProfileQuestion = {
   enabled:true,showPublic:true,order:333,locked:false,
 };
 describe('Profile question schema database flows',()=>{
+  it('persists answer rules and rejects missing comparison targets',async()=>{
+    const ctx=fixture(),schema=await ctx.service.get();
+    const target={...custom,id:'q_'+'f'.repeat(32),question:'Other answer'};
+    const question={...custom,rules:[{type:'not_equal' as const,questionId:target.id,message:'Keep answers different'}]};
+    const saved=await ctx.service.save('admin',{revision:0,questions:[...schema.questions,question,target]});
+    expect(saved.questions.find(q=>q.id===question.id)?.rules).toEqual(question.rules);
+    await expect(ctx.service.save('admin',{revision:saved.revision,questions:saved.questions.map(q=>
+      q.id===question.id?{...q,rules:[{type:'not_equal',questionId:'q_'+'e'.repeat(32)}]}:q,
+    )})).rejects.toThrow('another single answer question');
+  });
   it('loads original questions without writing them to the database',async()=>{
     const ctx=fixture(), schema=await ctx.service.get();
     expect(schema.questions.length).toBe(BUILTINS.length);

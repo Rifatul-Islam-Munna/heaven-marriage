@@ -1,4 +1,5 @@
 import fallback from './profile-question-defaults.json';
+import {ageFromBirthDate} from './birth-date';
 
 export const PROTECTED_LOCATION_PATHS = new Set([
  'nationality','residenceCountry','address.district','address.upazila',
@@ -6,19 +7,26 @@ export const PROTECTED_LOCATION_PATHS = new Set([
 ]);
 export const isProtectedLocationQuestion=(q:{path?:string}|null|undefined)=>
   !!q?.path&&PROTECTED_LOCATION_PATHS.has(q.path);
+export const isProtectedQuestion=(q:{path?:string}|null|undefined)=>
+  isProtectedLocationQuestion(q)||q?.path==='dateOfBirth';
 export type QuestionGender = 'male'|'female'|'both';
-export type QuestionType = 'text'|'textarea'|'number'|'select'|'dropdown'|'checkbox'|'multi_checkbox';
+export type QuestionType = 'text'|'textarea'|'number'|'date'|'select'|'dropdown'|'checkbox'|'multi_checkbox';
 export type QuestionOption = {label:string;value:string};
+export type QuestionRule = {type:'not_equal';questionId:string;message?:string};
 export type ProfileQuestion = {
  id:string; path?:string;legacyKey?:string;question:string;publicLabel:string;
  section:number;gender:QuestionGender;type:QuestionType;options:QuestionOption[];
  optionSource:string;required:boolean;enabled:boolean;showPublic:boolean;
  order:number;locked:boolean;
+ rules?:QuestionRule[];
 };
 export type ProfileQuestionSchema = {
  revision:number;sections:{id:number;title:string}[];questions:ProfileQuestion[];
 };
 const extraLocationQuestions = [
+  {id:'builtin_8e65c7400068cbe0',path:'dateOfBirth',question:'জন্ম তারিখ',
+    publicLabel:'জন্ম তারিখ',section:0,gender:'both',type:'date',options:[],
+    optionSource:'',required:true,enabled:true,showPublic:true,order:490,locked:false},
   {id:'builtin_8e65c7400068cbdd',path:'residenceCountry',question:'আপনি বর্তমানে কোন দেশে বসবাস করছেন?',
     publicLabel:'বর্তমান বসবাসের দেশ',section:0,gender:'both',type:'select',
     options:[],optionSource:'countries',required:false,enabled:true,showPublic:true,order:850,locked:false},
@@ -69,12 +77,37 @@ export function questionApplies(q:ProfileQuestion,gender?:string){
 export function readQuestionAnswer(profile:Record<string,any>,q:ProfileQuestion):unknown {
  if(questionUsesSeparateStorage(q))return profile.dynamicAnswers?.[q.id];
  if(q.legacyKey)return profile.customFields?.[q.legacyKey];
+ if(q.path==='age')return ageFromBirthDate(profile.dateOfBirth)??profile.age;
  return q.path?.split('.').reduce<any>((v,key)=>v?.[key],profile);
+}
+export function questionRuleErrors(profile:Record<string,any>,questions:ProfileQuestion[]){
+ const byId=new Map(questions.map(q=>[q.id,q]));
+ const errors:{questionId:string;otherQuestionId:string;message:string}[]=[];
+ const seen=new Set<string>();
+ const applies=(q:ProfileQuestion)=>questionApplies(q,profile.gender)&&locationQuestionApplies(q,profile);
+ const present=(value:unknown)=>value!==undefined&&value!==null&&value!==''&&!Array.isArray(value);
+ for(const question of questions){
+  if(!applies(question))continue;
+  for(const rule of question.rules||[]){
+   const other=byId.get(rule.questionId);
+   if(rule.type!=='not_equal'||!other||!applies(other))continue;
+   const left=readQuestionAnswer(profile,question),right=readQuestionAnswer(profile,other);
+   const pair=[question.id,other.id].sort().join(':');
+   if(present(left)&&present(right)&&left===right&&!seen.has(pair)){
+    seen.add(pair);
+    errors.push({questionId:question.id,otherQuestionId:other.id,
+     message:rule.message||`“${question.question}” ও “${other.question}” এর উত্তর আলাদা হতে হবে।`});
+   }
+  }
+ }
+ return errors;
 }
 export function questionDisplayValue(value:unknown,q:ProfileQuestion):string {
  if(value===null||value===undefined||value==='')return '';
  if(Array.isArray(value))return value.map(v=>q.options.find(o=>o.value===v)?.label||v).join(' • ');
  if(typeof value==='boolean')return value?'হ্যাঁ':'না';
+ if(q.type==='date' && typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+  return new Date(value+'T00:00:00').toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'});
  if(['select','dropdown'].includes(q.type))
   return q.options.find(o=>o.value===String(value))?.label||String(value);
  return String(value);
@@ -83,6 +116,7 @@ export function getMissingQuestions(profile:Record<string,any>,schema:ProfileQue
  return schema.questions.filter(q=>questionApplies(q,profile.gender)&&locationQuestionApplies(q,profile)&&q.required&&
   (step===undefined||q.section===step)).filter(q=>{
     const v=readQuestionAnswer(profile,q);
+    if(q.path==='dateOfBirth')return ageFromBirthDate(v as string)===undefined;
     return v===undefined||v===null||v===''||(Array.isArray(v)&&v.length===0)||
       (q.type==='checkbox'&&v!==true)||(q.type==='number'&&v===0);
   }).map(q=>q.question);

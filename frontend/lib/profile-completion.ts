@@ -1,4 +1,5 @@
 import {readQuestionAnswer,type ProfileQuestion,type ProfileQuestionSchema} from './profile-questions';
+import {ageFromBirthDate} from './birth-date';
 
 export type BiodataRequiredProgress={
   percentage:number;
@@ -30,6 +31,7 @@ export function previewBiodataCompletion(
   });
   const remaining=required.filter(q=>{
     const value=readQuestionAnswer(profile,q);
+    if(q.path==='dateOfBirth')return ageFromBirthDate(value as string)===undefined;
     return value===undefined||value===null||value===''||
       (Array.isArray(value)&&value.length===0)||
       (q.type==='checkbox'&&value!==true)||

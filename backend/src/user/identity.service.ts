@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { MessagingService, normalizePhone } from './messaging.service';
+import { applyBirthDate } from './birth-date';
 @Injectable()
 export class IdentityService {
   constructor(
@@ -377,6 +378,7 @@ export class IdentityService {
       unset: any = {},
       changed: string[] = [],
       reserved: string[] = [];
+    applyBirthDate(set,user);
     const next: any = { email: user.email, phoneNumber: user.phoneNumber };
     for (const key of ['email', 'phoneNumber']) {
       if (!Object.prototype.hasOwnProperty.call(input, key)) continue;

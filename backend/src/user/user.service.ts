@@ -1,5 +1,6 @@
 import { IdentityService } from './identity.service';
-import { QuestionConfigService, sanitizeDynamicAnswers } from '../profile-questions/question-config.service';
+import { QuestionConfigService, sanitizeDynamicAnswers, assertQuestionRules } from '../profile-questions/question-config.service';
+import { ageFromBirthDate, applyBirthDate } from './birth-date';
 import { PlatformService } from './platform.service';
 import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter, publicProfile } from './profile-rules';
 import {buildProfileCompletionSnapshot,describeProfileCompletion,needsProfileCompletionSync} from './profile-completion-snapshot';
@@ -147,10 +148,12 @@ async findUserAndUpdated() {
       throw new ForbiddenException('This biodata has been deleted after administrator approval.');
     const schema=await this.questions.get();
     const payload=editableProfile(updated);
+    applyBirthDate(payload,current);
     if((updated as any).dynamicAnswers!==undefined){
       payload.dynamicAnswers=sanitizeDynamicAnswers((updated as any).dynamicAnswers,
-        current.dynamicAnswers,schema.questions,current.gender||payload.gender);
+        current.dynamicAnswers,schema.questions,payload.gender||current.gender);
     }
+    assertQuestionRules(profileUpdatePreview(current,payload),schema.questions);
     // Account contact changes use separate verification; existing contact data stays intact.
     if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
     if ((updated as any).draftStep !== undefined)
@@ -626,17 +629,26 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
         );
       }catch(error){this.logger.warn('Profile completion cache sync skipped: '+String(error));}
     }
-    return {...findOne,...snapshot,completion:profileCompletion,
+    return {...findOne,age:ageFromBirthDate(findOne.dateOfBirth)??findOne.age,...snapshot,completion:profileCompletion,profileQuestionSchema:schema,
       biodataStage:biodataStage(findOne,profileCompletion.percentage),
       alreadySubmitted:hasSubmittedBiodata(findOne)};
   }
 
  async update( updateUserDto: UpdateUserDto,actor:string,actorRole:string=UserType.ADMIN) {
     await this.assertManageableTarget(updateUserDto.id,actorRole);
-    if(updateUserDto.numberOfConnections!==undefined&&(await this.userModel.findById(updateUserDto.id).select("numberOfConnections").lean())?.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,updateUserDto.id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
-    await this.platform.audit(actor,"profile.admin.update",updateUserDto.id);
     const {id,password, _v,updatedAt,createdAt,...raw} = updateUserDto
     const rest:any=editableProfile(raw);
+    const current:any=await this.userModel.findById(id).lean();
+    if(!current)throw new HttpException('User not found',400);
+    const activeSchema=await this.questions.get();
+    if(Object.keys(rest).length||raw.isPublishFromAdmin===true){
+      applyBirthDate(rest,current);
+      if(rest.dynamicAnswers!==undefined)rest.dynamicAnswers=sanitizeDynamicAnswers(
+        rest.dynamicAnswers,current.dynamicAnswers,activeSchema.questions,rest.gender||current.gender);
+      assertQuestionRules(profileUpdatePreview(current,rest),activeSchema.questions);
+    }
+    if(updateUserDto.numberOfConnections!==undefined&&current.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
+    await this.platform.audit(actor,"profile.admin.update",id);
     for(const k of ['isPublishFromAdmin','isPublished','verificationStatus','statusReason'])if(raw[k]!==undefined)rest[k]=raw[k];
     if(rest.isPublishFromAdmin===true) {
       rest.verificationStatus='approved';
@@ -649,7 +661,6 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
       throw new HttpException('User not found', 400);
     }
     // Account and biodata edits made by administrators also refresh the cache.
-    const activeSchema=await this.questions.get();
     const snapshot=buildProfileCompletionSnapshot(findOne,activeSchema);
     await this.userModel.collection.updateOne(
       {_id:findOne._id,updatedAt:(findOne as unknown as {updatedAt?:Date}).updatedAt},

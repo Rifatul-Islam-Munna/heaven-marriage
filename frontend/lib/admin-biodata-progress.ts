@@ -2,6 +2,7 @@ import {
   locationQuestionApplies, questionApplies, readQuestionAnswer,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from './profile-questions';
+import {ageFromBirthDate} from './birth-date';
 
 export type AdminBiodataSectionProgress = {
   id: number; title: string; answered: number; total: number;
@@ -10,6 +11,7 @@ export type AdminBiodataSectionProgress = {
 
 /** Progress is based on saved + currently edited answers, never on navigation history. */
 export function adminAnswerIsComplete(question: ProfileQuestion, value: unknown): boolean {
+  if (question.path === 'dateOfBirth') return ageFromBirthDate(value as string) !== undefined;
   if (value === undefined || value === null) return false;
   if (Array.isArray(value)) return value.length > 0;
   if (question.type === 'checkbox') return question.required ? value === true : typeof value === 'boolean';

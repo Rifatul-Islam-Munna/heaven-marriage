@@ -7,6 +7,8 @@ import {
 } from "@/staticData/all-data";
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
+import { savedBiodataAddress } from "./biodata-address";
+import { ageFromBirthDate } from "./birth-date";
 
 export interface BiodataWhatsappGroup {
   id: "girls" | "boys";
@@ -62,20 +64,28 @@ const getUpazilaLabel = (upazila?: string) =>
 
 const formatLocation = (
   addressText?: string,
-  upazila?: string,
-  district?: string,
+  address?: User["address"],
+  country?: string,
 ) => {
   const exactAddress = cleanText(addressText);
   if (exactAddress) return exactAddress;
 
-  return joinNonEmpty([getUpazilaLabel(upazila), getDistrictLabel(district)]);
+  const location = joinNonEmpty([
+    address?.area,
+    cleanText(address?.cityCorporation) || getUpazilaLabel(address?.upazila),
+    getDistrictLabel(address?.district),
+  ]);
+
+  return location
+    ? joinNonEmpty([location, cleanText(country) || "Bangladesh"])
+    : cleanText(country);
 };
 
 const formatAge = (age?: number) =>
   age ? `${toBanglaDigits(age)} বছর` : "";
 
-const formatBirthYear = (age?: number) =>
-  age ? toBanglaDigits(new Date().getFullYear() - age) : "";
+const formatBirthYear = (dateOfBirth?: string) =>
+  ageFromBirthDate(dateOfBirth) !== undefined ? toBanglaDigits(dateOfBirth!.slice(0, 4)) : "";
 
 const formatHeight = (height?: string | number) => {
   if (height === undefined || height === null || height === "") return "";
@@ -159,15 +169,11 @@ export const buildBiodataWhatsappText = (
   const publicProfileId = cleanText(user.userId) || cleanText(user._id);
   const biodataNumber = publicProfileId || "N/A";
   const currentLocation = formatLocation(
-    user.address?.presentAddress,
-    user.address?.upazila,
-    user.address?.district,
+    savedBiodataAddress(user, "presentAddress"),
+    user.address,
+    user.residenceCountry,
   );
-  const permanentLocation = formatLocation(
-    user.address?.permanentAddress,
-    user.address?.upazila,
-    user.address?.district,
-  );
+  const permanentLocation = savedBiodataAddress(user, "permanentAddress");
   const profileUrl = publicProfileId
     ? `${origin}/biodata/${publicProfileId}`
     : origin;
@@ -177,10 +183,10 @@ export const buildBiodataWhatsappText = (
     `${isFemale ? "🌿🍂" : "🌿🍁"} *${isFemale ? "পাত্রীর" : "পাত্রের"} বায়োডাটা নাম্বারঃ* ${biodataNumber}`,
     "",
     formatLabelValueLine("নামঃ", user.identityUnlocked===false?undefined:user.name),
-    formatLabelValueLine("বয়সঃ", formatAge(user.age)),
+    formatLabelValueLine("বয়সঃ", formatAge(ageFromBirthDate(user.dateOfBirth) ?? user.age)),
     formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
     formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
-    formatLabelValueLine("জন্ম সনঃ", formatBirthYear(user.age)),
+    formatLabelValueLine("জন্ম সনঃ", formatBirthYear(user.dateOfBirth)),
     formatLabelValueLine(
       "শিক্ষাগত ব্যাকগ্রাউন্ডঃ",
       formatEducationBackground(user),

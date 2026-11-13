@@ -1,10 +1,14 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { ageFromBirthDate } from '../user/birth-date';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { FALLBACK_PROFILE_SCHEMA } from './default-question-registry';
 
 export const SECTION_NAMES = FALLBACK_PROFILE_SCHEMA.sections;
 const extraLocationQuestions = [
+  {id:'builtin_8e65c7400068cbe0',path:'dateOfBirth',question:'জন্ম তারিখ',
+    publicLabel:'জন্ম তারিখ',section:0,gender:'both',type:'date',options:[],
+    optionSource:'',required:true,enabled:true,showPublic:true,order:490,locked:false},
   {id:'builtin_8e65c7400068cbdd',path:'residenceCountry',question:'আপনি বর্তমানে কোন দেশে বসবাস করছেন?',
     publicLabel:'বর্তমান বসবাসের দেশ',section:0,gender:'both',type:'select',
     options:[],optionSource:'countries',required:false,enabled:true,showPublic:true,order:850,locked:false},
@@ -18,15 +22,17 @@ const extraLocationQuestions = [
     optionSource:'cityAreas',required:false,enabled:true,showPublic:true,order:180,locked:false},
 ];
 const sourceQuestions = [...FALLBACK_PROFILE_SCHEMA.questions,...extraLocationQuestions];
-export type FieldType = 'text'|'textarea'|'number'|'select'|'dropdown'|'checkbox'|'multi_checkbox';
+export type FieldType = 'text'|'textarea'|'number'|'date'|'select'|'dropdown'|'checkbox'|'multi_checkbox';
 export type FieldGender = 'male'|'female'|'both';
 export type QuestionOption = { label: string; value: string };
+export type QuestionRule = {type:'not_equal';questionId:string;message?:string};
 export type ProfileQuestion = {
   id: string; path?: string; legacyKey?: string;
   question: string; publicLabel: string; section: number;
   gender: FieldGender; type: FieldType; options: QuestionOption[];
   optionSource: string; required: boolean; enabled: boolean; showPublic: boolean;
   order: number; locked: boolean;
+  rules?:QuestionRule[];
 };
 export type QuestionSchema = { revision: number; sections: {id:number;title:string}[]; questions: ProfileQuestion[] };
 
@@ -39,6 +45,8 @@ export const PROTECTED_LOCATION_PATHS = new Set([
 ]);
 export const isProtectedLocationQuestion = (q:Pick<ProfileQuestion,'path'>|undefined) =>
   !!q?.path && PROTECTED_LOCATION_PATHS.has(q.path);
+export const isProtectedQuestion = (q:Pick<ProfileQuestion,'path'>|undefined) =>
+  isProtectedLocationQuestion(q)||q?.path==='dateOfBirth';
 export const BUILTINS: ProfileQuestion[] = sourceQuestions.map(q => ({...q, type:q.type as FieldType,
   gender:q.gender as FieldGender,options:q.options.map(o=>({...o})),
   locked: authQuestionPaths.has(q.path || ''),
@@ -64,6 +72,7 @@ export function answerForQuestion(user: any, q: ProfileQuestion): unknown {
   const get = (map: any, key: string) => map?.get?.(key) ?? map?.[key];
   if (usesSeparateAnswerStorage(q)) return get(user.dynamicAnswers, q.id);
   if (q.legacyKey) return get(user.customFields, q.legacyKey);
+  if (q.path==='age') return ageFromBirthDate(user.dateOfBirth) ?? user.age;
   return q.path?.split('.').reduce((value: any, key) => value?.[key], user);
 }
 const builtins = new Map(BUILTINS.map(q=>[q.id,q]));
@@ -72,8 +81,43 @@ const builtins = new Map(BUILTINS.map(q=>[q.id,q]));
 // are not configurable here.
 const secretFields = new Set(['email','phoneNumber','password']);
 const unlockOnlyFields = new Set(['name','fatherName','motherName','guardianPhone','whatsapp']);
-const types = new Set<FieldType>(['text','textarea','number','select','dropdown','checkbox','multi_checkbox']);
+const types = new Set<FieldType>(['text','textarea','number','date','select','dropdown','checkbox','multi_checkbox']);
 const genders = new Set<FieldGender>(['male','female','both']);
+export function questionRuleErrors(profile:any,questions:ProfileQuestion[]){
+  const byId=new Map(questions.map(q=>[q.id,q]));
+  const errors:{questionId:string;otherQuestionId:string;message:string}[]=[];
+  const seen=new Set<string>();
+  const applies=(q:ProfileQuestion)=>{
+    if(!q.enabled||(q.gender!=='both'&&q.gender!==profile.gender))return false;
+    if(['address.district','address.upazila','address.cityCorporation','address.area'].includes(q.path||'')){
+      if(profile.residenceCountry&&profile.residenceCountry!=='Bangladesh')return false;
+      if(['address.upazila','address.cityCorporation'].includes(q.path!)&&!profile.address?.district)return false;
+      if(q.path==='address.area'&&(!profile.address?.district||!(profile.address?.cityCorporation||profile.address?.upazila)))return false;
+      if(q.path==='address.upazila'&&profile.address?.cityCorporation)return false;
+    }
+    return true;
+  };
+  const present=(value:unknown)=>value!==undefined&&value!==null&&value!==''&&!Array.isArray(value);
+  for(const question of questions){
+    if(!applies(question))continue;
+    for(const rule of question.rules||[]){
+      const other=byId.get(rule.questionId);
+      if(rule.type!=='not_equal'||!other||!applies(other))continue;
+      const left=answerForQuestion(profile,question),right=answerForQuestion(profile,other);
+      const pair=[question.id,other.id].sort().join(':');
+      if(present(left)&&present(right)&&left===right&&!seen.has(pair)){
+        seen.add(pair);
+        errors.push({questionId:question.id,otherQuestionId:other.id,
+          message:rule.message||`“${question.question}” ও “${other.question}” এর উত্তর আলাদা হতে হবে।`});
+      }
+    }
+  }
+  return errors;
+}
+export function assertQuestionRules(profile:any,questions:ProfileQuestion[]){
+  const errors=questionRuleErrors(profile,questions);
+  if(errors.length)throw new BadRequestException({message:errors[0].message,validationErrors:errors});
+}
 function cleanText(value:unknown, max:number, key:string) {
   if(typeof value!=='string'||value.length>max)throw new BadRequestException('Invalid '+key);
   return value.trim();
@@ -83,6 +127,19 @@ export function validateQuestion(input: unknown): ProfileQuestion {
   const a=input as Record<string,any>;
   const id=cleanText(a.id,80,'id');
   const existing=builtins.get(id);
+  if(a.rules!==undefined&&(!Array.isArray(a.rules)||a.rules.length>20))
+    throw new BadRequestException('Invalid answer rules');
+  const rules:QuestionRule[]=(a.rules||[]).map((rule:any)=>{
+    if(rule?.type!=='not_equal'||typeof rule.questionId!=='string'||
+       !/^(?:q_[a-f0-9]{32}|builtin_[a-f0-9]{16}|old_[a-f0-9]{24})$/.test(rule.questionId)||rule.questionId===id)
+      throw new BadRequestException('Choose another question for the answer rule');
+    const message=rule.message===undefined?'':cleanText(rule.message,300,'rule message');
+    return {type:'not_equal',questionId:rule.questionId,...(message?{message}:{})};
+  });
+  if(new Set(rules.map(rule=>rule.questionId)).size!==rules.length)
+    throw new BadRequestException('Duplicate answer rule');
+  if(rules.length&&(a.type==='multi_checkbox'||authQuestionPaths.has(existing?.path||'')))
+    throw new BadRequestException('Answer rules require a single answer field');
   if(!existing&&!/^q_[a-f0-9]{32}$/.test(id)&&!/^old_[a-f0-9]{24}$/.test(id))
     throw new BadRequestException('Invalid question ID');
   if(a.path!==undefined&&a.path!==existing?.path) throw new BadRequestException('Cannot change original answer field');
@@ -111,6 +168,9 @@ export function validateQuestion(input: unknown): ProfileQuestion {
   if(new Set(options.map(o=>o.value)).size!==options.length)
     throw new BadRequestException('Duplicate option');
   const protectedLocation=!!existing && isProtectedLocationQuestion(existing);
+  const birthDate=existing?.path==='dateOfBirth';
+  if(birthDate && (a.enabled===false || a.required!==true || a.type!=='date' || a.gender!=='both' || options.length))
+    throw new BadRequestException('Birth date is required and cannot be hidden or replaced');
   // Never allow a location input to be replaced with free text/custom choices,
   // hidden from either gender, or disconnected from the live location catalogue.
   if(protectedLocation && (
@@ -128,8 +188,8 @@ export function validateQuestion(input: unknown): ProfileQuestion {
   if (locked && (a.enabled === false || a.required !== existing!.required ||
     a.gender !== existing!.gender || a.question !== existing!.question ||
     a.type !== existing!.type)) throw new BadRequestException('Authentication fields are not configurable');
-  const required = locked ? existing!.required : a.required === true;
-  const enabled = (locked||protectedLocation) ? true : a.enabled !== false;
+  const required = (locked||birthDate) ? existing!.required : a.required === true;
+  const enabled = (locked||protectedLocation||birthDate) ? true : a.enabled !== false;
   return {
     id,
     ...(existing?.path?{path:existing.path}:{}),
@@ -138,7 +198,7 @@ export function validateQuestion(input: unknown): ProfileQuestion {
     gender:locked?existing!.gender:a.gender,
     type:a.type, options,optionSource,
     required,enabled,showPublic:!secretFields.has(existing?.path||'')&&a.showPublic===true,
-    order,locked,
+    order,locked,...(rules.length?{rules}:{}),
   };
 }
 export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string,unknown> | undefined,
@@ -175,6 +235,10 @@ export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string
       if(q.type!=='number'||!Number.isFinite(raw))throw new BadRequestException('Invalid number');
       result[key]=raw;
     } else if(typeof raw==='string'&&raw.length<=5000) {
+      if(q.type==='date' && raw && (!/^\d{4}-\d{2}-\d{2}$/.test(raw) ||
+          !Number.isFinite(Date.parse(raw+'T00:00:00Z')) ||
+          new Date(raw+'T00:00:00Z').toISOString().slice(0,10)!==raw))
+        throw new BadRequestException('Invalid date answer');
       if(['checkbox','multi_checkbox'].includes(q.type)&&raw!=='')throw new BadRequestException('Incorrect answer type');
       if(q.type==='number'&&raw!==''&&!Number.isFinite(Number(raw))) throw new BadRequestException('Invalid number');
       if(['select','dropdown'].includes(q.type)&&q.options.length&&raw&&raw!==result[key]&&!q.options.some(o=>o.value===raw))
@@ -244,15 +308,20 @@ export class QuestionConfigService {
       if(previous?.legacyKey) q.legacyKey=previous.legacyKey;
       submitted.set(q.id,q);
     }
-    // Essential location questions must be present in every submitted revision.
+    // Essential questions must be present in every submitted revision.
     // Do not silently archive one when an older/forged admin client omits it.
     for(const old of current.questions)
-      if(isProtectedLocationQuestion(old) && !submitted.has(old.id))
-        throw new BadRequestException('Essential location question cannot be deleted: '+old.path);
+      if(isProtectedQuestion(old) && !submitted.has(old.id))
+        throw new BadRequestException('Essential profile question cannot be deleted: '+old.path);
     // Other omitted questions are archived, preserving existing answers.
     for(const old of current.questions)
       if(!submitted.has(old.id))submitted.set(old.id,{...old,enabled:old.locked});
     const questions=[...submitted.values()].sort((a,b)=>a.section-b.section||a.order-b.order);
+    for(const question of questions)for(const rule of question.rules||[]){
+      const target=submitted.get(rule.questionId);
+      if(!target||target.type==='multi_checkbox'||authQuestionPaths.has(target.path||''))
+        throw new BadRequestException('Answer rule must reference another single answer question');
+    }
     try{
       const result=await this.collection.updateOne(
         {_id:'active' as any,revision:input.revision},
@@ -315,7 +384,7 @@ export class QuestionConfigService {
           return text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[সংরক্ষিত]')
             .replace(/(?:\+?\d[\d\s()-]{8,}\d)/g,'[সংরক্ষিত]');
         };
-        output[q.id]=Array.isArray(answer)?answer.map(x=>scrub(String(x))):
+        output[q.id]=q.path==='dateOfBirth'?answer:Array.isArray(answer)?answer.map(x=>scrub(String(x))):
           typeof answer==='string'?scrub(answer):answer;
       }
     }

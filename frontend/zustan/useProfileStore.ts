@@ -40,6 +40,7 @@ const getInitialFormData = (): Partial<User> => ({
   gender: '',
   maritalStatus: '',
   age: undefined,
+  dateOfBirth: '',
   bloodGroup: '',
   weight: undefined,
   nationality: '',

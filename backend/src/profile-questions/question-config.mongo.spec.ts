@@ -5,7 +5,7 @@ import { completion } from '../user/profile-rules';
 import { User, UserSchema } from '../user/entities/user.entity';
 import {
   QuestionConfigService,
-  sanitizeDynamicAnswers, usesSeparateAnswerStorage,
+  sanitizeDynamicAnswers, usesSeparateAnswerStorage, isProtectedQuestion,
   type ProfileQuestion,
 } from './question-config.service';
 
@@ -91,13 +91,13 @@ describe('Dynamic questions: persisted MongoDB behavior (isolated)',()=>{
     const publicObj=service.applyPublicVisibility({gender:'male',age:30},updated);
     expect(publicObj.age).toBeUndefined();
   });
-  it('lets admins archive every profile question without requiring old fields for completion',async()=>{
+  it('lets admins archive optional questions while retaining essential profile fields',async()=>{
     const current=await service.get();
     const updated=await service.save('admin',{revision:0,
-      questions:current.questions.map(q=>({...q,enabled:false,required:false})),
+      questions:current.questions.map(q=>q.locked||isProtectedQuestion(q)?q:{...q,enabled:false,required:false}),
     });
-    expect(updated.questions.filter(q=>q.enabled).length).toBe(0);
-    expect(completion({gender:'female'},updated.questions).percentage).toBe(100);
+    expect(updated.questions.filter(q=>q.enabled).every(q=>q.locked||isProtectedQuestion(q))).toBe(true);
+    expect(completion({gender:'female',dateOfBirth:'2000-05-15',nationality:'Bangladesh',residenceCountry:'Canada'},updated.questions).percentage).toBe(100);
     expect(updated.questions.find(q=>q.path==='pledge.allTheInformationTrue')?.enabled).toBe(false);
     expect(await db.collection('profile_question_config').countDocuments()).toBe(1);
   });

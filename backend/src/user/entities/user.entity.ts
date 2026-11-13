@@ -50,6 +50,8 @@ export class User {
 
     @Prop()
     age:number // will be slider enum
+    @Prop({type:String})
+    dateOfBirth?:string;
     @Prop()
     bloodGroup:string 
     @Prop()

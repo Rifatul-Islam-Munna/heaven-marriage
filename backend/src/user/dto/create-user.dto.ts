@@ -521,6 +521,12 @@ export class CreateUserDto {
   @Transform(({ value }) => parseInt(value, 10))
   age?: number;
 
+  @ApiPropertyOptional({ example: '2000-05-15', format: 'date' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Birth date must use YYYY-MM-DD' })
+  dateOfBirth?: string;
+
   @ApiPropertyOptional({ example: 'A+', enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] })
   @IsString()
   @IsOptional()

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/command";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ageFromBirthDate, latestBirthDate } from "@/lib/birth-date";
 
 export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
   const formData = useProfileStore((state) => state.formData);
@@ -130,13 +131,17 @@ export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="age">বয়স *</Label>
+          <Label htmlFor="dateOfBirth">জন্ম তারিখ *</Label>
           <Input
-            id="age"
-            type="number"
-            value={formData.age || ""}
-            onChange={(e) => updateField("age", parseInt(e.target.value))}
-            placeholder="বছর"
+            id="dateOfBirth"
+            type="date"
+            required
+            max={latestBirthDate()}
+            value={formData.dateOfBirth || ""}
+            onChange={(e) => {
+              updateField("dateOfBirth", e.target.value);
+              updateField("age", ageFromBirthDate(e.target.value));
+            }}
           />
         </div>
 

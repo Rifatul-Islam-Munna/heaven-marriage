@@ -1,11 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { BUILTINS, answerForQuestion, type ProfileQuestion } from '../profile-questions/question-config.service';
+import { ageFromBirthDate } from './birth-date';
 
 export const PROFILE_FIELDS = [
   'name',
   'gender',
   'maritalStatus',
   'age',
+  'dateOfBirth',
   'bloodGroup',
   'weight',
   'nationality',
@@ -50,6 +52,7 @@ export function completion(u:any, questions:readonly ProfileQuestion[]=BUILTINS)
   const applicable=applicableRequiredQuestions(u,questions);
   const missing=applicable.filter(q=>{
     const value=answerForQuestion(u||{},q);
+    if(q.path==='dateOfBirth')return ageFromBirthDate(value)===undefined;
     return value===undefined||value===null||value===''||
       (Array.isArray(value)&&value.length===0)||
       (q.type==='checkbox'&&value!==true)||
@@ -72,6 +75,7 @@ export function publicProfile(u: any, unlocked = false) {
     '_id',
     'userId',
     'age',
+    'dateOfBirth',
     'gender',
     'maritalStatus',
     'bloodGroup',
@@ -85,6 +89,7 @@ export function publicProfile(u: any, unlocked = false) {
     'createdAt',
   ]);
   out.name = unlocked ? u.name : undefined;
+  out.age = ageFromBirthDate(u.dateOfBirth) ?? out.age;
   out.identityUnlocked = unlocked;
   const premiumActive=!!u.isSubscriber && (!u.premiumService?.expiresAt ||
     new Date(u.premiumService.expiresAt).getTime()>Date.now());
@@ -93,6 +98,7 @@ export function publicProfile(u: any, unlocked = false) {
   out.isVerified =
     u.verificationStatus === 'approved' && u.isPublishFromAdmin === true;
   out.address = pick(u.address, ['district', 'upazila', 'cityCorporation', 'area']);
+  if (unlocked) Object.assign(out.address, pick(u.address, ['presentAddress', 'permanentAddress']));
   out.educationInfo = pick(u.educationInfo, [
     'educationMethod',
     'highestEducation',
@@ -209,7 +215,7 @@ export function publicProfile(u: any, unlocked = false) {
       if (Array.isArray(v)) return v.map(clean);
       if (v && typeof v === 'object')
         return Object.fromEntries(
-          Object.entries(v).map(([k, x]) => [k, clean(x)]),
+          Object.entries(v).map(([k, x]) => [k, k === 'dateOfBirth' ? x : clean(x)]),
         );
       return v;
     };

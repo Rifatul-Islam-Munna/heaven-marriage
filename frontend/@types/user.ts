@@ -142,6 +142,7 @@ export interface User {
   gender?: string;
   maritalStatus?: string;
   age?: number;
+  dateOfBirth?: string;
   bloodGroup?: string;
   weight?: number;
   nationality?: string;
@@ -166,6 +167,7 @@ export interface User {
   dynamicAnswers?: Record<string, string | number | boolean | string[]>;
   publicAnswers?: Record<string, string | number | boolean | string[]>;
   publicQuestionSchema?: import("@/lib/profile-questions").ProfileQuestionSchema;
+  profileQuestionSchema?: import("@/lib/profile-questions").ProfileQuestionSchema;
   howYouWannaGetMarried?: string;
 
 }

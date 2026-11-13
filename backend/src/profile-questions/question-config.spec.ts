@@ -7,6 +7,15 @@ import {
 } from './question-config.service';
 
 describe('Admin controlled profile question rules', () => {
+  it('requires a date input for birth date and refuses hiding, replacing or removing it',async()=>{
+    const question=BUILTINS.find(q=>q.path==='dateOfBirth')!;
+    expect(question).toMatchObject({type:'date',enabled:true,required:true,gender:'both'});
+    for(const changes of [{enabled:false},{required:false},{type:'number'},{gender:'female'}])
+      expect(()=>validateQuestion({...question,...changes})).toThrow(BadRequestException);
+    const service=new QuestionConfigService({} as any);
+    jest.spyOn(service,'get').mockResolvedValue({revision:1,sections:[],questions:[question]});
+    await expect(service.save('admin',{revision:1,questions:[]})).rejects.toThrow(BadRequestException);
+  });
   const locations=[
     'nationality','residenceCountry','address.district','address.upazila',
     'address.cityCorporation','address.area',

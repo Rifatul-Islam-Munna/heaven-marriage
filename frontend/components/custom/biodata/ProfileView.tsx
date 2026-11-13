@@ -30,6 +30,8 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { leadEvent, viewContentEvent } from "@/lib/google-tag-manager";
 import { defaultQuestions, questionDisplayValue, questionUsesSeparateStorage, type ProfileQuestionSchema } from "@/lib/profile-questions";
+import { addressQuestionKind, savedBiodataAddress } from "@/lib/biodata-address";
+import { ageFromBirthDate } from "@/lib/birth-date";
 
 interface ProfileViewProps { id: string }
 type Fact = { path?: string; label: string; value: unknown };
@@ -52,7 +54,7 @@ function whatsappUrl(number: string) {
 /** Public answers the backend allowed, for questions that have no fixed slot on this page. */
 function extraEntries(user: User, schema: ProfileQuestionSchema, section: number): ShownFact[] {
   return schema.questions.filter(q =>
-    q.section === section && q.enabled && q.showPublic &&
+    q.section === section && q.enabled && q.showPublic && !(section === 1 && addressQuestionKind(q)) &&
     (!q.path || questionUsesSeparateStorage(q) || q.path.startsWith("pledge.") || q.path === "howYouWannaGetMarried" ||
       defaultQuestions.questions.find(original => original.id === q.id)?.section !== q.section) &&
     user.publicAnswers?.[q.id] !== undefined && user.publicAnswers?.[q.id] !== null && user.publicAnswers?.[q.id] !== "" &&
@@ -205,11 +207,18 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const a = userData.address, e = userData.educationInfo, f = userData.familyInfo, p = userData.personalInformation;
   const o = userData.occupational, w = userData.marriageInformationWomen, m = userData.marriageInformationMan, x = userData.expectedLifePartner;
   const area = [a?.area, a?.cityCorporation || bnUpazila(a?.upazila), bnDistrict(a?.district)].filter(Boolean).join(", ");
+  const currentAddress = savedBiodataAddress(userData, "presentAddress");
+  const permanentAddress = savedBiodataAddress(userData, "permanentAddress");
+  const age = ageFromBirthDate(userData.dateOfBirth) ?? userData.age;
+  const addressFacts: ShownFact[] = [
+    { label: "বর্তমান ঠিকানা", value: currentAddress || (showField("address.presentAddress") && area ? `${area}, ${userData.residenceCountry || "Bangladesh"}` : "") },
+    { label: "স্থায়ী ঠিকানা", value: permanentAddress },
+  ].filter(fact => fact.value);
   const maritalLabel = configFor("maritalStatus")?.options.find(opt => opt.value === String(userData.maritalStatus))?.label
     || marriedStatus.find(item => item.en === userData.maritalStatus)?.bn || userData.maritalStatus;
 
   const keyFacts = shown([
-    { path: "age", label: "বয়স", value: userData.age ? `${toBn(userData.age)} বছর` : undefined },
+    { path: "age", label: "বয়স", value: age ? `${toBn(age)} বছর` : undefined },
     { path: "personalInformation.height", label: "উচ্চতা", value: p?.height ? formatHeight(p.height) : undefined },
     { path: "maritalStatus", label: "বৈবাহিক অবস্থা", value: maritalLabel },
     { path: "address.district", label: "জেলা", value: bnDistrict(a?.district) },
@@ -229,7 +238,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
     { id: "basic", title: "মৌলিক তথ্য", icon: UserIcon, facts: [...shown([
       { path: "gender", label: "লিঙ্গ", value: gender ? (gender === "male" ? "পুরুষ" : "মহিলা") : undefined },
       { path: "maritalStatus", label: "বৈবাহিক অবস্থা", value: maritalLabel },
-      { path: "age", label: "বয়স", value: userData.age ? `${toBn(userData.age)} বছর` : undefined },
+      { path: "age", label: "বয়স", value: age ? `${toBn(age)} বছর` : undefined },
+      { path: "dateOfBirth", label: "জন্ম তারিখ", value: userData.dateOfBirth ? questionDisplayValue(userData.dateOfBirth, configFor("dateOfBirth") || defaultQuestions.questions.find(q => q.path === "dateOfBirth")!) : undefined },
       { path: "personalInformation.height", label: "উচ্চতা", value: p?.height ? formatHeight(p.height) : undefined },
       { path: "personalInformation.skinTone", label: "গাত্রবর্ণ", value: pick(skinColorOptions, p?.skinTone) },
       { path: "weight", label: "ওজন", value: userData.weight ? `${toBn(userData.weight)} কেজি` : undefined },
@@ -237,9 +247,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
       { path: "nationality", label: "জাতীয়তা", value: countries.find(item => item.en.trim() === userData.nationality)?.en || userData.nationality },
       { path: "residenceCountry", label: "বর্তমান বসবাসের দেশ", value: userData.residenceCountry },
     ]), ...extras(0)] },
-    { id: "address", title: "ঠিকানা", icon: MapPin, facts: [...shown([
-      { path: "address.permanentAddress", label: "স্থায়ী ঠিকানা", value: a?.permanentAddress || (area ? `${area}, ${userData.residenceCountry || "Bangladesh"}` : undefined) },
-      { path: "address.presentAddress", label: "বর্তমান ঠিকানা", value: a?.presentAddress || (area ? `${area}, ${userData.residenceCountry || "Bangladesh"}` : undefined) },
+    { id: "address", title: "ঠিকানা", icon: MapPin, facts: [...addressFacts, ...shown([
       { path: "address.district", label: "জেলা", value: bnDistrict(a?.district) },
       { path: "address.upazila", label: "উপজেলা", value: bnUpazila(a?.upazila) },
       { path: "address.cityCorporation", label: "সিটি কর্পোরেশন", value: a?.cityCorporation },

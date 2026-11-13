@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  AlignLeft, Archive, ArchiveRestore, ArrowDown, ArrowLeft, ArrowUp, ChevronDown, Copy, EyeOff, Hash, Info, List,
+  AlignLeft, Archive, ArchiveRestore, ArrowDown, ArrowLeft, ArrowUp, Calendar, ChevronDown, Copy, EyeOff, Hash, Info, List,
   ListChecks, Lock, Plus, SquareCheck, Trash2, Type, Undo2, X, type LucideIcon,
 } from 'lucide-react';
 import { profileQuestionOptions } from '@/lib/profile-question-options';
 import {
-  questionDisplayValue, questionUsesSeparateStorage, isProtectedLocationQuestion,
+  questionDisplayValue, questionUsesSeparateStorage, isProtectedLocationQuestion, isProtectedQuestion,
   type ProfileQuestion, type QuestionOption, type QuestionType,
 } from '@/lib/profile-questions';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ export const TYPES: { value: QuestionType; label: string; hint: string; icon: Lu
   { value: 'text', label: 'Short text', hint: 'One line', icon: Type },
   { value: 'textarea', label: 'Long text', hint: 'A paragraph', icon: AlignLeft },
   { value: 'number', label: 'Number', hint: 'Digits only', icon: Hash },
+  { value: 'date', label: 'Date', hint: 'Day, month, year', icon: Calendar },
   { value: 'select', label: 'Dropdown', hint: 'Pick one', icon: List },
   { value: 'dropdown', label: 'Dropdown (classic)', hint: 'Pick one', icon: ChevronDown },
   { value: 'checkbox', label: 'Yes / no', hint: 'Single tick', icon: SquareCheck },
@@ -28,7 +29,7 @@ export const TYPES: { value: QuestionType; label: string; hint: string; icon: Lu
 export const TYPE_LABEL = Object.fromEntries(TYPES.map(type => [type.value, type.label])) as Record<QuestionType, string>;
 export const GENDER_LABEL = { both: 'Everyone', male: 'Men', female: 'Women' } as const;
 /** blocking = the backend would reject the save; otherwise it's only advice. */
-export type QuestionIssue = { field: 'question' | 'publicLabel' | 'options'; message: string; blocking: boolean };
+export type QuestionIssue = { field: 'question' | 'publicLabel' | 'options' | 'rules'; message: string; blocking: boolean };
 
 const effectiveValue = (option: QuestionOption) => option.value.trim() || option.label.trim();
 
@@ -45,9 +46,19 @@ export function sanitizeQuestion(q: ProfileQuestion): ProfileQuestion {
 }
 
 /** Same rules as backend validateQuestion(). Only blocking issues stop a save. */
-export function questionIssues(q: ProfileQuestion): QuestionIssue[] {
+export function questionIssues(q: ProfileQuestion, questions:ProfileQuestion[]=[]): QuestionIssue[] {
   if (q.locked) return [];
   const issues: QuestionIssue[] = [];
+  const targets=new Set<string>();
+  for(const rule of q.rules||[]){
+    const target=questions.find(item=>item.id===rule.questionId);
+    if(rule.type!=='not_equal'||!rule.questionId||rule.questionId===q.id||targets.has(rule.questionId)||
+      q.type==='multi_checkbox'||(questions.length&&(!target||target.locked||target.type==='multi_checkbox')))
+      issues.push({field:'rules',message:'Choose a different single-answer question for each rule.',blocking:true});
+    if((rule.message||'').length>300)issues.push({field:'rules',message:'Keep the rule message under 300 characters.',blocking:true});
+    targets.add(rule.questionId);
+  }
+  if((q.rules||[]).length>20)issues.push({field:'rules',message:'Use 20 answer rules or fewer.',blocking:true});
   if (!q.question.trim()) issues.push({ field: 'question', message: 'Write the question members will see.', blocking: true });
   if (q.showPublic && !q.publicLabel.trim())
     issues.push({ field: 'publicLabel', message: 'Add a public label, or turn off “Show on public biodata”.', blocking: true });
@@ -232,7 +243,7 @@ function PreviewPanel({ q }: { q: ProfileQuestion }) {
 }
 
 type EditorProps = {
-  question: ProfileQuestion; sections: { id: number; title: string }[]; issues: QuestionIssue[];
+  question: ProfileQuestion; questions?:ProfileQuestion[]; sections: { id: number; title: string }[]; issues: QuestionIssue[];
   isNew: boolean; isChanged: boolean; savedVersion?: ProfileQuestion;
   canMoveUp: boolean; canMoveDown: boolean; focusSignal: number;
   onChange: (changes: Partial<ProfileQuestion>) => void;
@@ -245,7 +256,7 @@ type EditorProps = {
 };
 
 export function QuestionEditor({
-  question: q, sections, issues, isNew, isChanged, savedVersion, canMoveUp, canMoveDown, focusSignal,
+  question: q, questions=[], sections, issues, isNew, isChanged, savedVersion, canMoveUp, canMoveDown, focusSignal,
   onChange, onSectionChange, onMove, onDuplicate, onToggleArchive, onDelete, onRevert, onBack, onSave, canSave,
 }: EditorProps) {
   const questionRef = useRef<HTMLTextAreaElement>(null);
@@ -256,6 +267,8 @@ export function QuestionEditor({
   }, [focusSignal]);
   const secret = !!q.path && SECRET_PATHS.has(q.path);
   const protectedLocation=isProtectedLocationQuestion(q);
+  const protectedField=isProtectedQuestion(q);
+  const birthDate=q.path==='dateOfBirth';
   const kind = q.legacyKey ? 'Older custom question' : q.path ? 'Built-in field' : 'Custom question';
   const issueFor = (field: QuestionIssue['field']) => issues.find(issue => issue.field === field);
   const questionIssue = issueFor('question'), labelIssue = issueFor('publicLabel');
@@ -286,8 +299,8 @@ export function QuestionEditor({
             <DashButton disabled={q.locked} onClick={onDuplicate} title="Duplicate"><Copy size={14} /><span className="hidden sm:inline">Duplicate</span></DashButton>
             {isChanged && !isNew && <DashButton onClick={onRevert} title="Undo changes to this question"><Undo2 size={14} /><span className="hidden sm:inline">Revert</span></DashButton>}
             {isNew
-              ? <DashButton tone="danger" disabled={protectedLocation} onClick={onDelete}><Trash2 size={14} /> Delete</DashButton>
-              : <DashButton tone={q.enabled ? 'danger' : 'secondary'} disabled={q.locked||protectedLocation} onClick={onToggleArchive}>
+              ? <DashButton tone="danger" disabled={protectedField} onClick={onDelete}><Trash2 size={14} /> Delete</DashButton>
+              : <DashButton tone={q.enabled ? 'danger' : 'secondary'} disabled={q.locked||protectedField} onClick={onToggleArchive}>
                 {q.enabled ? <><Archive size={14} /> Hide</> : <><ArchiveRestore size={14} /> Show</>}
               </DashButton>}
           </div>
@@ -296,6 +309,7 @@ export function QuestionEditor({
 
       <div className="space-y-7 p-4">
         {q.locked && <Note tone="info" icon={Lock}>This is a login field managed by the sign-in system. Only its section and position can change here.</Note>}
+        {birthDate && <Note tone="info" icon={Lock}>Birth date is required for everyone. It cannot be deleted, hidden or replaced. Age is calculated from the saved date.</Note>}
         {protectedLocation && <Note tone="info" icon={Lock}>
           Essential location field: cannot be deleted, hidden, changed to another input type, or restricted to one gender.
           You may edit its wording, public label, Required setting or position.
@@ -331,7 +345,7 @@ export function QuestionEditor({
             {TYPES.map(type => {
               const active = q.type === type.value;
               const Icon = type.icon;
-              return <button key={type.value} type="button" role="radio" aria-checked={active} disabled={q.locked||protectedLocation}
+              return <button key={type.value} type="button" role="radio" aria-checked={active} disabled={q.locked||protectedField}
                 onClick={() => onChange({ type: type.value })}
                 className={cn('flex items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50',
                   active ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-400' : 'border-[#e9ecef] hover:border-[#ced4da] hover:bg-[#f8f9fa]')}>
@@ -353,11 +367,39 @@ export function QuestionEditor({
           {!OPTION_TYPES.has(q.type) && issueFor('options') && <p className="text-[12px]"><IssueText issue={issueFor('options')} /></p>}
         </Group>
 
+        {!q.locked&&<Group title="Answer rules">
+          <p className="text-[12px] text-muted-foreground">Require this answer to differ from another answer. Blank answers are skipped.</p>
+          {(q.rules||[]).map((rule,index)=><div key={index} className="flex flex-col gap-2 rounded-md border p-3">
+            <label htmlFor={'qb-rule-'+index} className={labelClass}>Must differ from</label>
+            <div className="flex items-center gap-2">
+              <select id={'qb-rule-'+index} value={rule.questionId} aria-invalid={!!issueFor('rules')}
+                onChange={event=>onChange({rules:(q.rules||[]).map((row,i)=>i===index?{...row,questionId:event.target.value}:row)})}
+                className={fieldClass}>
+                <option value="">Choose another question</option>
+                {questions.filter(item=>item.id!==q.id&&!item.locked&&item.type!=='multi_checkbox'&&
+                  !(q.rules||[]).some((row,i)=>i!==index&&row.questionId===item.id)).map(item=>
+                    <option key={item.id} value={item.id}>{item.question}{item.enabled?'':' (hidden)'}</option>)}
+              </select>
+              <DashButton tone="danger" aria-label={'Remove answer rule '+(index+1)}
+                onClick={()=>onChange({rules:(q.rules||[]).filter((_,i)=>i!==index)})}><Trash2 size={14}/></DashButton>
+            </div>
+            <label htmlFor={'qb-rule-message-'+index} className={labelClass}>Error message (optional)</label>
+            <input id={'qb-rule-message-'+index} value={rule.message||''} maxLength={300} dir="auto" className={fieldClass}
+              placeholder="These two answers must be different"
+              onChange={event=>onChange({rules:(q.rules||[]).map((row,i)=>i===index?{...row,message:event.target.value}:row)})}/>
+          </div>)}
+          {issueFor('rules')&&<IssueText issue={issueFor('rules')}/>}
+          <DashButton disabled={q.type==='multi_checkbox'||(q.rules||[]).length>=20}
+            onClick={()=>onChange({rules:[...(q.rules||[]),{type:'not_equal',questionId:''}]})}>
+            <Plus size={14}/> Add “must differ” rule
+          </DashButton>
+        </Group>}
+
         <Group title="Who answers and where">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="min-w-0">
               <p className={labelClass}>Asked to</p>
-              <Segmented label="Asked to" value={q.gender} disabled={q.locked||protectedLocation} onChange={gender => onChange({ gender })} options={[
+              <Segmented label="Asked to" value={q.gender} disabled={q.locked||protectedField} onChange={gender => onChange({ gender })} options={[
                 { value: 'both', label: 'Everyone' }, { value: 'male', label: 'Men only' }, { value: 'female', label: 'Women only' },
               ]} />
             </div>
@@ -373,9 +415,9 @@ export function QuestionEditor({
         <Group title="Visibility">
           <div className="grid gap-2 lg:grid-cols-3">
             <Toggle id="qb-enabled" label="Show in form" description="Members are asked this question" checked={q.enabled}
-              disabled={q.locked||protectedLocation} onChange={enabled => onChange({ enabled })} />
+              disabled={q.locked||protectedField} onChange={enabled => onChange({ enabled })} />
             <Toggle id="qb-required" label="Required" description="Members must answer to finish" checked={q.required}
-              disabled={q.locked} onChange={required => onChange({ required })} />
+              disabled={q.locked||birthDate} onChange={required => onChange({ required })} />
             <Toggle id="qb-public" label="Show on public biodata" description={secret ? 'Private login field' : 'Visitors see the answer'}
               checked={q.showPublic} disabled={secret} onChange={showPublic => onChange({ showPublic })} />
           </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Eye, GripVertical, Loader2, Plus, RefreshCw, Save, Search, TriangleAlert, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { defaultQuestions, isProtectedLocationQuestion, type ProfileQuestion, type ProfileQuestionSchema } from '@/lib/profile-questions';
+import { defaultQuestions, isProtectedLocationQuestion, isProtectedQuestion, type ProfileQuestion, type ProfileQuestionSchema } from '@/lib/profile-questions';
 import { profileQuestionOptions } from '@/lib/profile-question-options';
 import { cn } from '@/lib/utils';
 
@@ -71,7 +71,7 @@ export default function QuestionBuilder() {
     return !before || JSON.stringify(before) !== JSON.stringify(q);
   }).map(q => q.id)), [schema, savedById]);
   const dirty = changedIds.size > 0;
-  const issuesById = useMemo(() => new Map(schema.questions.map(q => [q.id, questionIssues(q)])), [schema]);
+  const issuesById = useMemo(() => new Map(schema.questions.map(q => [q.id, questionIssues(q,schema.questions)])), [schema]);
   const blockingQuestions = useMemo(() => schema.questions.filter(q => (issuesById.get(q.id) || []).some(issue => issue.blocking)), [schema, issuesById]);
   const warningQuestions = useMemo(() => schema.questions.filter(q => {
     const issues = issuesById.get(q.id) || [];
@@ -225,13 +225,14 @@ export default function QuestionBuilder() {
     toast.success('Copy added below the original');
   };
   const removeNew = (id: string) => {
-    if(isProtectedLocationQuestion(schema.questions.find(q=>q.id===id))){
-      toast.error('Essential Country, City and Area fields cannot be deleted.');
+    if(isProtectedQuestion(schema.questions.find(q=>q.id===id))){
+      toast.error('Essential profile fields cannot be deleted.');
       return;
     }
     const index = schema.questions.findIndex(q => q.id === id);
     const remaining = schema.questions.filter(q => q.id !== id);
-    setSchema(s => ({ ...s, questions: s.questions.filter(q => q.id !== id) }));
+    setSchema(s => ({ ...s, questions: s.questions.filter(q => q.id !== id).map(q=>
+      q.rules?.some(rule=>rule.questionId===id)?{...q,rules:q.rules.filter(rule=>rule.questionId!==id)}:q) }));
     setSelectedId(remaining[Math.max(0, index - 1)]?.id || '');
     setMobileView('list');
   };
@@ -457,6 +458,7 @@ export default function QuestionBuilder() {
 
         <div className={cn('min-w-0 xl:block', mobileView === 'list' && 'hidden')}>
           {selected ? <QuestionEditor
+            questions={schema.questions}
             question={selected}
             sections={schema.sections}
             issues={issuesById.get(selected.id) || []}
@@ -471,7 +473,7 @@ export default function QuestionBuilder() {
             onMove={direction => moveTo(selected.id, selIndex + direction)}
             onDuplicate={() => duplicate(selected)}
             onToggleArchive={() => {
-              if(isProtectedLocationQuestion(selected))return;
+              if(isProtectedQuestion(selected))return;
               update(selected.id, { enabled: !selected.enabled });
             }}
             onDelete={() => removeNew(selected.id)}
@@ -525,7 +527,7 @@ export default function QuestionBuilder() {
                   <td className="whitespace-nowrap px-3 py-2 text-[#495057]">{TYPE_LABEL[q.type]}</td>
                   <td className="px-3 py-2 text-center">
                     <label className="inline-flex"><span className="sr-only">Show in form</span>
-                      <Toggle checked={q.enabled} disabled={q.locked||isProtectedLocationQuestion(q)} onChange={value => update(q.id, { enabled: value })} /></label>
+                      <Toggle checked={q.enabled} disabled={q.locked||isProtectedQuestion(q)} onChange={value => update(q.id, { enabled: value })} /></label>
                   </td>
                   <td className="px-3 py-2 text-center">
                     <label className="inline-flex"><span className="sr-only">Required</span>

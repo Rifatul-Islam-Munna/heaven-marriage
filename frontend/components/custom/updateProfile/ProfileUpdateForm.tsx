@@ -16,7 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer,
+  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
@@ -24,6 +24,7 @@ import type {LocationResponse} from '@/lib/location-options';
 import AiBiodataAssistant from "./AiBiodataAssistant";
 import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
 import {previewBiodataCompletion} from '@/lib/profile-completion';
+import {ageFromBirthDate,latestBirthDate} from '@/lib/birth-date';
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
 type Answer = string | number | boolean | string[];
@@ -48,6 +49,7 @@ const CSS = `
 
 /** Same rules the server uses to count a question as answered. */
 function isAnswered(q: ProfileQuestion, value: unknown) {
+  if(q.path==='dateOfBirth')return ageFromBirthDate(value as string)!==undefined;
   if (value === undefined || value === null || value === "") return false;
   if (Array.isArray(value)) return value.length > 0;
   if (q.type === "checkbox") return q.required ? value === true : typeof value === "boolean";
@@ -151,7 +153,8 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
     <p className="mt-1 text-right text-xs text-gray-400">{bn(String(raw).length)}/৫০০০</p>
   </div>;
 
-  return <input autoFocus aria-labelledby="qb-question" dir="auto" type={q.type === "number" ? "number" : "text"}
+  return <input autoFocus aria-labelledby="qb-question" dir="auto" type={q.type === "number" ? "number" : q.type==='date'?'date':"text"}
+    max={q.path==='dateOfBirth'?latestBirthDate():undefined}
     inputMode={q.type === "number" ? "decimal" : undefined} value={String(raw)} maxLength={q.type === "number" ? undefined : 5000}
     onChange={event => onChange(q.type === "number" ? (event.target.value === "" ? "" : Number(event.target.value)) : event.target.value)}
     onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }}
@@ -243,6 +246,8 @@ export default function ProfileUpdateForm() {
     setSaveState("saving");
     setSaveError("");
     try {
+      const errors=questionRuleErrors(snapshot as Record<string,unknown>,schema.questions);
+      if(errors.length)throw new Error(errors[0].message);
       const [result, error] = await PatchRequestAxios<{
         message:string;data:Record<string,unknown>;
         completion:{percentage:number;requiredCount:number;answeredCount:number;remaining:string[];nextStep:number;schemaRevision:number};
@@ -307,7 +312,7 @@ export default function ProfileUpdateForm() {
   }, []);
 
   const gender = formData.gender as string | undefined;
-  const flow = useMemo(() => schema.questions.filter(q => !q.locked && questionApplies(q, gender) && locationQuestionApplies(q,formData))
+  const flow = useMemo(() => schema.questions.filter(q => q.path!=='age' && !q.locked && questionApplies(q, gender) && locationQuestionApplies(q,formData))
     .sort((a, b) => a.section - b.section || a.order - b.order), [schema, gender, formData]);
   const levels = useMemo(() => schema.sections
     .map(section => ({ section, questions: flow.filter(q => q.section === section.id) }))
@@ -333,6 +338,8 @@ export default function ProfileUpdateForm() {
   const completedLevels = levels.filter(levelComplete).length;
   const connectionBalance = (data as { numberOfConnections?: number } | undefined)?.numberOfConnections;
   const requiredMissing=requiredProgress.remaining;
+  const ruleErrors=questionRuleErrors(formData,schema.questions);
+  const currentRuleError=ruleErrors.find(error=>error.questionId===question?.id||error.otherQuestionId===question?.id)?.message;
   const name = typeof formData.name === "string" ? formData.name.split(" ")[0] : "";
 
   useEffect(() => {
@@ -351,6 +358,11 @@ export default function ProfileUpdateForm() {
     return options.find(option => option.value === String(value))?.label || String(value);
   };
   const setAnswer = (q: ProfileQuestion, answer: Answer) => {
+    if(q.path==='dateOfBirth'){
+      updateField('dateOfBirth',String(answer));
+      updateField('age',ageFromBirthDate(String(answer)));
+      return;
+    }
     if (questionUsesSeparateStorage(q)) { updateDynamicAnswer(q.id, answer); return; }
     if (q.legacyKey) { updateCustomField(q.legacyKey, String(answer)); return; }
     if (!q.path) return;
@@ -399,6 +411,8 @@ export default function ProfileUpdateForm() {
   const next = (skipped = false) => {
     if (!question) return;
     const fresh = useProfileStore.getState().formData;
+    const error=questionRuleErrors(fresh,schema.questions).find(row=>row.questionId===question.id||row.otherQuestionId===question.id);
+    if(error){setShake(n=>n+1);toast.error(error.message);return;}
     const isDone = answered(question, fresh);
     if (!skipped && question.required && !isDone) {
       setShake(n => n + 1);
@@ -416,6 +430,8 @@ export default function ProfileUpdateForm() {
   useEffect(() => { nextRef.current = next; });
   const autoAdvance = () => window.setTimeout(() => nextRef.current(false), 350);
   const submit = async () => {
+    const errors=questionRuleErrors(useProfileStore.getState().formData,schema.questions);
+    if(errors.length){toast.error(errors[0].message);return;}
     const stage = currentBiodataStage(data as BiodataStatusSource);
     if (stage === "deleted" || stage === "under_review" || stage === "published") {
       toast.info("বায়োডাটা ইতোমধ্যে জমা হয়েছে। এখন তথ্য Edit/Update করতে পারবেন।");
@@ -513,9 +529,11 @@ export default function ProfileUpdateForm() {
           {streak >= 2 && <span className="qb-pop inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-600"><Flame className="h-3.5 w-3.5" /> {bn(streak)} টানা উত্তর</span>}
         </div>
         <h1 id="qb-question" dir="auto" className="mt-4 text-2xl font-bold leading-snug text-gray-900 sm:text-[28px]">{question.question}</h1>
-        <div className="mt-6">
+        <div className="mt-6" role="group" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
+          aria-describedby={currentRuleError?'qb-answer-error':undefined}>
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
+          {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}
         </div>
       </div>
 

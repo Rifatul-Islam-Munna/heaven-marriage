@@ -57,6 +57,43 @@ describe('Biodata deletion requests and submission lifecycle (isolated MongoDB)'
     for (const collection of Object.values(db.collections)) await collection.deleteMany({});
   });
 
+  it('persists the entered birth date, calculates age and rejects removing a saved date',async()=>{
+    const member=await account();
+    const dateOfBirth='2000-05-15';
+    await writer.updatedFullUserInformation({dateOfBirth,age:90} as any,String(member._id));
+    const saved=await users.findById(member._id).lean();
+    expect(saved.dateOfBirth).toBe(dateOfBirth);
+    expect(saved.age).not.toBe(90);
+    await expect(writer.updatedFullUserInformation({dateOfBirth:null} as any,String(member._id)))
+      .rejects.toThrow('Saved birth date cannot be removed');
+    expect((await users.findById(member._id).lean()).dateOfBirth).toBe(dateOfBirth);
+  });
+
+  it('rejects matching answers in partial member and admin updates before writing',async()=>{
+    const member=await account(),first='q_'+'a'.repeat(32),second='q_'+'b'.repeat(32);
+    const previous=(writer as any).questions;
+    const field=(id:string)=>({id,question:id,publicLabel:id,section:1,gender:'both',type:'text',
+      options:[],optionSource:'',enabled:true,required:false,showPublic:false,order:1,locked:false});
+    (writer as any).questions={get:async()=>({revision:0,questions:[
+      {...field(first),rules:[{type:'not_equal',questionId:second,message:'Answers must differ'}]},field(second),
+    ]})};
+    try{
+      await users.updateOne({_id:member._id},{$set:{dynamicAnswers:{[first]:'same',[second]:'different'}}});
+      await expect(writer.updatedFullUserInformation({dynamicAnswers:{[second]:'same'}} as any,String(member._id)))
+        .rejects.toThrow('Answers must differ');
+      const adminUpdate=jest.fn();
+      const adminWriter=Object.assign(Object.create(UserService.prototype),writer,{
+        identity:{adminUpdateProfile:adminUpdate},platform:{audit:jest.fn()},
+      });
+      await expect(adminWriter.update({id:String(member._id),dynamicAnswers:{[second]:'same'}},'admin',UserType.ADMIN))
+        .rejects.toThrow('Answers must differ');
+      expect(adminUpdate).not.toHaveBeenCalled();
+      expect((await users.findById(member._id).lean()).dynamicAnswers[second]).toBe('different');
+      await writer.updatedFullUserInformation({dynamicAnswers:{[second]:'corrected'}} as any,String(member._id));
+      expect((await users.findById(member._id).lean()).dynamicAnswers[second]).toBe('corrected');
+    }finally{(writer as any).questions=previous;}
+  });
+
   it('shows saved unpublished profiles first, moves them to the top after every save, and excludes signups',async()=>{
     (writer as any).questions={get:async()=>({revision:80,
       questions:BUILTINS.filter(question=>question.path==='age')})};

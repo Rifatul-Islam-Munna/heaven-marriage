@@ -4,7 +4,7 @@
  * Only send changes to biodata fields; keep nested objects as small patches.
  */
 export const BIODATA_DRAFT_FIELDS = [
-  "name", "gender", "maritalStatus", "age", "bloodGroup", "weight",
+  "name", "gender", "maritalStatus", "age", "dateOfBirth", "bloodGroup", "weight",
   "nationality", "residenceCountry", "whatsapp", "guardianPhone", "fatherName", "motherName",
   "address", "educationInfo", "familyInfo", "personalInformation",
   "occupational", "marriageInformationWomen", "marriageInformationMan",

@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
-import { defaultQuestions, type ProfileQuestionSchema } from "@/lib/profile-questions";
+import { defaultQuestions, questionRuleErrors, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
@@ -227,6 +227,8 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
 
   const handleSubmit = () => {
     if(!data || !initialBiodataRef.current)return;
+    const errors=questionRuleErrors(getFormData(),questionSchema.questions);
+    if(errors.length){toast.error(errors[0].message);return;}
     // Account credentials are edited only in the separate Account & Security section.
     // Patch changed biodata fields instead of sending stale account / payment fields.
     const changes=diffBiodataDraft(initialBiodataRef.current,
