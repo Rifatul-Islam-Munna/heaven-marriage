@@ -16,11 +16,9 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
-import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 
 interface WebData {
   _id: string;
@@ -48,60 +46,71 @@ export default function WebDataDashboard() {
   const queryClient = useQueryClient();
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
-  // Fetch web data
-  const { data: webData, isLoading } = useQueryWrapper<WebData>(
-    ["web-data"],
-    "/web-data",
-  );
-
-  // Upload mutation - returns object with {data, error}
-  const uploadMutation = useCommonMutationApi<any>({
-    method: "POST",
-    url: "/image/upload-image",
-    successMessage: "আপলোড সফল হয়েছে",
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["web-data"], exact: false });
-      setUploadingField(null);
-    },
-    onError: () => {
-      setUploadingField(null);
+  // Use normal API routes for both reading and writing; Server Actions post to
+  // /dashboard/images and can be rejected by the hosting layer for large uploads.
+  const { data: webData, isLoading, isError, error: loadError } = useQuery<WebData>({
+    queryKey: ["web-data"],
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard-media", { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || `Could not load website media (${response.status})`);
+      return data as WebData;
     },
   });
 
-  // Update web data mutation
-  const updateMutation = useCommonMutationApi({
-    method: "PATCH",
-    url: "/web-data",
-    successMessage: "সফলভাবে আপডেট হয়েছে",
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["web-data"], exact: false });
-    },
-  });
+  const saveWebData = async (updateData: Partial<WebData>) => {
+    const response = await fetch("/api/dashboard-media", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(updateData),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(result?.message || `Could not save media (${response.status})`);
+  };
 
-  // Handle file upload - FIXED to handle {data, error} response
+  // Upload through the authenticated media route, then save the returned URL.
   const handleFileUpload = async (
     file: File,
     section: string,
     field: string,
   ) => {
+    if (uploadingField) return;
+    const isVideo = section === 'home-heroVideo';
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const videoExtensions = new Set(['mp4','m4v','webm','mov','mkv','avi','wmv','flv','mpeg','mpg','m2v','3gp','3g2','ogv','ts','mts','m2ts']);
+    const imageExtensions = new Set(['jpg','jpeg','jpe','jfif','png','apng','webp','avif','gif','ico','bmp','tif','tiff','heic','heif']);
+    const typeMatches = isVideo ? file.type.startsWith('video/') : file.type.startsWith('image/');
+    if (!(isVideo ? videoExtensions : imageExtensions).has(extension) && !typeMatches) {
+      toast.error(isVideo ? 'Choose a supported video file' : 'Choose a supported image file');
+      return;
+    }
+    const maxMB = isVideo ? 80 : 25;
+    if (file.size > maxMB * 1024 * 1024) {
+      toast.error(`File must be ${maxMB} MB or smaller`);
+      return;
+    }
     const fieldKey = `${section}-${field}`;
     setUploadingField(fieldKey);
+    const loadingToast = toast.loading(isVideo ? 'Uploading and preparing video...' : 'Uploading image...');
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      // Response is {data: "url", error: null}
-      const uploadResponse = await uploadMutation.mutateAsync(formData);
-
-      // Extract the actual URL from response.data
-      const uploadedUrl = uploadResponse?.data || uploadResponse;
-
-      console.log("Uploaded URL:", uploadedUrl);
-      console.log("Current webData:", webData);
+      const response = await fetch('/api/dashboard-media', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+      });
+      const uploadResponse = await response.json().catch(() => ({ message: `Upload rejected (HTTP ${response.status})` }));
+      if (!response.ok || typeof uploadResponse?.url !== 'string') {
+        throw new Error(uploadResponse?.message || 'Media upload failed');
+      }
+      const uploadedUrl: string = uploadResponse.url;
 
       // Update web data with new URL - PRESERVE EXISTING DATA
-      const updateData: any = {};
+      const updateData: Partial<WebData> = {};
 
       if (section === "home-heroVideo") {
         updateData.home = {
@@ -129,13 +138,15 @@ export default function WebDataDashboard() {
         };
       }
 
-      console.log("Update payload:", updateData);
-
-      const updateResult = await updateMutation.mutateAsync(updateData);
-      console.log("Update response:", updateResult);
+      await saveWebData(updateData);
+      toast.success(isVideo ? 'ভিডিও সফলভাবে আপলোড হয়েছে' : 'ছবি সফলভাবে আপলোড হয়েছে');
+      await queryClient.invalidateQueries({ queryKey: ['web-data'] });
     } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("আপলোড ব্যর্থ হয়েছে");
+      console.error('Upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'আপলোড ব্যর্থ হয়েছে');
+    } finally {
+      toast.dismiss(loadingToast);
+      setUploadingField(null);
     }
   };
 
@@ -160,6 +171,15 @@ export default function WebDataDashboard() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="container mx-auto px-4 py-8 space-y-3">
+        <p className="text-sm text-red-700">{loadError?.message || 'Could not load website media'}</p>
+        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['web-data'] })}>Retry</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">
       {/* Header */}
@@ -170,6 +190,9 @@ export default function WebDataDashboard() {
         </h1>
         <p className="text-sm sm:text-base text-gray-600 mt-1">
           ছবি এবং ভিডিও আপলোড ও আপডেট করুন
+        </p>
+        <p className="text-xs text-gray-500 mt-2">
+          Video: MP4, MOV, WebM, MKV, AVI and more (up to 80 MB). Images: JPG, PNG, GIF, HEIC and more (up to 25 MB).
         </p>
       </div>
 
@@ -252,7 +275,7 @@ export default function WebDataDashboard() {
                   <input
                     id="bigScreen-video"
                     type="file"
-                    accept="video/*"
+                    accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.mpeg,.mpg,.m2v,.3gp,.3g2,.ogv,.ts,.mts,.m2ts"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -329,7 +352,7 @@ export default function WebDataDashboard() {
                   <input
                     id="mobileScreen-video"
                     type="file"
-                    accept="video/*"
+                    accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.wmv,.flv,.mpeg,.mpg,.m2v,.3gp,.3g2,.ogv,.ts,.mts,.m2ts"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -416,7 +439,7 @@ export default function WebDataDashboard() {
                   <input
                     id="home-left-image"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jpg,.jpeg,.jpe,.jfif,.png,.apng,.webp,.avif,.gif,.ico,.bmp,.tif,.tiff,.heic,.heif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -489,7 +512,7 @@ export default function WebDataDashboard() {
                   <input
                     id="home-right-image"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jpg,.jpeg,.jpe,.jfif,.png,.apng,.webp,.avif,.gif,.ico,.bmp,.tif,.tiff,.heic,.heif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -582,7 +605,7 @@ export default function WebDataDashboard() {
                   <input
                     id="about-left-image"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jpg,.jpeg,.jpe,.jfif,.png,.apng,.webp,.avif,.gif,.ico,.bmp,.tif,.tiff,.heic,.heif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -655,7 +678,7 @@ export default function WebDataDashboard() {
                   <input
                     id="about-right-image"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jpg,.jpeg,.jpe,.jfif,.png,.apng,.webp,.avif,.gif,.ico,.bmp,.tif,.tiff,.heic,.heif"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];

@@ -28,7 +28,7 @@ export class WebDataController {
   // Create or update web data
   @Patch()
   @UseGuards(AuthGuard,RolesGuard)
-  @DashboardPermission('visual-editor')
+  @DashboardPermission('images','visual-editor')
   @ApiOperation({ summary: 'Update website data (Create if not exists)' })
   @ApiResponse({
     status: 200,

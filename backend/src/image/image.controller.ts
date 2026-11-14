@@ -1,60 +1,55 @@
+import {
+  BadRequestException, Controller, Post, UploadedFile, UseGuards, UseInterceptors,
+} from '@nestjs/common';
+import {ApiConsumes} from '@nestjs/swagger';
+import {FileInterceptor} from '@nestjs/platform-express';
+import {Throttle,ThrottlerGuard} from '@nestjs/throttler';
+import {diskStorage} from 'multer';
+import {randomUUID} from 'node:crypto';
+import {mkdirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {AuthGuard,type ExpressRequest} from '../lib/auth.guard';
+import {RolesGuard} from '../lib/roles.guard';
 import {DashboardPermission} from '../staff-access/permissions';
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UseInterceptors, BadRequestException, UploadedFile } from '@nestjs/common';
-import { ImageService } from './image.service';
-import { CreateImageDto } from './dto/create-image.dto';
-import { UpdateImageDto } from './dto/update-image.dto';
-import { AuthGuard, type ExpressRequest } from 'src/lib/auth.guard';
-import { ApiConsumes } from '@nestjs/swagger';
-import { existsSync, mkdirSync } from 'fs';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { cwd } from 'process';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { RolesGuard } from 'src/lib/roles.guard';
-import { Roles } from 'src/lib/roles.decorator';
-import { UserType } from 'src/user/entities/user.entity';
+import {UserType} from '../user/entities/user.entity';
+import {ImageService} from './image.service';
+import {getMediaFormat,MAX_MEDIA_BYTES} from './media-upload';
+
+const uploadDirectory=join(tmpdir(),'niqaha-dashboard-media');
+mkdirSync(uploadDirectory,{recursive:true});
+
 @Controller('image')
 export class ImageController {
-  constructor(private readonly imageService: ImageService) {}
-  @Post("upload-image")
-    @UseGuards(AuthGuard,RolesGuard)
-    @DashboardPermission('images','blog','visual-editor')
-  
-     @ApiConsumes('multipart/form-data')
-   @UseInterceptors(FileInterceptor("file",{
-    storage:diskStorage({
-      destination:  (existsSync( join(cwd() , '/uploads') ) ?? mkdirSync(join(cwd() , '/uploads'), { recursive: true }), join(cwd() , '/uploads')), 
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-      },
-      
-    }),
-   limits: { fileSize: 1024 * 1024 * 20 },
+  constructor(private readonly imageService:ImageService) {}
 
-    fileFilter: (req, file, callback) => {
-      const allowedMimeTypes = [ 'image/jpeg', 'image/png', 'image/webp', "image/avif",'image/jpg','application/pdf','video/mp4',
-  'video/webm',
-  'video/ogg',
-  'video/quicktime',     // .mov
-  'video/x-matroska'];
-    
+  @Post('upload-image')
+  @UseGuards(AuthGuard,RolesGuard,ThrottlerGuard)
+  @DashboardPermission('images','blog','visual-editor')
+  @Throttle({default:{limit:100,ttl:3600000}})
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file',{
+    storage:diskStorage({
+      destination:uploadDirectory,
+      filename:(_req,file,callback)=>{
+        const format=getMediaFormat(file.originalname,file.mimetype);
+        callback(null,randomUUID()+'.'+(format?.extension||'bin'));
+      },
+    }),
+    limits:{fileSize:MAX_MEDIA_BYTES,files:1,fields:0},
+    fileFilter:(req,file,callback)=>{
+      const format=getMediaFormat(file.originalname,file.mimetype);
+      if(!format)return callback(new BadRequestException(
+        'Unsupported file format. Use a standard image, video, or PDF.'),false);
       const staff=(req as unknown as ExpressRequest).user;
-      const canUploadExtendedMedia=staff?.role===UserType.ADMIN||
+      const extended=staff?.role===UserType.ADMIN||
         staff?.dashboardPermissions?.includes('images');
-      const imageMimeTypes=['image/jpeg','image/png','image/webp','image/avif','image/jpg'];
-      if (!canUploadExtendedMedia&&!imageMimeTypes.includes(file.mimetype))
-        return callback(new BadRequestException('This role can upload image files only'),false);
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        return callback(new BadRequestException('Only PDF and image files are allowed'), false);
-      }
-    
-      callback(null, true);
-    }
-   }))
-  uploadImage(@UploadedFile() file: Express.Multer.File) {
+      if(!extended&&format.kind!=='image')
+        return callback(new BadRequestException('This role can upload images only'),false);
+      callback(null,true);
+    },
+  }))
+  uploadImage(@UploadedFile()file:Express.Multer.File){
     return this.imageService.uploadImage(file);
   }
 }
-
-
