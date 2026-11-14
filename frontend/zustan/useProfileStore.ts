@@ -22,7 +22,7 @@ interface ProfileStore {
   updateDynamicAnswer: (key: string, answer: string | number | boolean | string[]) => void;
   
   // Initialize with existing data
-  initializeForm: (data: Partial<User>) => void;
+  initializeForm: (data: Partial<User>, options?: { preserveStep?: boolean }) => void;
   
   // Get all form data for submission
   getFormData: () => Partial<User>;
@@ -208,8 +208,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     })),
 
   // Load existing data into form
-  initializeForm: (data) =>
-    set({
+  initializeForm: (data, options) =>
+    set((state) => ({
       formData: {
         ...getInitialFormData(),
         ...data,
@@ -219,8 +219,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
       },
       shouldShowEmail: !data.email,
       shouldShowPhoneNumber: !data.phoneNumber,
-      currentStep: 0
-    }),
+      currentStep: options?.preserveStep ? state.currentStep : 0
+    })),
 
   // Get all form data (for submission)
   getFormData: () => get().formData,

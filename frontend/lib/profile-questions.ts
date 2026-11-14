@@ -1,5 +1,5 @@
 import fallback from './profile-question-defaults.json';
-import {ageFromBirthDate} from './birth-date';
+import {ageFromBirthDate,formatBirthDate} from './birth-date';
 
 export const PROTECTED_LOCATION_PATHS = new Set([
  'nationality','residenceCountry','address.district','address.upazila',
@@ -104,6 +104,7 @@ export function questionRuleErrors(profile:Record<string,any>,questions:ProfileQ
 }
 export function questionDisplayValue(value:unknown,q:ProfileQuestion):string {
  if(value===null||value===undefined||value==='')return '';
+ if(q.path==='dateOfBirth')return formatBirthDate(value as string);
  if(Array.isArray(value))return value.map(v=>q.options.find(o=>o.value===v)?.label||v).join(' • ');
  if(typeof value==='boolean')return value?'হ্যাঁ':'না';
  if(q.type==='date' && typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value))

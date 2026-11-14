@@ -8,7 +8,7 @@ import {
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { savedBiodataAddress } from "./biodata-address";
-import { ageFromBirthDate } from "./birth-date";
+import { ageFromBirthDate, formatBirthDate } from "./birth-date";
 
 export interface BiodataWhatsappGroup {
   id: "girls" | "boys";
@@ -83,9 +83,6 @@ const formatLocation = (
 
 const formatAge = (age?: number) =>
   age ? `${toBanglaDigits(age)} বছর` : "";
-
-const formatBirthYear = (dateOfBirth?: string) =>
-  ageFromBirthDate(dateOfBirth) !== undefined ? toBanglaDigits(dateOfBirth!.slice(0, 4)) : "";
 
 const formatHeight = (height?: string | number) => {
   if (height === undefined || height === null || height === "") return "";
@@ -186,7 +183,7 @@ export const buildBiodataWhatsappText = (
     formatLabelValueLine("বয়সঃ", formatAge(ageFromBirthDate(user.dateOfBirth) ?? user.age)),
     formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
     formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
-    formatLabelValueLine("জন্ম সনঃ", formatBirthYear(user.dateOfBirth)),
+    formatLabelValueLine("জন্ম তারিখঃ", formatBirthDate(user.dateOfBirth)),
     formatLabelValueLine(
       "শিক্ষাগত ব্যাকগ্রাউন্ডঃ",
       formatEducationBackground(user),

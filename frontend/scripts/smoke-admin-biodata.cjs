@@ -32,4 +32,51 @@ const component=fs.readFileSync(path.join(__dirname,'../components/edit-profile/
 assert(!component.includes('window.scrollTo({ top: 0'), 'Section navigation must not scroll to page top');
 assert(component.includes('scrollIntoView'), 'Section navigation must scroll to the editor card');
 assert(component.includes('Account & security'), 'Account controls must be separated from biodata');
-console.log('PASS: section completion, city corporation alternative, account separation and section navigation');
+// Execute the real profile-refresh effect with the actual store: refresh after
+// Next/Previous must keep the section; another member must start fresh.
+const {useProfileStore}=require('../zustan/useProfileStore.ts');
+const {diffBiodataDraft,hasBiodataChanges}=require('../lib/biodata-draft.ts');
+const vm=require('node:vm');
+const ast=ts.createSourceFile('Profile-Update-Admin.tsx',component,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+let refreshEffect;
+function findRefreshEffect(node){
+  if(ts.isCallExpression(node)&&node.expression.getText(ast)==='useEffect'&&
+    node.arguments[0]?.getText(ast).includes('initializeForm(data')) refreshEffect=node.arguments[0];
+  ts.forEachChild(node,findRefreshEffect);
+}
+findRefreshEffect(ast);
+assert(refreshEffect,'Admin profile refresh effect should exist');
+const effectJs=ts.transpileModule('('+refreshEffect.getText(ast)+')();',{
+  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},
+}).outputText;
+const member={_id:'member-one',gender:'female',dateOfBirth:'2000-05-15'};
+const context={data:member,id:member._id,useProfileStore,diffBiodataDraft,hasBiodataChanges,
+  initialBiodataRef:{current:null},loadedMemberRef:{current:''},
+  initializeForm:useProfileStore.getState().initializeForm,setContactEmail:()=>{},setContactPhone:()=>{}};
+const refresh=()=>vm.runInNewContext(effectJs,context);
+useProfileStore.getState().resetForm();
+refresh();
+assert.equal(useProfileStore.getState().currentStep,0);
+for(const step of [1,2,3,2]){
+  useProfileStore.getState().setCurrentStep(step);
+  context.data={...member,phoneNumber:'01700000000'};
+  refresh();
+  assert.equal(useProfileStore.getState().currentStep,step,'Same-member refresh must keep selected section');
+}
+useProfileStore.getState().updateField('dateOfBirth','2001-06-16');
+refresh();
+assert.equal(useProfileStore.getState().formData.dateOfBirth,'2001-06-16','Refresh must keep unsaved edits');
+assert.equal(useProfileStore.getState().currentStep,2);
+// Saving clears the dirty baseline, then triggers another refresh.
+context.initialBiodataRef.current=useProfileStore.getState().getFormData();
+context.data={...member,dateOfBirth:'2001-06-16'};
+refresh();
+assert.equal(useProfileStore.getState().currentStep,2,'Save refresh must keep selected section');
+useProfileStore.getState().updateField('name','Unsaved draft');
+context.data={_id:'member-two',gender:'male',name:'Another member'};
+context.id='member-two';
+refresh();
+assert.equal(useProfileStore.getState().currentStep,0,'Another member must start at the first section');
+assert.equal(useProfileStore.getState().formData.name,'Another member');
+useProfileStore.getState().resetForm();
+console.log('PASS: section completion, city alternative, account separation, refresh/save navigation and unsaved drafts');

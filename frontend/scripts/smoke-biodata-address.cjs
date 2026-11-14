@@ -70,7 +70,15 @@ assert.ok(!html.includes('Motijheel, Dhaka South City Corporation, ঢাকা,
 const copied = buildBiodataWhatsappText(profile, 'https://example.com');
 assert.ok(copied.includes('*বর্তমান অবস্থানঃ* ' + current));
 assert.ok(copied.includes('*স্থায়ী ঠিকানাঃ* ' + permanent));
-assert.ok(copied.includes('*জন্ম সনঃ* ২০০০'));
+assert.ok(copied.includes('*জন্ম তারিখঃ* ১৫ মে, ২০০০'));
+assert.ok(!copied.includes('জন্ম সনঃ'));
+assert.ok(renderToStaticMarkup(React.createElement(ProfileView, { id: 'test' })).includes('১৫ মে, ২০০০'));
+const { buildBiodataWhatsappShareUrlForNumber } = load('lib/biodata-whatsapp-share.ts');
+const withContact = buildBiodataWhatsappText({ ...profile, phoneNumber: '01700000000' }, 'https://example.com', { includeContactNumber: true });
+assert.ok(withContact.includes('*জন্ম তারিখঃ* ১৫ মে, ২০০০'));
+assert.ok(withContact.includes('01700000000'));
+const shareUrl = new URL(buildBiodataWhatsappShareUrlForNumber(profile, 'https://example.com', '01700000000'));
+assert.ok(shareUrl.searchParams.get('text').includes('*জন্ম তারিখঃ* ১৫ মে, ২০০০'));
 delete profile.publicAnswers[presentQuestion.id];
 html = addressSection();
 assert.ok(html.includes('Motijheel, Dhaka South City Corporation, ঢাকা, Bangladesh'));
@@ -85,7 +93,14 @@ const admin = { ...profile, publicQuestionSchema: undefined, publicAnswers: unde
 const adminCopy = buildBiodataWhatsappText(admin, 'https://example.com');
 assert.ok(adminCopy.includes(current));
 assert.ok(adminCopy.includes(permanent));
-assert.ok(!buildBiodataWhatsappText({ age: 26 }, '').includes('জন্ম সনঃ'));
+for (const dateOfBirth of [undefined, '', '2001-02-29', '2999-01-01']) {
+  assert.ok(!buildBiodataWhatsappText({ age: 26, dateOfBirth }, '').includes('জন্ম তারিখঃ'));
+}
+const { questionDisplayValue } = load('lib/profile-questions.ts');
+const birthQuestion = defaultQuestions.questions.find(q => q.path === 'dateOfBirth');
+assert.equal(questionDisplayValue('2000-05-15', birthQuestion), '১৫ মে, ২০০০');
+assert.equal(questionDisplayValue('2000-02-29', birthQuestion), '২৯ ফেব্রুয়ারি, ২০০০');
+assert.equal(questionDisplayValue('2001-02-29', birthQuestion), '');
 const { DynamicQuestionStep, QuestionInput } = load('components/custom/updateProfile/DynamicQuestionStep.tsx');
 const form = renderToStaticMarkup(React.createElement(DynamicQuestionStep, { schema: defaultQuestions, step: 0 }));
 assert.ok(form.includes('type="date"'));

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 import { UserDocument } from './entities/user.entity';
+import { ageFromBirthDate } from './birth-date';
 
 @Injectable()
 export class PdfService {
@@ -69,7 +70,12 @@ export class PdfService {
 
   private generateHtml(user: UserDocument): string {
     const isMale = user.gender?.toLowerCase() === 'male';
-    const birthYear = user.age ? new Date().getFullYear() - user.age : 'N/A';
+    const calculatedAge = ageFromBirthDate(user.dateOfBirth);
+    const age = calculatedAge ?? user.age;
+    const birthDate = calculatedAge === undefined ? 'N/A'
+      : new Date(`${user.dateOfBirth}T00:00:00Z`).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+      });
 
     // Build personal info rows
     const personalInfoRows: Array<[string, any]> = [
@@ -292,8 +298,8 @@ export class PdfService {
 
       <div class="quick-info">
         ${this.renderQuickInfo('Marital Status', user.maritalStatus)}
-        ${this.renderQuickInfo('Birth Year', birthYear)}
-        ${this.renderQuickInfo('Age', user.age ? `${user.age} years` : 'N/A')}
+        ${this.renderQuickInfo('Date of Birth', birthDate)}
+        ${this.renderQuickInfo('Age', age === undefined || age === null ? 'N/A' : `${age} years`)}
         ${this.renderQuickInfo('Height', user.personalInformation?.height || 'N/A')}
         ${this.renderQuickInfo('Skin Tone', user.personalInformation?.skinTone)}
         ${this.renderQuickInfo('Blood Group', user.bloodGroup)}

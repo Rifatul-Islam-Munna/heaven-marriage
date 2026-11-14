@@ -22,6 +22,7 @@ import { useProfileStore } from "@/zustan/useProfileStore";
 import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
 import { defaultQuestions, questionRuleErrors, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { useRouter } from "next/navigation";
@@ -104,6 +105,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     return ()=>controller.abort();
   },[]);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Alert dialog states
   const [showHideAlert, setShowHideAlert] = useState(false);
@@ -146,7 +148,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     }
   },[editMode]);
   useEffect(()=>{
-    if(!activeSteps.includes(currentStep))
+    if(activeSteps.length && !activeSteps.includes(currentStep))
       setCurrentStep(activeSteps.find(index=>index>currentStep)??activeSteps[activeSteps.length-1]);
   },[activeSteps,currentStep,setCurrentStep]);
   const { mutate: saveContacts, isPending: isSavingContacts } = useCommonMutationApi({
@@ -175,6 +177,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     successMessage: "বায়োডাটার পরিবর্তন সংরক্ষিত হয়েছে",
     onSuccess: () => {
       initialBiodataRef.current=useProfileStore.getState().getFormData() as Record<string,unknown>;
+      void queryClient.invalidateQueries({ queryKey: ["admin-share-profile", id] });
       void refetch();
     },
   });
@@ -213,7 +216,8 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     // Contact, visibility and other server refreshes must never erase an unsaved biodata draft.
     // Loading a different member always replaces the old draft.
     if(!pending || loadedMemberRef.current!==memberId) {
-      initializeForm(data);
+      // Refresh saved answers without sending Next/Previous back to the first section.
+      initializeForm(data, { preserveStep: loadedMemberRef.current===memberId });
       initialBiodataRef.current=useProfileStore.getState().getFormData() as Record<string,unknown>;
       loadedMemberRef.current=memberId;
     }

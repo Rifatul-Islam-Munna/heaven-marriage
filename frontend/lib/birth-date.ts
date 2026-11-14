@@ -11,3 +11,10 @@ export function ageFromBirthDate(value?: string | null, today = new Date()): num
 export function latestBirthDate(today = new Date()): string {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 }
+
+export function formatBirthDate(value?: string | null): string {
+  if (ageFromBirthDate(value) === undefined) return "";
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString("bn-BD", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
+  });
+}

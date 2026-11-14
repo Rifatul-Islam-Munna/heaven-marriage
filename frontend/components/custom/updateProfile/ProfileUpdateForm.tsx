@@ -16,7 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors,
+  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
@@ -352,6 +352,7 @@ export default function ProfileUpdateForm() {
   const displayAnswer = (q: ProfileQuestion) => {
     const value = readQuestionAnswer(formData, q);
     if (!isAnswered(q, value)) return "";
+    if (q.type === "date") return questionDisplayValue(value, q);
     const options = optionsFor(q);
     if (Array.isArray(value)) return value.map(item => options.find(option => option.value === item)?.label || String(item)).join(", ");
     if (typeof value === "boolean") return value ? "হ্যাঁ" : "না";
