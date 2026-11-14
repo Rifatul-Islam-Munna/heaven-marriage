@@ -433,7 +433,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
   };
 
   const avatar = gender ? (gender === "male" ? "/male.png" : "/female.png") : null;
-  const likeButton = (full: boolean) => <button type="button" onClick={() => { if (requireLogin()) shortlist({ shortlistedUserId: id }); }} disabled={shortlisting}
+  const likeButton = (full: boolean) => <button type="button" onClick={() => { if (requireLogin()) shortlist({ shortlistedUserId: String(userData._id) }); }} disabled={shortlisting}
     className={"inline-flex min-h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 bg-white px-3 py-3 font-bold text-primary transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 " + (full ? "w-full text-[15px]" : "text-[12px] sm:text-sm")}>
     {shortlisting ? <Loader2 className="size-4 animate-spin" /> : <Heart className="size-4" />}
     {full ? "পছন্দের তালিকায় রাখুন" : "পছন্দে রাখুন"}
