@@ -60,15 +60,34 @@ export function questionUsesSeparateStorage(q:ProfileQuestion):boolean {
  if(q.path==='gender'&&q.options.some(option=>!['male','female'].includes(option.value)))return true;
  return false;
 }
-export function locationQuestionApplies(q: ProfileQuestion, profile: Record<string,any>):boolean {
+export function locationQuestionLabel(q:ProfileQuestion):string {
+ if(q.path==='address.upazila' && q.question.trim()==='বর্তমান ঠিকানা')return 'উপজেলা নির্বাচন করুন';
+ return q.question;
+}
+export function questionInputAttributes(q:ProfileQuestion){
+ if(q.type==='number')return {type:'number',inputMode:
+   ['age','familyInfo.brotherCount','familyInfo.sisterCount'].includes(q.path||'')?'numeric':'decimal'} as const;
+ if(q.type==='date')return {type:'date'} as const;
+ if(q.type==='text'&&['phoneNumber','guardianPhone','whatsapp'].includes(q.path||''))
+   return {type:'tel',inputMode:'tel'} as const;
+ if(q.type==='text'&&q.path==='educationInfo.highestEducationPassingYear')
+   return {type:'text',inputMode:'numeric'} as const;
+ return {type:'text'} as const;
+}
+export function locationQuestionVisible(q: ProfileQuestion, profile: Record<string,any>):boolean {
  const path=q.path || '';
  if(['address.district','address.upazila','address.cityCorporation','address.area'].includes(path)) {
    if(profile?.residenceCountry && profile.residenceCountry!=='Bangladesh')return false;
    if(['address.upazila','address.cityCorporation'].includes(path) && !profile?.address?.district)return false;
    if(path==='address.area' && (!profile?.address?.district ||
      !(profile?.address?.cityCorporation || profile?.address?.upazila)))return false;
-   if(path==='address.upazila' && profile?.address?.cityCorporation)return false;
  }
+ return true;
+}
+export function locationQuestionApplies(q: ProfileQuestion, profile: Record<string,any>):boolean {
+ if(!locationQuestionVisible(q,profile))return false;
+ if(q.path==='address.upazila' && profile?.address?.cityCorporation)return false;
+ if(q.path==='address.cityCorporation' && profile?.address?.upazila)return false;
  return true;
 }
 export function questionApplies(q:ProfileQuestion,gender?:string){

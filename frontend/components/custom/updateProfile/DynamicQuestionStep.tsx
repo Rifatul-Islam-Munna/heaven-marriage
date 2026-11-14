@@ -5,7 +5,7 @@ import { profileQuestionOptions } from '@/lib/profile-question-options';
 import {useQueryWrapper} from '@/api-hooks/react-query-wrapper';
 import type {LocationEntry,LocationResponse} from '@/lib/location-options';
 import {
- questionApplies,locationQuestionApplies,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,type ProfileQuestion, type ProfileQuestionSchema,
+ questionApplies,locationQuestionApplies,locationQuestionVisible,locationQuestionLabel,questionInputAttributes,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,type ProfileQuestion, type ProfileQuestionSchema,
 } from '@/lib/profile-questions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -29,10 +29,20 @@ export function QuestionInput({
  const raw=(value===undefined||value===null?'':value);
  const id='question-'+q.id;
  const choices=q.type==='multi_checkbox';
+ const address=profile?.address;
+ const emptyOptionsMessage=q.optionSource==='cityCorporations'
+   ? !address?.district?'আগে জেলা নির্বাচন করুন।':address?.upazila?'':'এই জেলায় সিটি কর্পোরেশন পাওয়া যায়নি। উপজেলা নির্বাচন করুন।'
+   : q.optionSource==='upazilas'
+   ? !address?.district?'আগে জেলা নির্বাচন করুন।':address?.cityCorporation?'':'এই জেলার জন্য কোনো উপজেলা যুক্ত করা হয়নি।'
+   : q.optionSource==='cityAreas'
+   ? !address?.district?'আগে জেলা নির্বাচন করুন।':!(address?.upazila||address?.cityCorporation)
+     ? 'আগে উপজেলা অথবা সিটি কর্পোরেশন নির্বাচন করুন।':'এই ঠিকানার জন্য কোনো এলাকা যুক্ত করা হয়নি।'
+   : 'কোনো অপশন যুক্ত করা হয়নি।';
  return <div className="space-y-2 rounded-xl border border-pink-100 bg-white p-4 shadow-sm" data-profile-question={q.id} data-invalid={!!error||undefined}>
   <Label htmlFor={id} className="block font-medium leading-relaxed text-gray-800">
-    {q.question} {q.required&&<span className="text-pink-600" aria-label="required">*</span>}
+    {locationQuestionLabel(q)} {q.required&&<span className="text-pink-600" aria-label="required">*</span>}
   </Label>
+  {q.path==='address.upazila'&&<p className="text-sm text-muted-foreground">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>}
   {q.type==='checkbox'?(
    <label className="flex cursor-pointer items-center gap-3 py-2 text-sm">
     <Checkbox id={id} aria-invalid={!!error} aria-describedby={error?id+'-error':undefined} checked={raw===true} onCheckedChange={checked=>onChange(checked===true)}/>
@@ -64,11 +74,11 @@ export function QuestionInput({
          <option value={String(raw)}>{String(raw)} (saved answer)</option>}
        {filteredOptions.map(opt=><option key={opt.value} value={opt.value}>{opt.label}</option>)}
      </select>
-     {!options.length && <p className="text-xs text-amber-700">আগের ঠিকানা বা parent নির্বাচন করুন।</p>}
+     {!options.length && !raw && emptyOptionsMessage && <p className="text-xs text-muted-foreground">{emptyOptionsMessage}</p>}
      {!!optionSearch && !filteredOptions.length && <p className="text-xs text-slate-500">No matching options</p>}
    </div>
   ):(
-   <Input id={id} type={q.type==='number'?'number':q.type==='date'?'date':'text'} dir="auto"
+   <Input id={id} {...questionInputAttributes(q)} dir="auto"
      aria-invalid={!!error} aria-describedby={error?id+'-error':undefined}
      required={q.required} max={q.path==='dateOfBirth'?latestBirthDate():undefined}
      value={String(raw)} maxLength={q.type==='number'?undefined:5000}
@@ -88,7 +98,7 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
  const updateDynamicAnswer=useProfileStore(state=>state.updateDynamicAnswer);
  const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
  const questions=useMemo(()=>schema.questions
-   .filter(q=>q.path!=='age'&&q.section===step&&questionApplies(q,profile.gender)&&locationQuestionApplies(q,profile))
+   .filter(q=>q.path!=='age'&&q.section===step&&questionApplies(q,profile.gender)&&locationQuestionVisible(q,profile))
    .sort((a,b)=>a.order-b.order),[schema,step,profile]);
  const errors=questionRuleErrors(profile,schema.questions);
  const setAnswer=(q:ProfileQuestion,answer:string|number|boolean|string[])=>{
@@ -111,12 +121,12 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
        updateNestedField('address','area','');
      }
      if(q.path==='address.cityCorporation'){
-       updateNestedField('address','upazila','');
-       updateNestedField('address','area','');
+       if(answer)updateNestedField('address','upazila','');
+       if(answer||profile.address?.cityCorporation)updateNestedField('address','area','');
      }
      if(q.path==='address.upazila'){
-       updateNestedField('address','cityCorporation','');
-       updateNestedField('address','area','');
+       if(answer)updateNestedField('address','cityCorporation','');
+       if(answer||profile.address?.upazila)updateNestedField('address','area','');
      }
    }else updateField(q.path as any,normalized as any);
  };
@@ -125,7 +135,7 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
   </div>;
  return <div className="grid gap-4 md:grid-cols-2">
   {questions.map(q=><div key={q.id} className={q.type==='textarea'||q.question.length>130?'md:col-span-2':''}>
-   <QuestionInput q={q} gender={profile.gender} profile={profile} locations={locations?.entries}
+   <QuestionInput q={{...q,required:q.required&&locationQuestionApplies(q,profile)}} gender={profile.gender} profile={profile} locations={locations?.entries}
      error={errors.find(error=>error.questionId===q.id||error.otherQuestionId===q.id)?.message}
      value={readQuestionAnswer(profile,q)} onChange={answer=>setAnswer(q,answer)}/>
   </div>)}

@@ -101,7 +101,98 @@ const birthQuestion = defaultQuestions.questions.find(q => q.path === 'dateOfBir
 assert.equal(questionDisplayValue('2000-05-15', birthQuestion), '১৫ মে, ২০০০');
 assert.equal(questionDisplayValue('2000-02-29', birthQuestion), '২৯ ফেব্রুয়ারি, ২০০০');
 assert.equal(questionDisplayValue('2001-02-29', birthQuestion), '');
+const {useProfileStore}=load('zustan/useProfileStore.ts');
+// Server rendering otherwise uses Zustand's initial snapshot instead of this fixture.
+mocks['@/zustan/useProfileStore']={useProfileStore:Object.assign(
+  selector=>selector(useProfileStore.getState()),{getState:useProfileStore.getState},
+)};
 const { DynamicQuestionStep, QuestionInput } = load('components/custom/updateProfile/DynamicQuestionStep.tsx');
+const {getMissingQuestions}=load('lib/profile-questions.ts');
+const {profileQuestionOptions}=load('lib/profile-question-options.ts');
+const upazilaQuestion=defaultQuestions.questions.find(q=>q.path==='address.upazila');
+const cityQuestion=defaultQuestions.questions.find(q=>q.path==='address.cityCorporation');
+const noCityForm=renderToStaticMarkup(React.createElement(QuestionInput,{
+  q:cityQuestion,value:'',onChange:noop,profile:{address:{district:'Munshiganj',upazila:'Lohajang'}},
+}));
+assert.ok(!noCityForm.includes('আগের ঠিকানা বা parent নির্বাচন করুন।'));
+assert.ok(!noCityForm.includes('আগে জেলা নির্বাচন করুন।'),'Selected district must not trigger a missing-parent hint');
+assert.ok(!noCityForm.includes('উপজেলা নির্বাচন করুন।'),'Chosen Upazila must not trigger an empty-city hint');
+const missingDistrictForm=renderToStaticMarkup(React.createElement(QuestionInput,{
+  q:cityQuestion,value:'',onChange:noop,profile:{address:{}},
+}));
+assert.ok(missingDistrictForm.includes('আগে জেলা নির্বাচন করুন।'));
+const locationSchema={...defaultQuestions,questions:[upazilaQuestion,cityQuestion].map(q=>({...q,required:true}))};
+for(const address of [
+  {district:'Dhaka',cityCorporation:'Dhaka North City Corporation'},
+  {district:'Dhaka',upazila:'Savar'},
+]){
+  const member={gender:'male',residenceCountry:'Bangladesh',address};
+  useProfileStore.getState().initializeForm(member);
+  const addressForm=renderToStaticMarkup(React.createElement(DynamicQuestionStep,{schema:locationSchema,step:1}));
+  assert.ok(addressForm.includes('id="question-'+upazilaQuestion.id+'"'),'Saved city must not hide Upazila');
+  assert.ok(addressForm.includes('id="question-'+cityQuestion.id+'"'),'Saved Upazila must not hide City Corporation');
+  assert.ok(addressForm.includes('উপজেলা নির্বাচন করুন'),'Upazila needs an explicit label');
+  assert.equal(getMissingQuestions(member,locationSchema,1).length,0,'Either choice must satisfy required address');
+}
+const customLocations=[
+  {kind:'upazila',name:'New Upazila',label:'নতুন উপজেলা',district:'Dhaka',enabled:true},
+  {kind:'upazila',name:'Other District Upazila',label:'Other',district:'Feni',enabled:true},
+  {kind:'upazila',name:'Hidden Upazila',label:'Hidden',district:'Dhaka',enabled:false},
+  {kind:'cityCorporation',name:'New City Corporation',label:'নতুন সিটি কর্পোরেশন',district:'Dhaka',enabled:true},
+  {kind:'area',name:'New Rural Ward',label:'Ward',district:'Dhaka',upazila:'New Upazila',enabled:true},
+  {kind:'area',name:'New City Ward',label:'Ward',district:'Dhaka',cityCorporation:'New City Corporation',enabled:true},
+];
+const ruralProfile={address:{district:'Dhaka',upazila:'New Upazila'}};
+const ruralOptions=profileQuestionOptions(upazilaQuestion,'male',ruralProfile,customLocations);
+assert.ok(ruralOptions.some(option=>option.value==='New Upazila'&&option.label==='নতুন উপজেলা'));
+assert.ok(!ruralOptions.some(option=>['Other District Upazila','Hidden Upazila'].includes(option.value)));
+assert.ok(profileQuestionOptions(cityQuestion,'male',ruralProfile,customLocations).some(option=>option.value==='New City Corporation'));
+const areaQuestion=defaultQuestions.questions.find(q=>q.path==='address.area');
+assert.deepEqual(profileQuestionOptions(areaQuestion,'male',ruralProfile,customLocations).map(option=>option.value),['New Rural Ward']);
+assert.deepEqual(profileQuestionOptions(areaQuestion,'male',{address:{district:'Dhaka',cityCorporation:'New City Corporation'}},customLocations).map(option=>option.value),['New City Ward']);
+const {questionUsesSeparateStorage}=load('lib/profile-questions.ts');
+for(const filename of ['DynamicQuestionStep.tsx','ProfileUpdateForm.tsx']){
+  const source=fs.readFileSync(path.join(root,'components/custom/updateProfile',filename),'utf8');
+  const ast=ts.createSourceFile(filename,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  let setter;
+  function findSetter(node){
+    if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='setAnswer')setter=node.initializer;
+    ts.forEachChild(node,findSetter);
+  }
+  findSetter(ast);
+  assert.ok(setter,filename+' must expose its answer handler');
+  const setterJs=ts.transpileModule('('+setter.getText(ast)+')',{
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},
+  }).outputText;
+  const choose=(q,answer)=>{
+    const state=useProfileStore.getState();
+    const handler=vm.runInNewContext(setterJs,{
+      ...state,profile:state.formData,questionUsesSeparateStorage,NUMERIC_PATHS:[],
+    });
+    handler(q,answer);
+  };
+  useProfileStore.getState().initializeForm({gender:'male',address:{district:'Dhaka',
+    cityCorporation:'Dhaka North City Corporation',area:'Gulshan',presentAddress:'Keep saved address'}});
+  choose(upazilaQuestion,'Savar');
+  assert.deepEqual(useProfileStore.getState().formData.address,{district:'Dhaka',
+    upazila:'Savar',cityCorporation:'',area:'',presentAddress:'Keep saved address'},filename+': switching to Upazila clears city and dependent area');
+  useProfileStore.getState().updateNestedField('address','area','Rural Ward');
+  choose(cityQuestion,'');
+  assert.equal(useProfileStore.getState().formData.address.upazila,'Savar',filename+': clearing unused city keeps Upazila');
+  assert.equal(useProfileStore.getState().formData.address.area,'Rural Ward');
+  choose(cityQuestion,'Dhaka South City Corporation');
+  assert.equal(useProfileStore.getState().formData.address.upazila,'');
+  assert.equal(useProfileStore.getState().formData.address.area,'');
+  useProfileStore.getState().updateNestedField('address','area','Motijheel');
+  choose(upazilaQuestion,'');
+  assert.equal(useProfileStore.getState().formData.address.cityCorporation,'Dhaka South City Corporation');
+  assert.equal(useProfileStore.getState().formData.address.area,'Motijheel');
+  choose(defaultQuestions.questions.find(q=>q.path==='address.district'),'Feni');
+  assert.equal(useProfileStore.getState().formData.address.cityCorporation,'');
+  assert.equal(useProfileStore.getState().formData.address.upazila,'');
+  assert.equal(useProfileStore.getState().formData.address.area,'');
+}
+useProfileStore.getState().resetForm();
 const form = renderToStaticMarkup(React.createElement(DynamicQuestionStep, { schema: defaultQuestions, step: 0 }));
 assert.ok(form.includes('type="date"'));
 const dateInput = renderToStaticMarkup(React.createElement(QuestionInput, {

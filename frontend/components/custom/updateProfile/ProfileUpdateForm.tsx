@@ -16,7 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, locationQuestionApplies, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue,
+  defaultQuestions, questionApplies, locationQuestionApplies, locationQuestionVisible, locationQuestionLabel, questionInputAttributes, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
@@ -153,9 +153,9 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
     <p className="mt-1 text-right text-xs text-gray-400">{bn(String(raw).length)}/৫০০০</p>
   </div>;
 
-  return <input autoFocus aria-labelledby="qb-question" dir="auto" type={q.type === "number" ? "number" : q.type==='date'?'date':"text"}
+  return <input autoFocus aria-labelledby="qb-question" dir="auto" {...questionInputAttributes(q)}
     max={q.path==='dateOfBirth'?latestBirthDate():undefined}
-    inputMode={q.type === "number" ? "decimal" : undefined} value={String(raw)} maxLength={q.type === "number" ? undefined : 5000}
+    value={String(raw)} maxLength={q.type === "number" ? undefined : 5000}
     onChange={event => onChange(q.type === "number" ? (event.target.value === "" ? "" : Number(event.target.value)) : event.target.value)}
     onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }}
     placeholder={q.type === "number" ? "সংখ্যা লিখুন" : "আপনার উত্তর লিখুন..."}
@@ -185,7 +185,7 @@ export default function ProfileUpdateForm() {
   const [view, setView] = useState<View>("journey");
   const queryClient = useQueryClient();
   const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
-  const [qi, setQi] = useState(0);
+  const [activeQuestionId, setActiveQuestionId] = useState<string|null>(null);
   const [streak, setStreak] = useState(0);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
   const [shake, setShake] = useState(0);
@@ -312,7 +312,8 @@ export default function ProfileUpdateForm() {
   }, []);
 
   const gender = formData.gender as string | undefined;
-  const flow = useMemo(() => schema.questions.filter(q => q.path!=='age' && !q.locked && questionApplies(q, gender) && locationQuestionApplies(q,formData))
+  const flow = useMemo(() => schema.questions.filter(q => q.path!=='age' && !q.locked && questionApplies(q, gender) && locationQuestionVisible(q,formData))
+    .map(q => ({...q,question:locationQuestionLabel(q),required:q.required&&locationQuestionApplies(q,formData)}))
     .sort((a, b) => a.section - b.section || a.order - b.order), [schema, gender, formData]);
   const levels = useMemo(() => schema.sections
     .map(section => ({ section, questions: flow.filter(q => q.section === section.id) }))
@@ -325,6 +326,9 @@ export default function ProfileUpdateForm() {
   const levelIndex = Math.max(0, levels.findIndex(level => level.section.id === currentStep));
   const level = levels[levelIndex];
   const levelQuestions = level?.questions ?? [];
+  // Revealing Area after a location choice must not move the active question.
+  const qi = Math.max(0,levelQuestions.findIndex(q=>q.id===activeQuestionId));
+  const setQi = (index:number) => setActiveQuestionId(levelQuestions[index]?.id??null);
   const question = levelQuestions[Math.min(qi, Math.max(0, levelQuestions.length - 1))];
   const answeredCount = flow.filter(q => answered(q)).length;
   // Mirrors the live Dynamic Question Builder rules in backend profile-rules.ts.
@@ -379,12 +383,12 @@ export default function ProfileUpdateForm() {
         updateNestedField("address" as any, "area", "");
       }
       if (q.path === "address.cityCorporation") {
-        updateNestedField("address" as any, "upazila", "");
-        updateNestedField("address" as any, "area", "");
+        if(answer)updateNestedField("address" as any, "upazila", "");
+        if(answer||formData.address?.cityCorporation)updateNestedField("address" as any, "area", "");
       }
       if (q.path === "address.upazila") {
-        updateNestedField("address" as any, "cityCorporation", "");
-        updateNestedField("address" as any, "area", "");
+        if(answer)updateNestedField("address" as any, "cityCorporation", "");
+        if(answer||formData.address?.upazila)updateNestedField("address" as any, "area", "");
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } else updateField(q.path as any, normalized as any);
@@ -395,7 +399,7 @@ export default function ProfileUpdateForm() {
     if (!target) return;
     setCurrentStep(target.section.id);
     const firstOpen = target.questions.findIndex(q => !answered(q));
-    setQi(startAt ?? (firstOpen >= 0 ? firstOpen : 0));
+    setActiveQuestionId(target.questions[startAt ?? (firstOpen >= 0 ? firstOpen : 0)]?.id??null);
     setView("play");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -530,6 +534,14 @@ export default function ProfileUpdateForm() {
           {streak >= 2 && <span className="qb-pop inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-600"><Flame className="h-3.5 w-3.5" /> {bn(streak)} টানা উত্তর</span>}
         </div>
         <h1 id="qb-question" dir="auto" className="mt-4 text-2xl font-bold leading-snug text-gray-900 sm:text-[28px]">{question.question}</h1>
+        {(question.path==='address.upazila'||question.path==='address.cityCorporation')&&<div className="mt-3 flex flex-col gap-2">
+          <p className="text-sm text-gray-600">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>
+          {levelQuestions.map((alternative,index)=>alternative.path===(question.path==='address.upazila'?'address.cityCorporation':'address.upazila')&&
+            <button key={alternative.id} type="button" onClick={()=>setQi(index)}
+              className="self-start rounded-lg border border-pink-200 px-3 py-2 text-sm font-semibold text-pink-700 hover:bg-pink-50">
+              {alternative.path==='address.upazila'?'উপজেলা নির্বাচন করুন':'সিটি কর্পোরেশন নির্বাচন করুন'}
+            </button>)}
+        </div>}
         <div className="mt-6" role="group" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
           aria-describedby={currentRuleError?'qb-answer-error':undefined}>
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}

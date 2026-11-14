@@ -45,6 +45,10 @@ const progress=previewBiodataCompletion({gender:'female',residenceCountry:'Bangl
   address:{district:'Dhaka',cityCorporation:'Dhaka North City Corporation'}},addressSchema);
 assert.equal(progress.percentage,100);
 assert.equal(progress.requiredCount,1);
+const rural=previewBiodataCompletion({gender:'female',residenceCountry:'Bangladesh',
+  address:{district:'Dhaka',upazila:'Savar'}},addressSchema);
+assert.equal(rural.percentage,100);
+assert.equal(rural.requiredCount,1,'Upazila must also satisfy a required City Corporation alternative');
 assert.equal(previewBiodataCompletion({gender:'female',residenceCountry:'Canada'},addressSchema).requiredCount,0);
 console.log('PASS: City Corporation alternative and foreign-residence exceptions.');
 

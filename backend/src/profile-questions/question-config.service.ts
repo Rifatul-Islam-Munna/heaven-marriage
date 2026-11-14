@@ -94,6 +94,7 @@ export function questionRuleErrors(profile:any,questions:ProfileQuestion[]){
       if(['address.upazila','address.cityCorporation'].includes(q.path!)&&!profile.address?.district)return false;
       if(q.path==='address.area'&&(!profile.address?.district||!(profile.address?.cityCorporation||profile.address?.upazila)))return false;
       if(q.path==='address.upazila'&&profile.address?.cityCorporation)return false;
+      if(q.path==='address.cityCorporation'&&profile.address?.upazila)return false;
     }
     return true;
   };

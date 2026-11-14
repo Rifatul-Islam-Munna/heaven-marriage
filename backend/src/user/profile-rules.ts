@@ -44,6 +44,7 @@ export function applicableRequiredQuestions(u:any, questions:readonly ProfileQue
     if(q.path?.startsWith('address.') && ['district','upazila','cityCorporation','area'].includes(q.path.split('.')[1])) {
       if(u?.residenceCountry && u.residenceCountry!=='Bangladesh')return false;
       if(q.path==='address.upazila' && u?.address?.cityCorporation)return false;
+      if(q.path==='address.cityCorporation' && u?.address?.upazila)return false;
     }
     return true;
   });

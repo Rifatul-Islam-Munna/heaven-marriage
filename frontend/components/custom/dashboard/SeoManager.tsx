@@ -565,7 +565,7 @@ export default function SeoManager() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="robots-snippet-length" label="Longest text snippet" hint="Characters. Leave empty for no limit, or -1 for any length.">
-                <input id="robots-snippet-length" type="number" min={-1} max={10000} value={form.robots?.maxSnippet ?? ''} placeholder="No limit"
+              <input id="robots-snippet-length" type="number" inputMode="numeric" min={-1} max={10000} value={form.robots?.maxSnippet ?? ''} placeholder="No limit"
                   onChange={event => nested('robots', 'maxSnippet', event.target.value === '' ? undefined : Number(event.target.value))} className={fieldClass} />
               </Field>
               <Field id="robots-image-preview" label="Image preview size">
@@ -585,7 +585,7 @@ export default function SeoManager() {
                 </select>
               </Field>
               <Field id="sitemap-priority" label="Priority (0 to 1)" hint="Leave empty for the default.">
-                <input id="sitemap-priority" type="number" step={0.1} min={0} max={1} value={form.sitemap?.priority ?? ''} placeholder="Default"
+                <input id="sitemap-priority" type="number" inputMode="decimal" step={0.1} min={0} max={1} value={form.sitemap?.priority ?? ''} placeholder="Default"
                   onChange={event => nested('sitemap', 'priority', event.target.value === '' ? undefined : Number(event.target.value))} className={fieldClass} />
               </Field>
             </div>

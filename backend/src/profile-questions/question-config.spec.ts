@@ -80,6 +80,17 @@ describe('Admin controlled profile question rules', () => {
     expect(BUILTINS.find(q=>q.path==='marriageInformationWomen.jobAfterMarriage')?.gender).toBe('female');
   });
 
+  it.each([
+    {district:'Dhaka',upazila:'Savar'},
+    {district:'Dhaka',cityCorporation:'Dhaka North City Corporation'},
+  ])('accepts either address branch when both questions are required: %j',address=>{
+    const questions=BUILTINS.filter(q=>['address.upazila','address.cityCorporation'].includes(q.path||''))
+      .map(q=>({...q,required:true}));
+    expect(completion({gender:'male',residenceCountry:'Bangladesh',address},questions))
+      .toEqual({percentage:100,remaining:[],nextStep:-1});
+    expect(completion({gender:'male',address:{district:'Dhaka'}},questions).percentage).toBe(0);
+  });
+
   it.each(['age','gender','maritalStatus','personalInformation.height',
     'pledge.youGordianKnowsThis','pledge.allTheInformationTrue','name'])(
     'allows admin to disable, make optional, move and reword the old %s field', path => {

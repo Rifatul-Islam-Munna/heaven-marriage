@@ -26,6 +26,7 @@ export function previewBiodataCompletion(
       ['district','upazila','cityCorporation','area'].includes(q.path.split('.')[1])){
       if(profile.residenceCountry&&profile.residenceCountry!=='Bangladesh')return false;
       if(q.path==='address.upazila'&&profile.address?.cityCorporation)return false;
+      if(q.path==='address.cityCorporation'&&profile.address?.upazila)return false;
     }
     return true;
   });

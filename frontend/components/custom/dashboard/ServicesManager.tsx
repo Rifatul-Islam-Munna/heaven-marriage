@@ -642,7 +642,7 @@ function MembersTab({ memberId, setMemberId, lookup, lookupState, lookupError, o
         <div className="space-y-4">
           <div>
             <label htmlFor="grant-amount" className={labelClass}>Connections to add</label>
-            <input id="grant-amount" type="number" min={1} max={10000} step={1} value={amount} onChange={event => setAmount(event.target.value)}
+            <input id="grant-amount" type="number" inputMode="numeric" min={1} max={10000} step={1} value={amount} onChange={event => setAmount(event.target.value)}
               placeholder="5" className={cn(fieldClass, 'w-40')} aria-invalid={!!amount && !amountOk} />
             {!!amount && !amountOk && <p className="mt-1 text-[11px] text-red-600">Use a whole number from 1 to 10,000.</p>}
           </div>
@@ -697,7 +697,7 @@ function MatchingTab({ settings, onSaved }: { settings?: Settings; onSaved: () =
         <input type="range" min={0} max={100} value={minScore} onChange={event => setMinScore(Number(event.target.value))}
           aria-label="Minimum match score" className="flex-1 accent-rose-600" />
         <div className="flex items-center gap-1">
-          <input type="number" min={0} max={100} value={minScore} aria-label="Minimum match score, percent"
+          <input type="number" inputMode="numeric" min={0} max={100} value={minScore} aria-label="Minimum match score, percent"
             onChange={event => setMinScore(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} className={cn(fieldClass, 'w-20 text-right')} />
           <span className="text-[13px] text-[#6c757d]">%</span>
         </div>
@@ -716,7 +716,7 @@ function MatchingTab({ settings, onSaved }: { settings?: Settings; onSaved: () =
             <label htmlFor={'weight-' + key} className="text-[13px] font-medium">{humanize(key)}</label>
             <input type="range" min={0} max={scaleMax} value={value} aria-label={humanize(key) + ' weight'}
               onChange={event => setWeights(current => ({ ...current, [key]: Number(event.target.value) }))} className="accent-rose-600" />
-            <input id={'weight-' + key} type="number" min={0} max={100} value={value}
+            <input id={'weight-' + key} type="number" inputMode="numeric" min={0} max={100} value={value}
               onChange={event => setWeights(current => ({ ...current, [key]: Math.max(0, Math.min(100, Number(event.target.value) || 0)) }))}
               className={cn(fieldClass, 'px-2 text-right')} />
             <span className="text-right text-[12px] tabular-nums text-[#6c757d]" title="Share of the total score">{share}%</span>
@@ -781,7 +781,7 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
           <div><label htmlFor="premium-title" className={labelClass}>Title</label>
             <input id="premium-title" value={premium.title} maxLength={120} onChange={event => set('title', event.target.value)} className={fieldClass} /></div>
           <div><label htmlFor="premium-fee" className={labelClass}>Registration fee (৳)</label>
-            <input id="premium-fee" type="number" min={1} max={1000000} step={1} value={premium.fee}
+            <input id="premium-fee" type="number" inputMode="numeric" min={1} max={1000000} step={1} value={premium.fee}
               onChange={event => set('fee', Number(event.target.value))} className={fieldClass} /></div>
         </div>
         <div><label htmlFor="premium-summary" className={labelClass}>Profile card description</label>
@@ -794,7 +794,7 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div><label htmlFor="premium-phone" className={labelClass}>Contact phone (optional)</label>
-            <input id="premium-phone" type="tel" maxLength={20} value={premium.contactPhone} onChange={event => set('contactPhone', event.target.value)} aria-invalid={phoneBad} className={fieldClass} />
+            <input id="premium-phone" type="tel" inputMode="tel" maxLength={20} value={premium.contactPhone} onChange={event => set('contactPhone', event.target.value)} aria-invalid={phoneBad} className={fieldClass} />
             {phoneBad && <p className="mt-1 text-xs text-red-600">Use 8–15 digits, with optional + prefix.</p>}</div>
         </div>
       </div>
@@ -810,7 +810,7 @@ function PremiumTab({ settings, onSaved }: { settings?: Settings; onSaved: () =>
           ['extraConnectionFee','Extra connection reference rate (৳)',0,1000000],
         ] as const).map(([key,label,min,max])=><div key={key}>
            <label htmlFor={'premium-'+key} className={labelClass}>{label}</label>
-           <input id={'premium-'+key} type="number" min={min} max={max} step="1" value={premium[key]}
+           <input id={'premium-'+key} type="number" inputMode="numeric" min={min} max={max} step="1" value={premium[key]}
              onChange={event=>set(key,Number(event.target.value))} className={fieldClass} />
          </div>)}
         <div className="rounded-lg bg-blue-50 px-4 py-3">

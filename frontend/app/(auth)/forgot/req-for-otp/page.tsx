@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { toast } from "sonner";
 import Image from "next/image";
+import { normalizeBangladeshMobile } from "@/lib/bangladesh-mobile";
 
 const ForgotPassword = () => {
   const router = useRouter();
@@ -29,7 +30,8 @@ const ForgotPassword = () => {
     },
   });
 
-  const normalizeContact = (value: string) => value.includes("@") ? value.trim().toLowerCase() : value.replace(/[০-৯]/g,n=>String("০১২৩৪৫৬৭৮৯".indexOf(n))).replace(/[\s()-]/g,"");
+  const normalizeContact = (value: string) => value.includes("@") ? value.trim().toLowerCase() :
+    normalizeBangladeshMobile(value) ?? value.replace(/[০-৯]/g,n=>String("০১২৩৪৫৬৭৮৯".indexOf(n))).replace(/[\s()-]/g,"");
   // Validate phone number
   const validatePhone = (phone: string) => {
     // Bangladesh phone number validation (11 digits starting with 01)

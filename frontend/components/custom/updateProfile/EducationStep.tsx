@@ -129,6 +129,7 @@ export function EducationStep() {
           <Label htmlFor="highestEducationPassingYear">পাসের সন</Label>
           <Input
             id="highestEducationPassingYear"
+            inputMode="numeric"
             value={formData.educationInfo?.highestEducationPassingYear || ""}
             onChange={(e) =>
               updateNestedField(

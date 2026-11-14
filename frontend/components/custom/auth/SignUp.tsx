@@ -132,7 +132,7 @@ export default function SignUp() {
                 name={mode==="email"?"email":"phoneNumber"}
                 type={mode==="email"?"email":"tel"}
                 placeholder={mode==="email"?"name@example.com":"01712345678"}
-                inputMode={mode==="phone"?"numeric":undefined}
+                inputMode={mode==="phone"?"tel":undefined}
                 autoComplete={mode==="phone"?"tel-national":"email"}
                 maxLength={mode==="phone"?20:undefined}
                 value={mode==="email"?formData.email:formData.phoneNumber}
@@ -142,7 +142,7 @@ export default function SignUp() {
               />
               {mode === "phone" && (
                 <p className="text-xs text-gray-500">
-                  শুধু বাংলাদেশের নম্বর (01XXXXXXXXX) লিখুন। +880 বা দেশের কোড লাগবে না।
+                  বাংলাদেশের নম্বর 01XXXXXXXXX লিখুন। +880 বা 880 দিয়েও লিখতে পারবেন।
                 </p>
               )}
             </div>

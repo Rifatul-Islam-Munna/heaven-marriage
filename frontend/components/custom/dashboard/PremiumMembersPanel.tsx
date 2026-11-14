@@ -107,7 +107,7 @@ export default function PremiumMembersPanel(){
         <select className={field} value={stage} onChange={e=>setStage(e.target.value)}>{stages.map(s=><option key={s} value={s}>{s}</option>)}</select>
        </label>
        <label className="text-xs font-semibold">Assisted connections used (allowance {selected.service?.assistedAllowance??0})
-        <input type="number" min={0} max={selected.service?.assistedAllowance??0} value={used}
+        <input type="number" inputMode="numeric" min={0} max={selected.service?.assistedAllowance??0} value={used}
           onChange={e=>setUsed(Number(e.target.value))} className={field}/>
        </label>
        <label className="text-xs font-semibold">Membership expiry date
@@ -146,7 +146,7 @@ export default function PremiumMembersPanel(){
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-blue-100 pt-3">
        <label className="text-xs font-semibold">Add wallet connection credits (separate from assisted count)
-        <input type="number" min={1} max={10000} value={credits||''} onChange={e=>setCredits(Number(e.target.value))}
+        <input type="number" inputMode="numeric" min={1} max={10000} value={credits||''} onChange={e=>setCredits(Number(e.target.value))}
           placeholder="Quantity" className={cn(field,'max-w-44')}/></label>
        <button type="button" disabled={busy||credits<1||!reason.trim()} onClick={()=>void addCredits()}
          className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-blue-300 bg-white px-3 text-xs font-semibold text-blue-800 disabled:opacity-40"><Plus size={14}/> Grant credits</button>

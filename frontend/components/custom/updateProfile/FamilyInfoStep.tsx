@@ -91,6 +91,7 @@ export function FamilyInfoStep() {
             <Input
               id="brotherCount"
               type="text"
+              inputMode="numeric"
               value={formData.familyInfo?.brotherCount || ""}
               onChange={(e) =>
                 updateNestedField("familyInfo", "brotherCount", e.target.value)
@@ -103,6 +104,7 @@ export function FamilyInfoStep() {
             <Input
               id="sisterCount"
               type="text"
+              inputMode="numeric"
               value={formData.familyInfo?.sisterCount || ""}
               onChange={(e) =>
                 updateNestedField("familyInfo", "sisterCount", e.target.value)

@@ -160,7 +160,7 @@ function CreateDialog({ open, onClose, onCreated }: { open: boolean; onClose: ()
           </div>
           <div>
             <label htmlFor="new-phone" className={labelClass}>Phone</label>
-            <input id="new-phone" type="tel" autoComplete="off" value={phone} onChange={event => setPhone(event.target.value)} placeholder="01712345678" className={fieldClass} />
+            <input id="new-phone" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={event => setPhone(event.target.value)} placeholder="01712345678" className={fieldClass} />
           </div>
           <p className="-mt-2 text-[11px] text-[#6c757d] sm:col-span-2">{emailBad ? <span className="text-red-600">Check the email address.</span> : 'Add at least one. They sign in with either.'}</p>
           <div>
