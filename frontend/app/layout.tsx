@@ -42,6 +42,7 @@ const lato = Lato({
 // app/layout.tsx
 import type { Metadata } from "next";
 import TrackingConsent from "@/lib/TrackingConsent";
+import { GoogleTagManager } from "@next/third-parties/google";
 import { publicMetadata } from "@/lib/seo";
 import { PageViewTracker } from "@/lib/PageViewTracker";
 import VisualContentRuntime from "@/components/custom/dashboard/VisualContentRuntime";
@@ -56,8 +57,34 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="bn" className={inter.variable}>
-
+      <head>
+        {/* Set consent defaults before GTM executes, including on the first visit. */}
+        <script
+          id="gtm-consent-default"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                window.dataLayer = window.dataLayer || [];
+                var granted = false;
+                try {
+                  granted = localStorage.getItem("niqaha_tracking_consent") === "granted";
+                } catch (_) {}
+                function gtag() { window.dataLayer.push(arguments); }
+                var consent = granted ? "granted" : "denied";
+                gtag("consent", "default", {
+                  analytics_storage: consent,
+                  ad_storage: consent,
+                  ad_user_data: consent,
+                  ad_personalization: consent
+                });
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={` ${cormorant.variable} ${lato.variable} antialiased`}>
+        {/* Keep GTM present for Tag Assistant, with tracking controlled by consent. */}
+        <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID || "GTM-K8LP7V8D"} />
         <TrackingConsent />
         <SeoSiteStructuredData />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "Niqaha.com", url: "https://niqaha.com", logo: "https://niqaha.com/logo.png", email: "niqahabd@gmail.com", telephone: "+8801748919251", address: { "@type": "PostalAddress", addressLocality: "Dashghar, Bishwanath, Sylhet", addressCountry: "BD" } }) }} />

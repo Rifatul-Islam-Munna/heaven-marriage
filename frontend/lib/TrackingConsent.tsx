@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { GoogleTagManager } from "@next/third-parties/google";
 import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { hasTrackingConsent, pageViewEvent } from "./google-tag-manager";
+import { pageViewEvent } from "./google-tag-manager";
 export default function TrackingConsent() {
   const [choice, setChoice] = useState<string | null>("loading");
   useEffect(() => {
@@ -41,17 +40,12 @@ export default function TrackingConsent() {
         event: "consent_revoked",
         analytics_consent: "denied",
       });
-      // Unload any third party listeners after withdrawal.
+      // Reload with the stored denied consent state so it applies before GTM starts.
       window.location.reload();
     }
   };
   return (
     <>
-      {choice === "granted" && hasTrackingConsent() && (
-        <GoogleTagManager
-          gtmId={process.env.NEXT_PUBLIC_GTM_ID || "GTM-K8LP7V8D"}
-        />
-      )}
       {choice === null && (
         <section
           role="region"
