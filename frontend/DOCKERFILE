@@ -19,7 +19,19 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID
 ENV NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID}
 
-RUN npm run build
+# Easypanel forwards service environment values as Docker build arguments.
+# Server Actions use this secret at BUILD time. Keep the same value on all
+# deployments; don't echo its value into build logs or copy it to the runner.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+ARG GIT_SHA
+# Persist the same AES key across builds, but give each new deployment its
+# own ID. Without an injected commit SHA, generate an ID once at build time.
+RUN node -e "const k=process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY; if (!k || ![16,24,32].includes(Buffer.from(k,'base64').length)) { console.error('Provide a valid NEXT_SERVER_ACTIONS_ENCRYPTION_KEY Docker BUILD ARG (not runtime-only)'); process.exit(1); }" \
+    && if [ -n "$GIT_SHA" ]; then \
+         DEPLOYMENT_VERSION="$GIT_SHA" npm run build; \
+       else \
+         DEPLOYMENT_VERSION="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')" npm run build; \
+       fi
 
 # ===== Minimal production runner =====
 FROM base AS runner

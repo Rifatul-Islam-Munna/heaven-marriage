@@ -42,9 +42,52 @@ interface WebData {
   updatedAt: string;
 }
 
+type SignedMediaUpload = {
+  putUrl: string;
+  key: string;
+  ticket: string;
+  contentType: string;
+  expiresIn: number;
+};
+
+function putDirectToRustFs(
+  putUrl: string,
+  file: File,
+  contentType: string,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', putUrl);
+    xhr.withCredentials = false;
+    xhr.timeout = 20 * 60 * 1000;
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(Math.min(100, Math.round(event.loaded / event.total * 100)));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve();
+      } else {
+        reject(new Error(`RustFS rejected the upload (HTTP ${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error(
+      'Cannot reach RustFS directly. Check RustFS CORS and storage availability.',
+    ));
+    xhr.ontimeout = () => reject(new Error('RustFS upload timed out. Retry with a smaller file.'));
+    xhr.onabort = () => reject(new Error('RustFS upload was cancelled.'));
+    xhr.send(file);
+  });
+}
+
 export default function WebDataDashboard() {
   const queryClient = useQueryClient();
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   // Use normal API routes for both reading and writing; Server Actions post to
   // /dashboard/images and can be rejected by the hosting layer for large uploads.
@@ -92,22 +135,44 @@ export default function WebDataDashboard() {
     }
     const fieldKey = `${section}-${field}`;
     setUploadingField(fieldKey);
-    const loadingToast = toast.loading(isVideo ? 'Uploading and preparing video...' : 'Uploading image...');
-
-    const formData = new FormData();
-    formData.append("file", file);
+    const loadingToast = toast.loading('Preparing secure RustFS upload...');
+    setUploadProgress(0);
 
     try {
-      const response = await fetch('/api/dashboard-media', {
+      // Only the file metadata and temporary upload authorization go through Next.
+      const signedResponse = await fetch('/api/dashboard-media?action=presign', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
+        body: JSON.stringify({ name: file.name, type: file.type || 'application/octet-stream', size: file.size }),
       });
-      const uploadResponse = await response.json().catch(() => ({ message: `Upload rejected (HTTP ${response.status})` }));
-      if (!response.ok || typeof uploadResponse?.url !== 'string') {
-        throw new Error(uploadResponse?.message || 'Media upload failed');
+      const signed = await signedResponse.json().catch(() => null) as SignedMediaUpload & { message?: string } | null;
+      if (!signedResponse.ok || !signed?.putUrl || !signed.key || !signed.ticket || !signed.contentType) {
+        throw new Error(signed?.message || `Could not authorize RustFS upload (HTTP ${signedResponse.status})`);
       }
-      const uploadedUrl: string = uploadResponse.url;
+
+      toast.loading('Uploading directly to RustFS...', { id: loadingToast });
+      await putDirectToRustFs(signed.putUrl, file, signed.contentType, setUploadProgress);
+
+      // Verify the object exists in RustFS before writing a URL into MongoDB.
+      toast.loading('Verifying and processing uploaded media...', { id: loadingToast });
+      const confirmResponse = await fetch('/api/dashboard-media?action=complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          key: signed.key,
+          ticket: signed.ticket,
+          contentType: signed.contentType,
+          size: file.size,
+        }),
+      });
+      const confirmed = await confirmResponse.json().catch(() => null) as
+        { url?: string; message?: string } | null;
+      if (!confirmResponse.ok || typeof confirmed?.url !== 'string') {
+        throw new Error(confirmed?.message || `Could not verify upload (HTTP ${confirmResponse.status})`);
+      }
+      const uploadedUrl = confirmed.url;
 
       // Update web data with new URL - PRESERVE EXISTING DATA
       const updateData: Partial<WebData> = {};
@@ -146,6 +211,7 @@ export default function WebDataDashboard() {
       toast.error(error instanceof Error ? error.message : 'আপলোড ব্যর্থ হয়েছে');
     } finally {
       toast.dismiss(loadingToast);
+      setUploadProgress(null);
       setUploadingField(null);
     }
   };
@@ -192,8 +258,14 @@ export default function WebDataDashboard() {
           ছবি এবং ভিডিও আপলোড ও আপডেট করুন
         </p>
         <p className="text-xs text-gray-500 mt-2">
-          Video: MP4, MOV, WebM, MKV, AVI and more (up to 80 MB). Images: JPG, PNG, GIF, HEIC and more (up to 25 MB).
+          Direct RustFS upload: videos up to 80 MB, images up to 25 MB. MOV/MKV/AVI and HEIC/TIFF are converted for browsers.
         </p>
+        {uploadingField && (
+          <p role="status" className="text-sm font-medium text-pink-700 mt-2">
+            {uploadProgress === 100 ? 'Upload complete — processing and saving...' :
+              `Uploading directly to RustFS: ${uploadProgress ?? 0}%`}
+          </p>
+        )}
       </div>
 
       {/* Home Section */}

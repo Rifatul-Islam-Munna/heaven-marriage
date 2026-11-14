@@ -41,9 +41,11 @@ const nextConfig: NextConfig = {
 
   },
   typedRoutes: true,
+  // Send clients back to the correct build during rolling deployments.
+  deploymentId: process.env.DEPLOYMENT_VERSION || undefined,
      experimental: {
     serverActions: {
-      bodySizeLimit: '20mb',
+      bodySizeLimit: '80mb',
     },
   },
   typescript: {
