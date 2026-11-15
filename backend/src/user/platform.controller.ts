@@ -50,6 +50,15 @@ export class PlatformController {
   @Get('summary') summary(@Req() r: ExpressRequest) {
     return this.service.summary(r.user.id);
   }
+  @Get('tracking/user') trackingUser(@Req() r: ExpressRequest) {
+    return this.service.trackingUser(r.user.id);
+  }
+  @Get('tracking/purchase')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  trackingPurchase(@Req() r: ExpressRequest, @Query('paymentId') paymentId: string,
+    @Query('purpose') purpose: string) {
+    return this.service.trackingPurchase(r.user.id, paymentId, purpose);
+  }
   @Get('admirers') admirers(@Req() r: ExpressRequest) {
     return this.service.admirers(r.user.id);
   }

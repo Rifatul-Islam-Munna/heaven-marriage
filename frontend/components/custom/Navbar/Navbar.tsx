@@ -29,6 +29,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { logOutUser } from "@/actions/auth";
+import { clearTrackingUser } from "@/lib/google-tag-manager";
 
 // Navigation items array
 const navItems = [
@@ -213,6 +214,7 @@ export default function Navbar() {
                         onClick={async () => {
                           const success = await logOutUser();
                           if (success) {
+                            clearTrackingUser();
                             setIsOpen(false);
                             window.location.assign("/");
                           }

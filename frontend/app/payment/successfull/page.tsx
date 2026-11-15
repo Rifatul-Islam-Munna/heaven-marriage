@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { User, UserInfo } from "@/@types/user";
 import { setUserData } from "@/actions/auth";
+import PurchaseTracker from "@/lib/PurchaseTracker";
 
 const PaymentSuccessPage = () => {
   const router = useRouter();
@@ -41,6 +42,7 @@ const PaymentSuccessPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50 flex items-center justify-center p-4">
+      <PurchaseTracker />
       <Card className="max-w-md w-full border-0 shadow-2xl">
         <CardContent className="pt-12 pb-8 px-6 text-center">
           {/* Success Icon with Animation */}

@@ -310,6 +310,51 @@ export class PlatformService implements OnModuleInit {
       'Member Management premium toggle');
     return {message:activate?'Premium activated':'Premium deactivated'};
   }
+  async trackingUser(actor: string) {
+    const user = await this.users.findById(actor)
+      .select('name email phoneNumber address.presentAddress address.district address.upazila address.cityCorporation residenceCountry')
+      .lean();
+    if (!user) throw new NotFoundException('Account unavailable');
+    return {
+      _id: String(user._id), name: user.name, email: user.email,
+      phoneNumber: user.phoneNumber, residenceCountry: user.residenceCountry,
+      address: user.address ? {
+        presentAddress: user.address.presentAddress, district: user.address.district,
+        upazila: user.address.upazila, cityCorporation: user.address.cityCorporation,
+      } : undefined,
+    };
+  }
+
+  /** Read-only receipt: the authenticated member must own an already settled order. */
+  async trackingPurchase(actor: string, paymentId: string, purpose: string) {
+    if (typeof paymentId !== 'string' || !paymentId.trim() || paymentId.length > 150 ||
+      !['premium', 'connections'].includes(purpose))
+      throw new BadRequestException('Invalid purchase reference');
+    const order = await this.db.collection(purpose === 'premium' ? 'premium_orders' : 'connection_orders')
+      .findOne({ userId: actor, paymentId, status: 'paid' }, { projection: {
+        _id: 0, id: 1, amount: 1, currency: 1, packageId: 1, packageName: 1, quantity: 1,
+      } });
+    if (!order || typeof order.id !== 'string' || !order.id ||
+      !Number.isFinite(order.amount) || order.amount <= 0 || order.currency !== 'BDT')
+      throw new NotFoundException('Paid purchase unavailable');
+    return {
+      order_id: order.id, event_id: order.id, user_id: actor,
+      status: 'paid' as const, purpose,
+      ecommerce: {
+        transaction_id: order.id, affiliation: 'Niqaha.com', value: order.amount,
+        tax: 0, shipping: 0, currency: 'BDT' as const,
+        items: [{
+          item_id: purpose === 'premium' ? 'premium' : String(order.packageId || 'connections'),
+          item_name: purpose === 'premium' ? 'Premium membership' : String(order.packageName || 'Connection package'),
+          item_category: purpose === 'premium' ? 'Premium' : 'Connections',
+          affiliation: 'Niqaha.com', price: order.amount, quantity: 1,
+          ...(purpose === 'connections' && Number.isInteger(order.quantity) && order.quantity > 0
+            ? { connection_credits: order.quantity } : {}),
+        }],
+      },
+    };
+  }
+
   /** Premium checkout is separate from connection_orders. It may grant only the configured included connections once. */
   async createPremiumPayment(actor: string) {
     const settings = resolvePremiumSettings(

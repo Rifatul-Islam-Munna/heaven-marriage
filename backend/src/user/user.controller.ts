@@ -149,7 +149,7 @@ export class UserController {
     try {
       const result = await this.userService.executePremiumPayment(paymentID);
       return res.redirect(redirectBase + (result.success
-        ? '/payment/successfull?purpose=premium'
+        ? '/payment/successfull?purpose=premium&payment_id=' + encodeURIComponent(paymentID)
         : '/payment/failed?purpose=premium'));
     } catch {
       return res.redirect(redirectBase + '/payment/failed?purpose=premium');
@@ -169,7 +169,7 @@ export class UserController {
       if (status === 'success') {
         const result = await this.userService.executePayment(paymentID);
         if(result.success){
-         return res.redirect(`${frontendBaseUrl}/payment/successfull`);
+         return res.redirect(`${frontendBaseUrl}/payment/successfull?purpose=connections&payment_id=${encodeURIComponent(paymentID)}`);
         }
            return res.redirect(`${frontendBaseUrl}/payment/failed`);
       }

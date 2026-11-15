@@ -2,6 +2,7 @@
 import { PostRequestAxios } from "@/api-hooks/api-hooks";
 import { cookies } from "next/headers";
 import {User, UserInfo} from "@/@types/user"
+import type { PurchaseReceipt, TrackingUser } from "@/lib/tracking-customer";
 
  type userData ={
     user:User,
@@ -57,6 +58,26 @@ export const getUser = async ()=>{
 
     return UserData;
 }
+
+// Optional tracking must not redirect the user when their session has expired.
+async function trackingRequest<T>(path: string): Promise<T | null> {
+    const token = (await cookies()).get("access_token")?.value;
+    if (!token) return null;
+    if (!process.env.BASE_URL) throw new Error("Tracking API is unavailable");
+    const response = await fetch(process.env.BASE_URL + path, {
+        cache: "no-store", headers: { access_token: token }, signal: AbortSignal.timeout(5000),
+    });
+    if ([401, 403, 404].includes(response.status)) return null;
+    if (!response.ok) throw new Error("Tracking API is unavailable");
+    return response.json();
+}
+
+export const getTrackingUser = async (): Promise<TrackingUser | null> =>
+    trackingRequest<TrackingUser>("/platform/tracking/user");
+
+export const getTrackingPurchase = async (paymentId: string, purpose: "premium" | "connections") =>
+    trackingRequest<PurchaseReceipt>("/platform/tracking/purchase?paymentId=" +
+        encodeURIComponent(paymentId) + "&purpose=" + encodeURIComponent(purpose));
 
 export const requestNumber = async (payoad:{userId:string, requestUserId:string}) => {
     const [data, error] = await PostRequestAxios<{userData:Record<string,unknown>}>("/user/request-for-number",payoad);

@@ -67,7 +67,7 @@ export default function RootLayout({
                 window.dataLayer = window.dataLayer || [];
                 var granted = false;
                 try {
-                  granted = localStorage.getItem("niqaha_tracking_consent") === "granted";
+                  granted = localStorage.getItem("niqaha_tracking_consent_v3") === "granted";
                 } catch (_) {}
                 function gtag() { window.dataLayer.push(arguments); }
                 var consent = granted ? "granted" : "denied";

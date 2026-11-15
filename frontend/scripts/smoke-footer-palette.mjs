@@ -93,7 +93,7 @@ try{
  browser=await puppeteer.launch({headless:true,executablePath:chrome,args:['--no-sandbox']});
  const page=await browser.newPage();
  await page.evaluateOnNewDocument(()=>{
-   try{localStorage.setItem('niqaha_tracking_consent','denied');}catch{}
+   try{localStorage.setItem('niqaha_tracking_consent_v3','denied');}catch{}
  });
  for(const {width,height} of [
    {width:320,height:568},{width:390,height:844},{width:768,height:800},

@@ -32,13 +32,15 @@ function OTP() {
   const { mutate, isPending } = useMutation({
     mutationKey: ["verify-otp"],
     mutationFn: (payoad: Record<string, any>) => setOtpData(payoad),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data?.error) {
         toast.error(data?.error?.message);
         return;
       }
       sessionStorage.removeItem("niqaha_challenge");
-      registrationEvent(String(data.data?.data?._id || "verified"), sessionStorage.getItem("niqaha_registration_method") === "email" ? "email" : "phone");
+      if (data.data?.data) {
+        await registrationEvent(data.data.data, sessionStorage.getItem("niqaha_registration_method") === "email" ? "email" : "phone");
+      }
       sessionStorage.removeItem("niqaha_registration_method");
       router.push("/profile/my-profile");
     },

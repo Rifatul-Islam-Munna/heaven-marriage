@@ -132,7 +132,7 @@ try{
  page.on('pageerror',error=>browserErrors.push(error.message));
  // The cookie notice is already addressed in this test (declined optional tracking).
  await page.evaluateOnNewDocument(()=>{
-   try{localStorage.setItem('niqaha_tracking_consent','denied');}catch{}
+   try{localStorage.setItem('niqaha_tracking_consent_v3','denied');}catch{}
  });
  await page.setViewport({width:1440,height:900});
 

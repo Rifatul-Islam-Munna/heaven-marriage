@@ -83,7 +83,7 @@ try{
  const page=await browser.newPage();
  await page.setViewport({width:1440,height:900});
  await page.evaluateOnNewDocument(()=>{
-   try{localStorage.setItem('niqaha_tracking_consent','denied');}catch{}
+   try{localStorage.setItem('niqaha_tracking_consent_v3','denied');}catch{}
  });
  await page.setCookie({name:'access_token',value:'smoke-admin',url:site,httpOnly:true});
  await page.goto(site+'/dashboard/premium-service',{waitUntil:'domcontentloaded',timeout:30000});

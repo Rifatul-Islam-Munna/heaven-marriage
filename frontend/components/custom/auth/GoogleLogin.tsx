@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { registrationEvent } from "@/lib/google-tag-manager";
+import { loginEvent, registrationEvent } from "@/lib/google-tag-manager";
 import { loginWithGoogle } from "@/actions/auth";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -37,7 +37,7 @@ export default function LoginWithGoogle({
   const { mutate, isPending } = useMutation({
     mutationKey: ["loginWithGoogle"],
     mutationFn: (idToken: string) => loginWithGoogle(idToken),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.error || !result.data?.user) {
         toast.error(
           result.error?.message || "Google sign-in failed. Please try again.",
@@ -45,7 +45,9 @@ export default function LoginWithGoogle({
         return;
       }
       if (result.data.isNewUser)
-        registrationEvent(String(result.data.user._id), "google");
+        await registrationEvent(result.data.user, "google");
+      else
+        await loginEvent(result.data.user, "google");
       queryClient.clear();
       const next = new URLSearchParams(window.location.search).get("next");
       const safeNext = next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\")

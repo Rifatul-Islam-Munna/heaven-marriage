@@ -37,6 +37,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { logOutUser } from "@/actions/auth";
+import { clearTrackingUser } from "@/lib/google-tag-manager";
 import { useUser } from "@/lib/useUser";
 import { useRouter } from "next/navigation";
 import { User as UserType, UserInfo } from "@/@types/user";
@@ -97,6 +98,7 @@ export function UserNav({ user }: { user: UserInfo | null }) {
   const handellogout = async () => {
     const res = await logOutUser();
     if (res) {
+      clearTrackingUser();
       /*    await refetch();
       router.refresh(); */
       window.location.href = "/";

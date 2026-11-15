@@ -6,6 +6,7 @@ import { ArrowUpRight, CheckCircle2, LogOut, Plus, UserRound } from "lucide-reac
 import { toast } from "sonner";
 import { useUser } from "@/lib/useUser";
 import { logOutUser } from "@/actions/auth";
+import { clearTrackingUser } from "@/lib/google-tag-manager";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { currentBiodataStage, type BiodataStatusSource } from "@/lib/biodata-status";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export default function BiodataCreationCta({ style = "section" }: { style?: Styl
     try {
       const result = await logOutUser();
       if (!result) throw new Error("Logout could not be completed");
+      clearTrackingUser();
       setOpen(false);
       router.replace("/signup");
       router.refresh();

@@ -14,6 +14,7 @@ import {
 import { Heart, Eye, EyeOff } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { loginUser } from "@/actions/auth";
+import { loginEvent } from "@/lib/google-tag-manager";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
@@ -35,8 +36,9 @@ export default function SignIn() {
   const { mutate, isPending } = useMutation({
     mutationKey: ["login-user"],
     mutationFn: () => loginUser(formData.phoneNumber, formData.password),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.data) {
+        await loginEvent(data.data.user, formData.phoneNumber.includes("@") ? "email" : "phone");
         const next = new URLSearchParams(window.location.search).get("next");
         const safeNext = next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
           ? next : "/profile";
