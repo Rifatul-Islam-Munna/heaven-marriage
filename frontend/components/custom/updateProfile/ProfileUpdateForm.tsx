@@ -16,7 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, locationQuestionApplies, locationQuestionVisible, locationQuestionLabel, questionInputAttributes, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue,
+  defaultQuestions, questionApplies, locationQuestionApplies, locationQuestionVisible, locationQuestionLabel, questionInputAttributes, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue, questionAnswerFitsInput, questionOptionsWithSavedAnswer,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
@@ -25,6 +25,7 @@ import AiBiodataAssistant from "./AiBiodataAssistant";
 import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
 import {previewBiodataCompletion} from '@/lib/profile-completion';
 import {ageFromBirthDate,latestBirthDate} from '@/lib/birth-date';
+import {SavedQuestionAnswer} from './DynamicQuestionStep';
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
 type Answer = string | number | boolean | string[];
@@ -86,7 +87,8 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
   onChange: (next: Answer) => void; onPicked: () => void; onEnter: () => void;
 }) {
   const [filter, setFilter] = useState("");
-  const raw = value === undefined || value === null ? "" : value;
+  const raw = value === undefined || value === null ||
+    (["number", "date"].includes(q.type) && !questionAnswerFitsInput(value,q,options)) ? "" : value;
   const chip = (active: boolean) => `flex w-full items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3.5 text-left text-[15px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600 ${
     active ? "border-pink-600 bg-pink-600 text-white shadow-sm" : "border-gray-200 bg-white text-gray-800 hover:border-pink-300 hover:bg-pink-50"}`;
   const big = "w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-4 text-lg text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-pink-500";
@@ -100,10 +102,11 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
 
   if (q.type === "multi_checkbox") {
     const chosen = Array.isArray(raw) ? raw.map(String) : [];
+    const choices = questionOptionsWithSavedAnswer(q,options,value);
     return <div className="space-y-2">
       <p className="text-sm text-gray-500">যতগুলো প্রযোজ্য, সব বেছে নিন</p>
       <div className="grid gap-2 sm:grid-cols-2">
-        {options.map(option => {
+        {choices.map(option => {
           const on = chosen.includes(option.value);
           return <button key={option.value} type="button" aria-pressed={on} className={chip(on)}
             onClick={() => onChange(on ? chosen.filter(v => v !== option.value) : [...chosen, option.value])}>
@@ -111,7 +114,7 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
           </button>;
         })}
       </div>
-      {!options.length && <p className="text-sm text-amber-700">এই প্রশ্নের কোনো উত্তর এখনো যোগ করা হয়নি।</p>}
+      {!choices.length && <p className="text-sm text-amber-700">এই প্রশ্নের কোনো উত্তর এখনো যোগ করা হয়নি।</p>}
     </div>;
   }
 
@@ -544,6 +547,7 @@ export default function ProfileUpdateForm() {
         </div>}
         <div className="mt-6" role="group" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
           aria-describedby={currentRuleError?'qb-answer-error':undefined}>
+          <SavedQuestionAnswer q={question} value={value} options={optionsFor(question)}/>
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
           {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}

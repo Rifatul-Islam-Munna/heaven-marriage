@@ -117,7 +117,33 @@ describe('Admin controlled profile question rules', () => {
     expect(user.age).toBe(30);
     expect(answerForQuestion(user,edited)).toBe('I prefer not to say');
     expect(completion(user,[edited]).percentage).toBe(100);
-    expect(completion({gender:'male',age:30},[edited]).percentage).toBe(0);
+    expect(answerForQuestion({gender:'male',age:30},edited)).toBe(30);
+    expect(completion({gender:'male',age:30},[edited]).percentage).toBe(100);
+  });
+
+  it('keeps original answers available after retyping and respects explicit replacement values',()=>{
+    const original=BUILTINS.find(q=>q.path==='familyInfo.brotherCount')!;
+    const edited=validateQuestion({...original,type:'text'});
+    expect(edited.answerStorage).toBe('dynamic');
+    const profile={familyInfo:{brotherCount:2}};
+    expect(answerForQuestion(profile,edited)).toBe(2);
+    for(const replacement of ['',false,0,[]])
+      expect(answerForQuestion({...profile,dynamicAnswers:{[edited.id]:replacement}},edited)).toEqual(replacement);
+    expect(answerForQuestion({...profile,dynamicAnswers:new Map([[edited.id,0]])},edited)).toBe(0);
+    const legacy=validateQuestion({...edited,id:'old_'+'a'.repeat(24),path:undefined,
+      legacyKey:'Original question',type:'multi_checkbox'});
+    expect(answerForQuestion({customFields:{'Original question':'Earlier answer'}},legacy)).toBe('Earlier answer');
+  });
+
+  it('allows retained historical choices while rejecting choices the member never saved',()=>{
+    const q=validateQuestion({id:'q_'+'a'.repeat(32),question:'Choices',publicLabel:'Choices',
+      section:0,gender:'both',type:'multi_checkbox',options:[{value:'new',label:'New'}],
+      optionSource:'',required:false,enabled:true,showPublic:true,order:0});
+    const existing={[q.id]:['removed']};
+    expect(sanitizeDynamicAnswers({[q.id]:['removed','new']},existing,[q],'male')[q.id])
+      .toEqual(['removed','new']);
+    expect(sanitizeDynamicAnswers({[q.id]:['new']},existing,[q],'male')[q.id]).toEqual(['new']);
+    expect(()=>sanitizeDynamicAnswers({[q.id]:['invented']},existing,[q],'male')).toThrow();
   });
 
   it('leaves authentication credentials outside the schema and refuses forged field bindings',()=>{

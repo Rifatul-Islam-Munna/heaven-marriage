@@ -27,7 +27,7 @@ export type FieldGender = 'male'|'female'|'both';
 export type QuestionOption = { label: string; value: string };
 export type QuestionRule = {type:'not_equal';questionId:string;message?:string};
 export type ProfileQuestion = {
-  id: string; path?: string; legacyKey?: string;
+  id: string; path?: string; legacyKey?: string; answerStorage?: 'dynamic';
   question: string; publicLabel: string; section: number;
   gender: FieldGender; type: FieldType; options: QuestionOption[];
   optionSource: string; required: boolean; enabled: boolean; showPublic: boolean;
@@ -52,6 +52,7 @@ export const BUILTINS: ProfileQuestion[] = sourceQuestions.map(q => ({...q, type
   locked: authQuestionPaths.has(q.path || ''),
 }));
 export function usesSeparateAnswerStorage(q: ProfileQuestion): boolean {
+  if (q.answerStorage === 'dynamic') return true;
   if (!q.path && !q.legacyKey) return true;
   const storageKind = (type: FieldType) => {
     if (type === 'checkbox') return 'boolean';
@@ -70,7 +71,10 @@ export function usesSeparateAnswerStorage(q: ProfileQuestion): boolean {
 }
 export function answerForQuestion(user: any, q: ProfileQuestion): unknown {
   const get = (map: any, key: string) => map?.get?.(key) ?? map?.[key];
-  if (usesSeparateAnswerStorage(q)) return get(user.dynamicAnswers, q.id);
+  const answers = user.dynamicAnswers;
+  if (usesSeparateAnswerStorage(q) &&
+      (answers instanceof Map ? answers.has(q.id) : Object.hasOwn(answers || {}, q.id)))
+    return get(answers, q.id);
   if (q.legacyKey) return get(user.customFields, q.legacyKey);
   if (q.path==='age') return ageFromBirthDate(user.dateOfBirth) ?? user.age;
   return q.path?.split('.').reduce((value: any, key) => value?.[key], user);
@@ -191,7 +195,7 @@ export function validateQuestion(input: unknown): ProfileQuestion {
     a.type !== existing!.type)) throw new BadRequestException('Authentication fields are not configurable');
   const required = (locked||birthDate) ? existing!.required : a.required === true;
   const enabled = (locked||protectedLocation||birthDate) ? true : a.enabled !== false;
-  return {
+  const result: ProfileQuestion = {
     id,
     ...(existing?.path?{path:existing.path}:{}),
     ...(id.startsWith('old_')&&a.legacyKey?{legacyKey:a.legacyKey}:{}),
@@ -201,6 +205,12 @@ export function validateQuestion(input: unknown): ProfileQuestion {
     required,enabled,showPublic:!secretFields.has(existing?.path||'')&&a.showPublic===true,
     order,locked,...(rules.length?{rules}:{}),
   };
+  // Once a typed legacy field is redesigned, keep its ID-based answer binding
+  // even if a later edit returns to the original input type.
+  if (!locked && !protectedLocation && !birthDate && (result.path || result.legacyKey) &&
+      (a.answerStorage === 'dynamic' || usesSeparateAnswerStorage(result)))
+    result.answerStorage = 'dynamic';
+  return result;
 }
 export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string,unknown> | undefined,
     questions:ProfileQuestion[], gender:unknown) {
@@ -226,7 +236,8 @@ export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string
     if(Array.isArray(raw)) {
       if(q.type!=='multi_checkbox'||raw.length>100||raw.some(s=>typeof s!=='string'||s.length>200))
         throw new BadRequestException('Invalid multiple-choice answer');
-      const options=new Set(q.options.map(o=>o.value));
+      const options=new Set([...q.options.map(o=>o.value),
+        ...(Array.isArray(result[key]) ? result[key] as string[] : [])]);
       if(options.size && raw.some(s=>!options.has(s))&&JSON.stringify(result[key])!==JSON.stringify(raw))throw new BadRequestException('Invalid choice');
       result[key]=raw;
     } else if(typeof raw==='boolean') {
@@ -283,7 +294,7 @@ export class QuestionConfigService {
       try {
         rows.set(q.id,validateQuestion({
           ...q,
-          ...(old?.legacyKey?{legacyKey:old.legacyKey}:{}),
+          ...(old?.legacyKey?{legacyKey:q.legacyKey || old.legacyKey}:{}),
         }));
       } catch { /* Keep the seed instead of letting corrupt config break forms. */ }
     }
@@ -307,6 +318,7 @@ export class QuestionConfigService {
       const previous=current.questions.find(p=>p.id===q.id);
       if(q.legacyKey&&!previous)throw new BadRequestException('Unknown original custom question');
       if(previous?.legacyKey) q.legacyKey=previous.legacyKey;
+      if(previous?.answerStorage==='dynamic') q.answerStorage='dynamic';
       submitted.set(q.id,q);
     }
     // Essential questions must be present in every submitted revision.

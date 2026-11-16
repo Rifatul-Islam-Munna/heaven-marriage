@@ -2,7 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import type { Connection } from 'mongoose';
 import {
   BUILTINS, QuestionConfigService, type ProfileQuestion,
-  sanitizeDynamicAnswers, missingDynamicAnswers,
+  sanitizeDynamicAnswers, missingDynamicAnswers, answerForQuestion, usesSeparateAnswerStorage,
 } from './question-config.service';
 
 function fixture() {
@@ -43,6 +43,36 @@ const custom: ProfileQuestion = {
   enabled:true,showPublic:true,order:333,locked:false,
 };
 describe('Profile question schema database flows',()=>{
+  it('keeps ID-based answers bound after renaming, moving and reverting a legacy input type',async()=>{
+    const {service}=fixture(),initial=await service.get();
+    const original=initial.questions.find(q=>q.path==='familyInfo.brotherCount')!;
+    const redesigned=await service.save('admin',{revision:0,questions:initial.questions.map(q=>
+      q.id===original.id?{...q,type:'text',question:'Updated siblings question'}:q)});
+    const first=redesigned.questions.find(q=>q.id===original.id)!;
+    expect(answerForQuestion({familyInfo:{brotherCount:2}},first)).toBe(2);
+    const answers=sanitizeDynamicAnswers({[first.id]:'Three siblings'},{},redesigned.questions,'male');
+    const reverted=await service.save('admin',{revision:redesigned.revision,questions:redesigned.questions.map(q=>
+      q.id===first.id?{...q,type:original.type,section:8,publicLabel:'Siblings',answerStorage:undefined}:q)});
+    const latest=reverted.questions.find(q=>q.id===first.id)!;
+    expect(usesSeparateAnswerStorage(latest)).toBe(true);
+    const profile={gender:'male',familyInfo:{brotherCount:2},dynamicAnswers:answers};
+    expect(answerForQuestion(profile,latest)).toBe('Three siblings');
+    expect((await service.publicAnswers(profile,true,reverted))[latest.id]).toBe('Three siblings');
+    expect(sanitizeDynamicAnswers({[latest.id]:4},answers,reverted.questions,'male')[latest.id]).toBe(4);
+    expect(profile.familyInfo.brotherCount).toBe(2);
+  });
+
+  it('preserves the original custom answer key when the source question is later renamed',async()=>{
+    const ctx=fixture();
+    ctx.oldQuestions.push({_id:'a'.repeat(24),question:'Original prompt'});
+    const initial=await ctx.service.get(),id='old_'+'a'.repeat(24);
+    await ctx.service.save('admin',{revision:0,questions:initial.questions.map(q=>
+      q.id===id?{...q,question:'Renamed prompt',publicLabel:'Renamed label'}:q)});
+    ctx.oldQuestions[0].question='Changed source prompt';
+    const latest=(await ctx.service.get()).questions.find(q=>q.id===id)!;
+    expect(latest.legacyKey).toBe('Original prompt');
+    expect(answerForQuestion({customFields:{'Original prompt':'Saved details'}},latest)).toBe('Saved details');
+  });
   it('persists answer rules and rejects missing comparison targets',async()=>{
     const ctx=fixture(),schema=await ctx.service.get();
     const target={...custom,id:'q_'+'f'.repeat(32),question:'Other answer'};

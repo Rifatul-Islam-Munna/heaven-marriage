@@ -5,13 +5,20 @@ import { profileQuestionOptions } from '@/lib/profile-question-options';
 import {useQueryWrapper} from '@/api-hooks/react-query-wrapper';
 import type {LocationEntry,LocationResponse} from '@/lib/location-options';
 import {
- questionApplies,locationQuestionApplies,locationQuestionVisible,locationQuestionLabel,questionInputAttributes,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,type ProfileQuestion, type ProfileQuestionSchema,
+ questionApplies,locationQuestionApplies,locationQuestionVisible,locationQuestionLabel,questionInputAttributes,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,questionDisplayValue,questionAnswerFitsInput,questionOptionsWithSavedAnswer,type ProfileQuestion, type ProfileQuestionSchema, type QuestionOption,
 } from '@/lib/profile-questions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {ageFromBirthDate,latestBirthDate} from '@/lib/birth-date';
+
+export function SavedQuestionAnswer({q,value,options}:{q:ProfileQuestion;value:unknown;options:QuestionOption[]}){
+ if(questionAnswerFitsInput(value,q,options))return null;
+ return <p className="whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-3 text-sm text-amber-900" data-saved-question-answer={q.id}>
+  Saved answer: <span className="font-medium">{questionDisplayValue(value,{...q,type:'text'})}</span>
+ </p>;
+}
 
 export function QuestionInput({
  q,value,onChange,gender,profile,preview=false,locations=[],error,
@@ -22,11 +29,13 @@ export function QuestionInput({
  error?:string;
 }){
  const [optionSearch,setOptionSearch]=useState('');
- const options=profileQuestionOptions(q,gender,profile,locations);
+ const configuredOptions=profileQuestionOptions(q,gender,profile,locations);
+ const options=questionOptionsWithSavedAnswer(q,configuredOptions,value);
  const filteredOptions=options.filter(opt=>opt.value===String(value??'') ||
    !optionSearch || opt.label.toLocaleLowerCase().includes(optionSearch.toLocaleLowerCase()) ||
    opt.value.toLocaleLowerCase().includes(optionSearch.toLocaleLowerCase()));
- const raw=(value===undefined||value===null?'':value);
+ const raw=(value===undefined||value===null||
+   (['number','date'].includes(q.type)&&!questionAnswerFitsInput(value,q,options))?'':value);
  const id='question-'+q.id;
  const choices=q.type==='multi_checkbox';
  const address=profile?.address;
@@ -42,6 +51,7 @@ export function QuestionInput({
   <Label htmlFor={id} className="block font-medium leading-relaxed text-gray-800">
     {locationQuestionLabel(q)} {q.required&&<span className="text-pink-600" aria-label="required">*</span>}
   </Label>
+  <SavedQuestionAnswer q={q} value={value} options={configuredOptions}/>
   {q.path==='address.upazila'&&<p className="text-sm text-muted-foreground">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>}
   {q.type==='checkbox'?(
    <label className="flex cursor-pointer items-center gap-3 py-2 text-sm">

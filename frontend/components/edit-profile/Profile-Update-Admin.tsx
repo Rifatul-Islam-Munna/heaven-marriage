@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
-import { defaultQuestions, questionRuleErrors, type ProfileQuestionSchema } from "@/lib/profile-questions";
+import { defaultQuestions, questionRuleErrors } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -86,7 +86,13 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const setCurrentStep = useProfileStore((state) => state.setCurrentStep);
   const getFormData = useProfileStore((state) => state.getFormData);
   const initializeForm = useProfileStore((state) => state.initializeForm);
-  const [questionSchema,setQuestionSchema] = useState<ProfileQuestionSchema>(defaultQuestions);
+  const { data, isLoading, refetch } = useQueryWrapper<User>(
+    ["get-my-profile", id],
+    `/user/get-user-profile-admin?id=${id}`,
+    { enabled: !!id },
+  );
+  // The profile response carries the exact schema used to read its answers.
+  const questionSchema = data?.profileQuestionSchema ?? defaultQuestions;
   const [editMode,setEditMode] = useState<'biodata'|'account'>('biodata');
   const [contactEmail,setContactEmail]=useState('');
   const [contactPhone,setContactPhone]=useState('');
@@ -96,14 +102,6 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const loadedMemberRef=useRef<string>('');
   const goToFormRef=useRef(false);
   const goToAccountRef=useRef(false);
-  useEffect(()=>{
-    const controller=new AbortController();
-    void fetch("/api/profile-questions",{signal:controller.signal})
-      .then(r=>r.ok?r.json():Promise.reject(Error()))
-      .then((v:ProfileQuestionSchema)=>{if(Array.isArray(v.questions))setQuestionSchema(v);})
-      .catch(()=>{});
-    return ()=>controller.abort();
-  },[]);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -160,14 +158,6 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const handleNext = () => {
     if (activeSteps[stepPosition+1]!==undefined) openSection(activeSteps[stepPosition+1]);
   };
-
-  const { data, isLoading, refetch } = useQueryWrapper<User>(
-    ["get-my-profile", id],
-    `/user/get-user-profile-admin?id=${id}`,
-    {
-      enabled: !!id,
-    },
-  );
 
   // Update mutation
   const { mutate, isPending } = useCommonMutationApi({

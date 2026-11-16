@@ -14,7 +14,7 @@ export type QuestionType = 'text'|'textarea'|'number'|'date'|'select'|'dropdown'
 export type QuestionOption = {label:string;value:string};
 export type QuestionRule = {type:'not_equal';questionId:string;message?:string};
 export type ProfileQuestion = {
- id:string; path?:string;legacyKey?:string;question:string;publicLabel:string;
+ id:string; path?:string;legacyKey?:string;answerStorage?:'dynamic';question:string;publicLabel:string;
  section:number;gender:QuestionGender;type:QuestionType;options:QuestionOption[];
  optionSource:string;required:boolean;enabled:boolean;showPublic:boolean;
  order:number;locked:boolean;
@@ -46,6 +46,7 @@ export const defaultQuestions:ProfileQuestionSchema={
 };
 const defaultById=new Map(defaultQuestions.questions.map(q=>[q.id,q]));
 export function questionUsesSeparateStorage(q:ProfileQuestion):boolean {
+ if(q.answerStorage==='dynamic')return true;
  if(!q.path&&!q.legacyKey)return true;
  const kind=(type:QuestionType)=>{
    if(type==='checkbox')return 'boolean';
@@ -94,10 +95,29 @@ export function questionApplies(q:ProfileQuestion,gender?:string){
  return q.enabled&&(q.gender==='both'||q.gender===gender);
 }
 export function readQuestionAnswer(profile:Record<string,any>,q:ProfileQuestion):unknown {
- if(questionUsesSeparateStorage(q))return profile.dynamicAnswers?.[q.id];
+ // A redesigned input must still show the answer saved before its type changed.
+ // An explicit empty/false/zero override must never resurrect the older value.
+ if(questionUsesSeparateStorage(q)&&Object.prototype.hasOwnProperty.call(profile.dynamicAnswers||{},q.id))
+  return profile.dynamicAnswers[q.id];
  if(q.legacyKey)return profile.customFields?.[q.legacyKey];
  if(q.path==='age')return ageFromBirthDate(profile.dateOfBirth)??profile.age;
  return q.path?.split('.').reduce<any>((v,key)=>v?.[key],profile);
+}
+export function questionAnswerFitsInput(value:unknown,q:ProfileQuestion,options:QuestionOption[]=q.options):boolean {
+ if(value===undefined||value===null||value==='')return true;
+ if(q.type==='checkbox')return typeof value==='boolean';
+ if(q.type==='multi_checkbox')return Array.isArray(value)&&value.every(v=>options.some(o=>o.value===v));
+ if(q.type==='number')return (typeof value==='number'||typeof value==='string'&&
+  /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))&&Number.isFinite(Number(value));
+ if(q.type==='date')return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&
+  Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
+ return !Array.isArray(value);
+}
+export function questionOptionsWithSavedAnswer(q:ProfileQuestion,options:QuestionOption[],value:unknown):QuestionOption[] {
+ if(q.type!=='multi_checkbox'||!Array.isArray(value))return options;
+ const missing=[...new Set(value.filter((v):v is string=>typeof v==='string'))]
+  .filter(v=>!options.some(o=>o.value===v));
+ return [...options,...missing.map(v=>({value:v,label:v+' (saved answer)'}))];
 }
 export function questionRuleErrors(profile:Record<string,any>,questions:ProfileQuestion[]){
  const byId=new Map(questions.map(q=>[q.id,q]));
