@@ -23,7 +23,7 @@ export default function AdminBiodataSectionOverview({
         <h2 className="flex items-center gap-2 text-[17px] font-semibold text-gray-900">
           <ClipboardList className="size-5 text-pink-600" /> Biodata sections
         </h2>
-        <p className="mt-1 text-[12px] leading-5 text-gray-600">সেকশনে ক্লিক করলে সরাসরি সেই ফর্মে যাবে। যে উত্তর পূরণ করেছেন, তার ভিত্তিতে অগ্রগতি আপডেট হবে।</p>
+        <p className="mt-1 text-[12px] leading-5 text-gray-600">সেকশনে ক্লিক করলে ফর্মে যাবে। প্রতিটি সেকশনে কোন উত্তরগুলো গণনা হচ্ছে তাও দেখানো আছে; পুরোনো উত্তর সম্পাদনা করা যাবে।</p>
       </div>
       <div className="flex items-center gap-3 rounded-lg bg-pink-50 px-3 py-2">
         <div className="text-right">
@@ -65,6 +65,11 @@ export default function AdminBiodataSectionOverview({
               style={{ width: section.percentage + '%' }} />
           </div>
           <span className={cn('text-[11px] leading-4',complete?'text-emerald-700':missing?'text-amber-800':'text-gray-500')}>{status}</span>
+          {section.answeredLabels.length > 0 &&
+            <span title={section.answeredLabels.join(' • ')} className="line-clamp-2 w-full border-t border-pink-100 pt-1.5 text-[10px] leading-4 text-gray-600">
+              উত্তর আছে: {section.answeredLabels.slice(0, 2).join(' • ')}
+              {section.answeredLabels.length > 2 ? ` এবং আরও ${section.answeredLabels.length - 2}টি` : ''}
+            </span>}
         </button>;
       })}
     </div>

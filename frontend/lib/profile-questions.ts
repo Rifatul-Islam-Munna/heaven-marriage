@@ -54,7 +54,9 @@ export function questionUsesSeparateStorage(q:ProfileQuestion):boolean {
    if(type==='number')return 'number';
    return 'string';
  };
- if(q.legacyKey)return kind(q.type)!=='string';
+ // Legacy text prompts are mutable; new edits go to the stable question ID.
+ // The reader still falls back to customFields[legacyKey] for all old answers.
+ if(q.legacyKey)return true;
  const original=defaultById.get(q.id);
  if(!original)return true;
  if(kind(q.type)!==kind(original.type))return true;
@@ -95,11 +97,15 @@ export function questionApplies(q:ProfileQuestion,gender?:string){
  return q.enabled&&(q.gender==='both'||q.gender===gender);
 }
 export function readQuestionAnswer(profile:Record<string,any>,q:ProfileQuestion):unknown {
+ // Match the backend reader: Mongoose Map values and plain JSON objects are both valid.
  // A redesigned input must still show the answer saved before its type changed.
  // An explicit empty/false/zero override must never resurrect the older value.
- if(questionUsesSeparateStorage(q)&&Object.prototype.hasOwnProperty.call(profile.dynamicAnswers||{},q.id))
-  return profile.dynamicAnswers[q.id];
- if(q.legacyKey)return profile.customFields?.[q.legacyKey];
+ const readStored=(source:any,key:string)=>source instanceof Map?source.get(key):source?.[key];
+ const hasStored=(source:any,key:string)=>source instanceof Map?source.has(key):
+  Object.prototype.hasOwnProperty.call(source||{},key);
+ if(questionUsesSeparateStorage(q)&&hasStored(profile.dynamicAnswers,q.id))
+  return readStored(profile.dynamicAnswers,q.id);
+ if(q.legacyKey)return readStored(profile.customFields,q.legacyKey);
  if(q.path==='age')return ageFromBirthDate(profile.dateOfBirth)??profile.age;
  return q.path?.split('.').reduce<any>((v,key)=>v?.[key],profile);
 }
@@ -113,10 +119,16 @@ export function questionAnswerFitsInput(value:unknown,q:ProfileQuestion,options:
   Number.isFinite(Date.parse(value+'T00:00:00Z'))&&new Date(value+'T00:00:00Z').toISOString().slice(0,10)===value;
  return !Array.isArray(value);
 }
+/** Keep historic multiple selections even if the question was formerly text/select.
+ * Editing converts a legacy scalar to an array without discarding its values. */
+export function savedMultiValues(value:unknown):string[] {
+ if(Array.isArray(value))return [...new Set(value.filter((v):v is string=>typeof v==='string'&&!!v.trim()))];
+ if(typeof value==='string'&&value.trim())return [...new Set(value.split(/\s*[,،•]\s*/).map(v=>v.trim()).filter(Boolean))];
+ return [];
+}
 export function questionOptionsWithSavedAnswer(q:ProfileQuestion,options:QuestionOption[],value:unknown):QuestionOption[] {
- if(q.type!=='multi_checkbox'||!Array.isArray(value))return options;
- const missing=[...new Set(value.filter((v):v is string=>typeof v==='string'))]
-  .filter(v=>!options.some(o=>o.value===v));
+ if(q.type!=='multi_checkbox')return options;
+ const missing=savedMultiValues(value).filter(v=>!options.some(o=>o.value===v));
  return [...options,...missing.map(v=>({value:v,label:v+' (saved answer)'}))];
 }
 export function questionRuleErrors(profile:Record<string,any>,questions:ProfileQuestion[]){
@@ -141,10 +153,20 @@ export function questionRuleErrors(profile:Record<string,any>,questions:ProfileQ
  }
  return errors;
 }
+/** Rules added after older answers must not block saving unrelated edits. */
+export function newQuestionRuleErrors(
+  profile:Record<string,any>,questions:ProfileQuestion[],before?:Record<string,any>
+){
+ const errors=questionRuleErrors(profile,questions);
+ if(!before)return errors;
+ const existing=new Set(questionRuleErrors(before,questions).map(error=>
+  [error.questionId,error.otherQuestionId].sort().join(':')));
+ return errors.filter(error=>!existing.has([error.questionId,error.otherQuestionId].sort().join(':')));
+}
 export function questionDisplayValue(value:unknown,q:ProfileQuestion):string {
  if(value===null||value===undefined||value==='')return '';
  if(q.path==='dateOfBirth')return formatBirthDate(value as string);
- if(Array.isArray(value))return value.map(v=>q.options.find(o=>o.value===v)?.label||v).join(' • ');
+ if(Array.isArray(value))return value.map(v=>q.options.find(o=>o.value===String(v))?.label||String(v)).join(', ');
  if(typeof value==='boolean')return value?'হ্যাঁ':'না';
  if(q.type==='date' && typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
   return new Date(value+'T00:00:00').toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'});

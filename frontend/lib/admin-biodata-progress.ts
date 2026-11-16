@@ -7,6 +7,7 @@ import {ageFromBirthDate} from './birth-date';
 export type AdminBiodataSectionProgress = {
   id: number; title: string; answered: number; total: number;
   required: number; requiredMissing: number; percentage: number;
+  answeredLabels: string[];
 };
 
 /** Progress is based on saved + currently edited answers, never on navigation history. */
@@ -28,7 +29,8 @@ export function getAdminBiodataProgress(
     const questions = schema.questions.filter(q =>
       q.section === section.id && !q.locked &&
       questionApplies(q, profile.gender) && locationQuestionApplies(q, profile));
-    const answered = questions.filter(q => adminAnswerIsComplete(q, readQuestionAnswer(profile, q))).length;
+    const answeredQuestions = questions.filter(q => adminAnswerIsComplete(q, readQuestionAnswer(profile, q)));
+    const answered = answeredQuestions.length;
     const required = questions.filter(q => q.required);
     const requiredMissing = required.filter(q => !adminAnswerIsComplete(q, readQuestionAnswer(profile, q))).length;
     return {
@@ -36,6 +38,7 @@ export function getAdminBiodataProgress(
       answered, total: questions.length,
       required: required.length, requiredMissing,
       percentage: questions.length ? Math.round(answered / questions.length * 100) : 100,
+      answeredLabels: answeredQuestions.map(q => q.question),
     };
   }).filter(section => section.total > 0);
 }

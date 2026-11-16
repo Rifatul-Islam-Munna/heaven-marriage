@@ -152,6 +152,24 @@ const getInitialFormData = (): Partial<User> => ({
   howYouWannaGetMarried: '',
 });
 
+/** Hydrate only values returned by the server. Empty form placeholders must
+ * never become fictitious answers in the admin/member completion counters. */
+function hydrateSavedProfile(data: Partial<User>): Partial<User> {
+  const restored: Partial<User> = { ...getInitialFormData(), ...data };
+  const sections = [
+    'address', 'educationInfo', 'familyInfo', 'personalInformation',
+    'occupational', 'marriageInformationWomen', 'marriageInformationMan',
+    'expectedLifePartner', 'pledge',
+  ] as const;
+  for (const key of sections) {
+    if (data[key] == null) delete restored[key];
+  }
+  if (data.residenceCountry == null) delete restored.residenceCountry;
+  restored.customFields = data.customFields || {};
+  restored.dynamicAnswers = data.dynamicAnswers || {};
+  return restored;
+}
+
 export const useProfileStore = create<ProfileStore>((set, get) => ({
   formData: getInitialFormData(),
   currentStep: 0,
@@ -210,13 +228,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   // Load existing data into form
   initializeForm: (data, options) =>
     set((state) => ({
-      formData: {
-        ...getInitialFormData(),
-        ...data,
-        // Ensure customFields is merged properly ✅
-        customFields: data.customFields || {},
-        dynamicAnswers: data.dynamicAnswers || {}
-      },
+      formData: hydrateSavedProfile(data),
       shouldShowEmail: !data.email,
       shouldShowPhoneNumber: !data.phoneNumber,
       currentStep: options?.preserveStep ? state.currentStep : 0

@@ -5,6 +5,7 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { ExecutionContext } from '@nestjs/common';
 import { PlatformService } from './platform.service';
+import { IdentityService } from './identity.service';
 import { PlatformController } from './platform.controller';
 import { UserService } from './user.service';
 import { User, UserSchema, UserType } from './entities/user.entity';
@@ -91,6 +92,62 @@ describe('Biodata deletion requests and submission lifecycle (isolated MongoDB)'
       expect((await users.findById(member._id).lean()).dynamicAnswers[second]).toBe('different');
       await writer.updatedFullUserInformation({dynamicAnswers:{[second]:'corrected'}} as any,String(member._id));
       expect((await users.findById(member._id).lean()).dynamicAnswers[second]).toBe('corrected');
+    }finally{(writer as any).questions=previous;}
+  });
+
+  it('allows unrelated admin and member saves after rules change, preserving nested siblings',async()=>{
+    const first='q_'+'c'.repeat(32),second='q_'+'d'.repeat(32);
+    const field=(id:string)=>({id,question:id,publicLabel:id,section:1,gender:'both',type:'text',
+      options:[],optionSource:'',enabled:true,required:false,showPublic:false,order:1,locked:false});
+    const schema={revision:8,questions:[{...field(first),rules:[{
+      type:'not_equal' as const,questionId:second,message:'Answers must differ',
+    }]},field(second)]};
+    const previous=(writer as any).questions;
+    (writer as any).questions={get:async()=>schema};
+    try {
+      const member=await account({gender:'female',familyInfo:{
+        mothersProfession:'Teacher',fathersProfession:'Doctor',
+      },dynamicAnswers:{[first]:'same',[second]:'same'}});
+      const id=String(member._id);
+      await writer.updatedFullUserInformation({familyInfo:{mothersProfession:'Engineer'}} as any,id);
+      expect((await users.findById(id).lean()).familyInfo).toMatchObject({
+        mothersProfession:'Engineer',fathersProfession:'Doctor',
+      });
+      const admin=await account({role:UserType.ADMIN,email:'admin-edit@example.com',phoneNumber:null});
+      const identity=Object.assign(Object.create(IdentityService.prototype),{users,db});
+      const adminWriter=Object.assign(Object.create(UserService.prototype),writer,{
+        identity,platform:{audit:jest.fn()},
+      });
+      await adminWriter.update({id,familyInfo:{fathersProfession:'Architect'}} as any,
+        String(admin._id),UserType.ADMIN);
+      const saved=await users.findById(id).lean();
+      expect(saved.familyInfo).toMatchObject({
+        mothersProfession:'Engineer',fathersProfession:'Architect',
+      });
+      expect(saved.dynamicAnswers).toMatchObject({[first]:'same',[second]:'same'});
+      // Creating a NEW violation is still rejected; existing violations are not silently removed.
+      await writer.updatedFullUserInformation({dynamicAnswers:{[second]:'different'}} as any,id);
+      await expect(writer.updatedFullUserInformation({dynamicAnswers:{[second]:'same'}} as any,id))
+        .rejects.toThrow('Answers must differ');
+    }finally{(writer as any).questions=previous;}
+  });
+
+  it('saves legacy text selections after admin changes question to multiple choice',async()=>{
+    const original=BUILTINS.find(q=>q.path==='familyInfo.brotherInformation')!;
+    const modified={...original,type:'multi_checkbox' as const,answerStorage:'dynamic' as const,
+      options:[{label:'New option',value:'New'}],enabled:true,required:false};
+    const previous=(writer as any).questions;
+    (writer as any).questions={get:async()=>({revision:9,questions:[modified]})};
+    try {
+      const member=await account({familyInfo:{brotherInformation:'Old, Removed',
+        sistersProfession:'Teacher'}});
+      const id=String(member._id);
+      await writer.updatedFullUserInformation({dynamicAnswers:{
+        [modified.id]:['Old','Removed','New'],
+      }} as any,id);
+      const saved=await users.findById(id).lean();
+      expect(saved.dynamicAnswers[modified.id]).toEqual(['Old','Removed','New']);
+      expect(saved.familyInfo.brotherInformation).toBe('Old, Removed');
     }finally{(writer as any).questions=previous;}
   });
 

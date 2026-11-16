@@ -60,7 +60,8 @@ export function usesSeparateAnswerStorage(q: ProfileQuestion): boolean {
     if (type === 'number') return 'number';
     return 'string'; // text, textarea, select, dropdown
   };
-  if (q.legacyKey) return storageKind(q.type) !== 'string';
+  // Store subsequent edits by stable ID; keep historical customFields readable.
+  if (q.legacyKey) return true;
   const original = builtins.get(q.id);
   if (!original) return true;
   if (storageKind(q.type) !== storageKind(original.type)) return true;
@@ -119,8 +120,18 @@ export function questionRuleErrors(profile:any,questions:ProfileQuestion[]){
   }
   return errors;
 }
-export function assertQuestionRules(profile:any,questions:ProfileQuestion[]){
+/** Let a member save unrelated edits when an old answer violates a rule
+ * added later by an administrator. New violations are still rejected.
+ * Submission / publication may require the full set of rules. */
+export function newQuestionRuleErrors(profile:any,questions:ProfileQuestion[],before?:any){
   const errors=questionRuleErrors(profile,questions);
+  if(!before)return errors;
+  const existing=new Set(questionRuleErrors(before,questions).map(error=>
+    [error.questionId,error.otherQuestionId].sort().join(':')));
+  return errors.filter(error=>!existing.has([error.questionId,error.otherQuestionId].sort().join(':')));
+}
+export function assertQuestionRules(profile:any,questions:ProfileQuestion[],before?:any){
+  const errors=newQuestionRuleErrors(profile,questions,before);
   if(errors.length)throw new BadRequestException({message:errors[0].message,validationErrors:errors});
 }
 function cleanText(value:unknown, max:number, key:string) {
@@ -213,13 +224,14 @@ export function validateQuestion(input: unknown): ProfileQuestion {
   return result;
 }
 export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string,unknown> | undefined,
-    questions:ProfileQuestion[], gender:unknown) {
+    questions:ProfileQuestion[], gender:unknown, originalProfile?:any) {
   if(!answers||typeof answers!=='object'||Array.isArray(answers)) throw new BadRequestException('Invalid answers');
   const received=Object.entries(answers as Record<string,unknown>);
   if(received.length>400)throw new BadRequestException('Too many answers');
   const byId=new Map(questions.filter(q=>q.enabled&&usesSeparateAnswerStorage(q)&&
     (q.gender==='both'||q.gender===gender)).map(q=>[q.id,q]));
-  const result:Record<string,unknown>={...(existing||{})};
+  const result:Record<string,unknown> = existing instanceof Map
+    ? Object.fromEntries(existing.entries()) : {...(existing||{})};
   for(const [key,raw] of received) {
     if(!/^(?:q_[a-f0-9]{32}|builtin_[a-f0-9]{16}|old_[a-f0-9]{24})$/.test(key))
       throw new BadRequestException('Invalid answer key');
@@ -236,8 +248,13 @@ export function sanitizeDynamicAnswers(answers: unknown, existing: Record<string
     if(Array.isArray(raw)) {
       if(q.type!=='multi_checkbox'||raw.length>100||raw.some(s=>typeof s!=='string'||s.length>200))
         throw new BadRequestException('Invalid multiple-choice answer');
+      // If a text/select question became multi-select, its old answer may
+      // live in the original typed field, not yet in dynamicAnswers.
+      const previous=originalProfile ? answerForQuestion(originalProfile,q) : result[key];
+      const oldChoices=Array.isArray(previous) ? previous.map(String) :
+        typeof previous==='string' ? previous.split(/\s*[,،•]\s*/).map(s=>s.trim()).filter(Boolean) : [];
       const options=new Set([...q.options.map(o=>o.value),
-        ...(Array.isArray(result[key]) ? result[key] as string[] : [])]);
+        ...(Array.isArray(result[key]) ? result[key] as string[] : []),...oldChoices]);
       if(options.size && raw.some(s=>!options.has(s))&&JSON.stringify(result[key])!==JSON.stringify(raw))throw new BadRequestException('Invalid choice');
       result[key]=raw;
     } else if(typeof raw==='boolean') {

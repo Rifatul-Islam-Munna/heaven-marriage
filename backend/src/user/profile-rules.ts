@@ -254,7 +254,7 @@ export function editableProfile(input: any) {
 const PARTIAL_BIODATA_OBJECTS = new Set([
   'address', 'educationInfo', 'familyInfo', 'personalInformation',
   'occupational', 'marriageInformationWomen', 'marriageInformationMan',
-  'expectedLifePartner', 'pledge', 'customFields',
+  'expectedLifePartner', 'pledge', 'customFields', 'dynamicAnswers',
 ]);
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

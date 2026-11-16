@@ -18,6 +18,11 @@ export function applyBirthDate(payload: Record<string, any>, current: Record<str
   const value = supplied ? payload.dateOfBirth : current.dateOfBirth;
   if (!value) return;
   const age = ageFromBirthDate(value);
-  if (age === undefined) throw new BadRequestException('Enter a valid birth date in YYYY-MM-DD format');
+  if (age === undefined) {
+    // A legacy account may hold a birth date from an older form format.
+    // Do not prevent unrelated answers from saving; validate when it is edited.
+    if (!supplied) return;
+    throw new BadRequestException('Enter a valid birth date in YYYY-MM-DD format');
+  }
   payload.age = age;
 }

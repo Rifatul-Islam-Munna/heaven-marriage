@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useProfileStore } from "@/zustan/useProfileStore";
 import { DynamicQuestionStep } from "../custom/updateProfile/DynamicQuestionStep";
-import { defaultQuestions, questionRuleErrors } from "@/lib/profile-questions";
+import { defaultQuestions, newQuestionRuleErrors } from "@/lib/profile-questions";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -96,6 +96,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
   const [editMode,setEditMode] = useState<'biodata'|'account'>('biodata');
   const [contactEmail,setContactEmail]=useState('');
   const [contactPhone,setContactPhone]=useState('');
+  const [saveFailure,setSaveFailure]=useState('');
   const formRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLElement>(null);
   const initialBiodataRef = useRef<Record<string,unknown> | null>(null);
@@ -165,7 +166,9 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
     url: "/user/update-user-admin",
     mutationKey: ["update-user"],
     successMessage: "বায়োডাটার পরিবর্তন সংরক্ষিত হয়েছে",
+    onError: (error) => setSaveFailure(error.message || "সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।"),
     onSuccess: () => {
+      setSaveFailure('');
       initialBiodataRef.current=useProfileStore.getState().getFormData() as Record<string,unknown>;
       void queryClient.invalidateQueries({ queryKey: ["admin-share-profile", id] });
       void refetch();
@@ -221,8 +224,8 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
 
   const handleSubmit = () => {
     if(!data || !initialBiodataRef.current)return;
-    const errors=questionRuleErrors(getFormData(),questionSchema.questions);
-    if(errors.length){toast.error(errors[0].message);return;}
+    const errors=newQuestionRuleErrors(getFormData(),questionSchema.questions,initialBiodataRef.current);
+    if(errors.length){setSaveFailure(errors[0].message);toast.error(errors[0].message);return;}
     // Account credentials are edited only in the separate Account & Security section.
     // Patch changed biodata fields instead of sending stale account / payment fields.
     const changes=diffBiodataDraft(initialBiodataRef.current,
@@ -231,6 +234,7 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
       toast.info('কোনো নতুন Biodata পরিবর্তন নেই');
       return;
     }
+    setSaveFailure('');
     mutate({id,...changes});
   };
 
@@ -498,6 +502,9 @@ export default function ProfileUpdateForm({ id }: { id: string }) {
             <p className={biodataDirty?'text-[12px] font-medium text-amber-700':'text-[12px] text-emerald-700'}>
               {biodataDirty?'Unsaved changes · সংরক্ষণ করতে Save চাপুন':'সব পরিবর্তন সংরক্ষিত'}
             </p>
+            {saveFailure && <p role="alert" className="max-w-md break-words text-[12px] font-semibold text-red-700">
+              সংরক্ষণ ব্যর্থ: {saveFailure}
+            </p>}
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Button type="button" onClick={handlePrevious} disabled={stepPosition===0}

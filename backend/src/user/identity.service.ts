@@ -12,6 +12,7 @@ import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { MessagingService, normalizePhone } from './messaging.service';
 import { applyBirthDate } from './birth-date';
+import { profileUpdateSet } from './profile-rules';
 @Injectable()
 export class IdentityService {
   constructor(
@@ -424,7 +425,9 @@ export class IdentityService {
           throw new BadRequestException('This contact is already reserved');
         if (!claim) reserved.push(subject);
       }
-      const update: any = { $set: set };
+      // Admin receives patches: update individual fields instead of replacing
+      // an entire address/family/education object and erasing sibling answers.
+      const update: any = { $set: profileUpdateSet(set) };
       if (Object.keys(unset).length) update.$unset = unset;
       const filter: any = { _id: user._id };
       if (changed.length) {

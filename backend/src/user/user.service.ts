@@ -151,9 +151,10 @@ async findUserAndUpdated() {
     applyBirthDate(payload,current);
     if((updated as any).dynamicAnswers!==undefined){
       payload.dynamicAnswers=sanitizeDynamicAnswers((updated as any).dynamicAnswers,
-        current.dynamicAnswers,schema.questions,payload.gender||current.gender);
+        current.dynamicAnswers,schema.questions,payload.gender||current.gender,current);
     }
-    assertQuestionRules(profileUpdatePreview(current,payload),schema.questions);
+    assertQuestionRules(profileUpdatePreview(current,payload),schema.questions,
+      (updated as any).submit === true ? undefined : current);
     // Account contact changes use separate verification; existing contact data stays intact.
     if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
     if ((updated as any).draftStep !== undefined)
@@ -616,8 +617,18 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     if(!findOne) {
       throw new HttpException('User not found', 400);
     }
+    // Mongoose Map fields do not JSON-serialize their entries. Admin profile
+    // responses must expose legacy customFields as a plain object so every
+    // previously saved custom answer can hydrate into its editable control.
+    const asPlainRecord=(value:any):Record<string,unknown>=>value instanceof Map
+      ? Object.fromEntries(value.entries())
+      : value&&typeof value==='object'&&!Array.isArray(value)?{...value}:{};
+    const profile={...findOne,
+      customFields:asPlainRecord(findOne.customFields),
+      dynamicAnswers:asPlainRecord(findOne.dynamicAnswers),
+    };
     const schema=await this.questions.get();
-    const {snapshot,completion:profileCompletion}=describeProfileCompletion(findOne,schema);
+    const {snapshot,completion:profileCompletion}=describeProfileCompletion(profile,schema);
     // Reconcile the same revisioned completion snapshot shown in Member Management.
     // A conditional raw write avoids changing a concurrent profile update.
     if(findOne.role===UserType.USER && findOne.biodataStatus!=='deleted' &&
@@ -629,7 +640,7 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
         );
       }catch(error){this.logger.warn('Profile completion cache sync skipped: '+String(error));}
     }
-    return {...findOne,age:ageFromBirthDate(findOne.dateOfBirth)??findOne.age,...snapshot,completion:profileCompletion,profileQuestionSchema:schema,
+    return {...profile,age:ageFromBirthDate(profile.dateOfBirth)??profile.age,...snapshot,completion:profileCompletion,profileQuestionSchema:schema,
       biodataStage:biodataStage(findOne,profileCompletion.percentage),
       alreadySubmitted:hasSubmittedBiodata(findOne)};
   }
@@ -644,8 +655,9 @@ async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.pro
     if(Object.keys(rest).length||raw.isPublishFromAdmin===true){
       applyBirthDate(rest,current);
       if(rest.dynamicAnswers!==undefined)rest.dynamicAnswers=sanitizeDynamicAnswers(
-        rest.dynamicAnswers,current.dynamicAnswers,activeSchema.questions,rest.gender||current.gender);
-      assertQuestionRules(profileUpdatePreview(current,rest),activeSchema.questions);
+        rest.dynamicAnswers,current.dynamicAnswers,activeSchema.questions,rest.gender||current.gender,current);
+      assertQuestionRules(profileUpdatePreview(current,rest),activeSchema.questions,
+        raw.isPublishFromAdmin === true ? undefined : current);
     }
     if(updateUserDto.numberOfConnections!==undefined&&current.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
     await this.platform.audit(actor,"profile.admin.update",id);

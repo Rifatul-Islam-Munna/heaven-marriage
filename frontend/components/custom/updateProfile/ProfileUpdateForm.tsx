@@ -16,7 +16,7 @@ import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { PatchRequestAxios } from "@/api-hooks/api-hooks";
 import {
-  defaultQuestions, questionApplies, locationQuestionApplies, locationQuestionVisible, locationQuestionLabel, questionInputAttributes, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, questionDisplayValue, questionAnswerFitsInput, questionOptionsWithSavedAnswer,
+  defaultQuestions, questionApplies, locationQuestionApplies, locationQuestionVisible, locationQuestionLabel, questionInputAttributes, questionUsesSeparateStorage, readQuestionAnswer, questionRuleErrors, newQuestionRuleErrors, questionDisplayValue, questionAnswerFitsInput, questionOptionsWithSavedAnswer, savedMultiValues,
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
@@ -24,7 +24,8 @@ import type {LocationResponse} from '@/lib/location-options';
 import AiBiodataAssistant from "./AiBiodataAssistant";
 import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
 import {previewBiodataCompletion} from '@/lib/profile-completion';
-import {ageFromBirthDate,latestBirthDate} from '@/lib/birth-date';
+import {ageFromBirthDate} from '@/lib/birth-date';
+import BirthDateSelect from './BirthDateSelect';
 import {SavedQuestionAnswer} from './DynamicQuestionStep';
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
@@ -93,6 +94,10 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
     active ? "border-pink-600 bg-pink-600 text-white shadow-sm" : "border-gray-200 bg-white text-gray-800 hover:border-pink-300 hover:bg-pink-50"}`;
   const big = "w-full rounded-2xl border-2 border-gray-200 bg-white px-4 py-4 text-lg text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-pink-500";
 
+  if (q.path === "dateOfBirth") return <BirthDateSelect
+    id="member-birth-date" value={typeof value === "string" ? value : ""}
+    onChange={onChange} required={q.required} large />;
+
   if (q.type === "checkbox") return <div className="grid grid-cols-2 gap-3">
     {[{ v: true, label: "হ্যাঁ" }, { v: false, label: "না" }].map(item => <button key={String(item.v)} type="button" aria-pressed={raw === item.v}
       onClick={() => { onChange(item.v); if (item.v) onPicked(); }} className={chip(raw === item.v)}>
@@ -101,7 +106,7 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
   </div>;
 
   if (q.type === "multi_checkbox") {
-    const chosen = Array.isArray(raw) ? raw.map(String) : [];
+    const chosen = savedMultiValues(raw);
     const choices = questionOptionsWithSavedAnswer(q,options,value);
     return <div className="space-y-2">
       <p className="text-sm text-gray-500">যতগুলো প্রযোজ্য, সব বেছে নিন</p>
@@ -157,7 +162,6 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
   </div>;
 
   return <input autoFocus aria-labelledby="qb-question" dir="auto" {...questionInputAttributes(q)}
-    max={q.path==='dateOfBirth'?latestBirthDate():undefined}
     value={String(raw)} maxLength={q.type === "number" ? undefined : 5000}
     onChange={event => onChange(q.type === "number" ? (event.target.value === "" ? "" : Number(event.target.value)) : event.target.value)}
     onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }}
@@ -252,7 +256,7 @@ export default function ProfileUpdateForm() {
     setSaveState("saving");
     setSaveError("");
     try {
-      const errors=questionRuleErrors(snapshot as Record<string,unknown>,schema.questions);
+      const errors=newQuestionRuleErrors(snapshot as Record<string,unknown>,schema.questions,saved.current);
       if(errors.length)throw new Error(errors[0].message);
       const [result, error] = await PatchRequestAxios<{
         message:string;data:Record<string,unknown>;
@@ -320,7 +324,8 @@ export default function ProfileUpdateForm() {
   const gender = formData.gender as string | undefined;
   const flow = useMemo(() => schema.questions.filter(q => q.path!=='age' && !q.locked && questionApplies(q, gender) && locationQuestionVisible(q,formData))
     .map(q => ({...q,question:locationQuestionLabel(q),required:q.required&&locationQuestionApplies(q,formData)}))
-    .sort((a, b) => a.section - b.section || a.order - b.order), [schema, gender, formData]);
+    .sort((a, b) => a.section - b.section || (a.path==='gender'?-1:b.path==='gender'?1:0) ||
+      Number(b.required)-Number(a.required) || a.order-b.order), [schema, gender, formData]);
   const levels = useMemo(() => schema.sections
     .map(section => ({ section, questions: flow.filter(q => q.section === section.id) }))
     .filter(level => level.questions.length), [schema.sections, flow]);
@@ -415,7 +420,18 @@ export default function ProfileUpdateForm() {
     if (openLevel >= 0) goLevel(openLevel); else setView("finish");
   };
   const finishLevel = () => {
-    setView("levelDone");
+    const following = levels[levelIndex + 1];
+    if (following) {
+      const fresh = useProfileStore.getState().formData;
+      const nextRequired = following.questions.findIndex(q => q.required && !answered(q, fresh));
+      const nextUnanswered = following.questions.findIndex(q => !answered(q, fresh));
+      setCurrentStep(following.section.id);
+      setActiveQuestionId(following.questions[nextRequired >= 0 ? nextRequired : nextUnanswered >= 0 ? nextUnanswered : 0]?.id ?? null);
+      setView("play");
+      toast.info(`পরবর্তী বিভাগ: ${following.section.title}`);
+    } else {
+      setView("finish");
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const next = async (skipped = false) => {
@@ -425,7 +441,7 @@ export default function ProfileUpdateForm() {
       autoAdvanceTimer.current = null;
     }
     const fresh = useProfileStore.getState().formData;
-    const error=questionRuleErrors(fresh,schema.questions).find(row=>row.questionId===question.id||row.otherQuestionId===question.id);
+    const error=newQuestionRuleErrors(fresh,schema.questions,saved.current).find(row=>row.questionId===question.id||row.otherQuestionId===question.id);
     if(error){setShake(n=>n+1);toast.error(error.message);return;}
     const isDone = answered(question, fresh);
     if (!skipped && question.required && !isDone) {
@@ -447,6 +463,29 @@ export default function ProfileUpdateForm() {
       else finishLevel();
     } catch {
       // Keep this question and its draft visible so the member can retry.
+    } finally {
+      advancePending.current = false;
+      setIsAdvancing(false);
+    }
+  };
+  const skipRemainingOptional = async () => {
+    if (!question || question.required || advancePending.current) return;
+    if (autoAdvanceTimer.current !== null) {
+      window.clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
+    advancePending.current = true;
+    setIsAdvancing(true);
+    try {
+      await queueSave();
+      const fresh = useProfileStore.getState().formData;
+      const nextRequired = levelQuestions.findIndex((item, index) =>
+        index > qi && item.required && !answered(item, fresh));
+      setStreak(0);
+      if (nextRequired >= 0) setQi(nextRequired);
+      else finishLevel();
+    } catch {
+      toast.error("সংরক্ষণ ব্যর্থ হয়েছে। আবার চেষ্টা করুন।");
     } finally {
       advancePending.current = false;
       setIsAdvancing(false);
@@ -556,10 +595,10 @@ export default function ProfileUpdateForm() {
         {cheer.text}
       </div>}
 
-      <div key={question.id + ":" + shake} className={`qb-in mt-6 rounded-3xl bg-white p-5 shadow-[0_10px_30px_rgba(219,39,119,0.08)] sm:p-8 ${shake ? "qb-shake" : ""}`}>
+      <div key={question.id + ":" + shake} className={`qb-in mt-6 rounded-3xl border-2 p-5 shadow-[0_10px_30px_rgba(219,39,119,0.08)] sm:p-8 ${question.required ? "border-pink-300 bg-pink-50" : "border-emerald-200 bg-emerald-50"} ${shake ? "qb-shake" : ""}`}>
         <div className="flex flex-wrap items-center gap-2">
-          {question.required ? <span className="rounded-full bg-pink-50 px-2.5 py-1 text-xs font-semibold text-pink-700">আবশ্যিক</span>
-            : <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">ঐচ্ছিক</span>}
+          {question.required ? <span className="rounded-full bg-pink-600 px-3 py-1.5 text-xs font-bold text-white">আবশ্যিক · আগে উত্তর দিন</span>
+            : <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">ঐচ্ছিক · চাইলে এড়িয়ে যান</span>}
           {streak >= 2 && <span className="qb-pop inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-600"><Flame className="h-3.5 w-3.5" /> {bn(streak)} টানা উত্তর</span>}
         </div>
         <h1 id="qb-question" dir="auto" className="mt-4 text-2xl font-bold leading-snug text-gray-900 sm:text-[28px]">{question.question}</h1>
@@ -573,23 +612,28 @@ export default function ProfileUpdateForm() {
         </div>}
         <fieldset disabled={isAdvancing} className="mt-6 min-w-0" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
           aria-describedby={currentRuleError?'qb-answer-error':undefined}>
-          <SavedQuestionAnswer q={question} value={value} options={optionsFor(question)}/>
+          <SavedQuestionAnswer q={question} value={value} options={optionsFor(question)} onChange={answer => setAnswer(question, answer)}/>
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
           {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}
         </fieldset>
+        {!question.required && levelQuestions.slice(qi + 1).some(item => !item.required) &&
+          <button type="button" disabled={isAdvancing} onClick={() => { void skipRemainingOptional(); }}
+            className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:opacity-60">
+            এই বিভাগের বাকি ঐচ্ছিক প্রশ্নগুলো এড়িয়ে যান
+          </button>}
       </div>
 
       <div data-question-navigation className="sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-2 bg-[#fff7f9]/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur" aria-busy={isAdvancing}>
         <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">{saveBadge}</div>
         <button type="button" data-question-action="skip" disabled={isAdvancing} onClick={() => { void next(true); }}
-          className="min-h-12 shrink-0 rounded-full border border-pink-200 bg-white px-4 py-3 text-sm font-semibold whitespace-nowrap text-gray-700 hover:bg-pink-50 disabled:opacity-60">
-          এড়িয়ে যান
+          className={`min-h-14 shrink-0 rounded-2xl border-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors disabled:opacity-60 ${question.required ? "border-pink-300 bg-white text-pink-700 hover:bg-pink-50" : "border-emerald-500 bg-emerald-100 text-emerald-800 hover:bg-emerald-200"}`}>
+          {question.required ? "পরে উত্তর দেব" : "এড়িয়ে যান"}
         </button>
         <button type="button" data-question-action="next" disabled={isAdvancing} onClick={() => { void next(false); }}
-          className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:flex-none sm:min-w-44 sm:text-base">
+          className="flex min-h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:flex-none sm:min-w-44 sm:text-base">
           {isAdvancing ? <><Loader2 className="h-5 w-5 shrink-0 animate-spin" /> সংরক্ষণ হচ্ছে…</>
-            : <>{qi < levelQuestions.length - 1 ? "পরবর্তী" : "লেভেল শেষ করুন"} <ChevronRight className="h-5 w-5 shrink-0" /></>}
+            : <>{qi < levelQuestions.length - 1 ? "পরবর্তী প্রশ্ন" : levelIndex < levels.length-1 ? "পরবর্তী বিভাগে যান" : "শেষ ধাপে যান"} <ChevronRight className="h-5 w-5 shrink-0" /></>}
         </button>
       </div>
     </div>);

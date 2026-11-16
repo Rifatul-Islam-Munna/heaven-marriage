@@ -27,8 +27,36 @@ function load(file) {
   return mod.exports;
 }
 const { defaultQuestions, readQuestionAnswer, questionUsesSeparateStorage, questionAnswerFitsInput,
-  questionOptionsWithSavedAnswer } = load('lib/profile-questions.ts');
+  questionOptionsWithSavedAnswer, savedMultiValues, questionDisplayValue, newQuestionRuleErrors } = load('lib/profile-questions.ts');
+const { currentPublicLabel } = load('lib/biodata-public-label.ts');
 const { QuestionInput } = load('components/custom/updateProfile/DynamicQuestionStep.tsx');
+const { birthDateParts, completeBirthDate, daysInBirthMonth } = load('lib/birth-date.ts');
+const { default: BirthDateSelect } = load('components/custom/updateProfile/BirthDateSelect.tsx');
+
+const fixedToday = new Date('2026-11-16T12:00:00Z');
+assert.deepEqual(birthDateParts('2000-02-29'), {day:'29',month:'02',year:'2000'});
+assert.deepEqual(birthDateParts('invalid'), {day:'',month:'',year:''});
+assert.equal(daysInBirthMonth('02','2000'),29);
+assert.equal(daysInBirthMonth('02','1900'),28);
+assert.equal(daysInBirthMonth('04','2000'),30);
+assert.equal(completeBirthDate({day:'29',month:'02',year:'2000'},fixedToday),'2000-02-29');
+assert.equal(completeBirthDate({day:'29',month:'02',year:'2001'},fixedToday),undefined);
+assert.equal(completeBirthDate({day:'31',month:'04',year:'2000'},fixedToday),undefined);
+assert.equal(completeBirthDate({day:'01',month:'12',year:'2026'},fixedToday),undefined);
+assert.equal(completeBirthDate({day:'15',month:'11',year:''},fixedToday),undefined);
+const dateMarkup = renderToStaticMarkup(React.createElement(BirthDateSelect,{
+  id:'dob',value:'2000-02-29',required:true,onChange() {},
+}));
+assert(dateMarkup.includes('data-birth-date-select'));
+assert(dateMarkup.indexOf('id="dob-day"') < dateMarkup.indexOf('id="dob-month"'));
+assert(dateMarkup.indexOf('id="dob-month"') < dateMarkup.indexOf('id="dob-year"'));
+assert(dateMarkup.includes('জন্মতারিখ'));
+assert(dateMarkup.includes('selected=""'), 'Previously saved date must preselect its dropdown values');
+const emptyDateMarkup=renderToStaticMarkup(React.createElement(BirthDateSelect,{
+  id:'dob-new',value:'',onChange() {},
+}));
+assert(emptyDateMarkup.includes('প্রথমে দিন, তারপর মাস ও বছর'));
+console.log('PASS: Day → Month → Year dropdown, saved date hydration, leap years and invalid dates');
 const { useProfileStore } = load('zustan/useProfileStore.ts');
 const original = defaultQuestions.questions.find(q => q.path === 'familyInfo.brotherCount');
 const renamed = { ...original, question: 'Updated siblings question', publicLabel: 'Siblings', section: 8 };
@@ -44,10 +72,21 @@ assert(questionUsesSeparateStorage(reverted));
 assert.equal(readQuestionAnswer({ familyInfo: { brotherCount: 3 }, dynamicAnswers: { [reverted.id]: 4 } }, reverted), 4);
 const legacy = { ...changed, id: 'old_' + 'a'.repeat(24), path: undefined, legacyKey: 'Original prompt' };
 assert.equal(readQuestionAnswer({ customFields: { 'Original prompt': 'Saved details' } }, legacy), 'Saved details');
+assert(questionUsesSeparateStorage(legacy), 'Legacy edits must use a stable answer ID');
+assert.equal(currentPublicLabel({ ...legacy, question:'Updated prompt',publicLabel:'Original prompt' },
+  'Original prompt'),'Updated prompt');
 
 const render = (q, value) => renderToStaticMarkup(React.createElement(QuestionInput, { q, value, onChange() {} }));
 assert(render(changed, 3).includes('value="3"'));
 assert(render(legacy, 'Saved details').includes('value="Saved details"'));
+// Legacy text answers retyped as number/date remain editable instead of read-only.
+for (const type of ['number', 'date']) {
+  const html = render({ ...changed, type }, 'Previous detailed answer');
+  assert(html.includes('data-saved-question-answer='), type + ' must flag an incompatible historic answer');
+  assert(html.includes('value="Previous detailed answer"'), type + ' must expose the historic answer in an editable input');
+}
+const mapProfile = { dynamicAnswers: new Map([[changed.id, 'Map-backed answer']]) };
+assert.equal(readQuestionAnswer(mapProfile, changed), 'Map-backed answer');
 for (const type of ['checkbox', 'multi_checkbox', 'number', 'date']) {
   const html = render({ ...changed, type, options: [{ value: 'new', label: 'New choice' }] }, 'Previous detailed answer');
   assert(html.includes('Previous detailed answer'), type + ' must show historical text');
@@ -67,6 +106,26 @@ for (const value of [' 3 ', '0x10', '+3']) {
 assert(!questionAnswerFitsInput('2024-02-31', { ...changed, type: 'date' }));
 assert.deepEqual(questionOptionsWithSavedAnswer(multiple, multiple.options, ['removed', 'removed'])
   .map(option => option.value), ['new', 'removed']);
+assert.deepEqual(savedMultiValues('Old, Removed'), ['Old','Removed']);
+assert.deepEqual(questionOptionsWithSavedAnswer(multiple,multiple.options,'Old, Removed')
+  .map(option=>option.value),['new','Old','Removed']);
+assert.equal(questionDisplayValue(['new','removed'], multiple), 'New choice, removed');
+assert(render(multiple,'Old, Removed').includes('data-state="checked"'));
+const ageQuestion=defaultQuestions.questions.find(q=>q.path==='age');
+assert.equal(currentPublicLabel({ ...ageQuestion, publicLabel:'পাত্রের বয়স' }, 'বয়স','female'), 'পাত্রীর বয়স');
+assert.equal(currentPublicLabel({ ...original,question:'Updated question',publicLabel:original.publicLabel },
+  'Old question','male'),'Updated question');
+const conflicting = [
+  {...changed,id:'q_'+'c'.repeat(32),rules:[{type:'not_equal',questionId:'q_'+'d'.repeat(32)}]},
+  {...changed,id:'q_'+'d'.repeat(32)},
+];
+const oldConflict={gender:'male',dynamicAnswers:{
+  [conflicting[0].id]:'same',[conflicting[1].id]:'same',
+}};
+assert.equal(newQuestionRuleErrors(oldConflict,conflicting,oldConflict).length,0);
+assert.equal(newQuestionRuleErrors(oldConflict,conflicting,{
+  gender:'male',dynamicAnswers:{[conflicting[0].id]:'same',[conflicting[1].id]:'different'},
+}).length,1);
 
 // Execute the real admin setter against the profile store, then render its saved value.
 const source = fs.readFileSync(path.join(root, 'components/custom/updateProfile/DynamicQuestionStep.tsx'), 'utf8');
@@ -95,4 +154,44 @@ profile = useProfileStore.getState().getFormData();
 assert.equal(readQuestionAnswer(profile, reverted), 4);
 assert.equal(profile.familyInfo.brotherCount, 3);
 useProfileStore.getState().resetForm();
-console.log('PASS: renamed/retyped/reverted answers, original custom keys, historical inputs/options and admin save/reload');
+useProfileStore.getState().initializeForm({
+  gender:'male',customFields:{'Original prompt':'Old legacy answer'},
+});
+vm.runInNewContext(setAnswerJs, {
+  ...useProfileStore.getState(),questionUsesSeparateStorage,
+  question:legacy,answer:'Edited legacy answer',
+});
+const legacyProfile=useProfileStore.getState().getFormData();
+assert.equal(legacyProfile.customFields['Original prompt'],'Old legacy answer');
+assert.equal(legacyProfile.dynamicAnswers[legacy.id],'Edited legacy answer');
+assert.equal(readQuestionAnswer(legacyProfile,legacy),'Edited legacy answer');
+useProfileStore.getState().resetForm();
+
+// The admin completion cards must count exactly the same saved questions as the editable form.
+const { getAdminBiodataProgress } = load('lib/admin-biodata-progress.ts');
+const sampleSchema = { sections: [{ id: 8, title: 'Additional' }], questions: [
+  { ...legacy, section: 8, enabled: true, locked: false, required: true, gender: 'both' },
+  { ...changed, section: 8, enabled: true, locked: true, required: false, gender: 'both' },
+]};
+const adminOverview = getAdminBiodataProgress(sampleSchema, {
+  gender: 'male', customFields: { 'Original prompt': 'Old saved answer' },
+  familyInfo: { brotherCount: 3 },
+});
+assert.equal(adminOverview[0].answered, 1);
+assert.equal(adminOverview[0].total, 1);
+assert.deepEqual(adminOverview[0].answeredLabels, [legacy.question]);
+assert(render({ ...changed, type: 'checkbox' }, undefined).includes('aria-pressed="false"'));
+// A newly loaded member with only gender saved must NOT inherit default "No"
+// checkbox answers or an unchosen default country from the blank form.
+useProfileStore.getState().initializeForm({ gender: 'female' });
+const minimallySaved = useProfileStore.getState().getFormData();
+assert.equal(minimallySaved.familyInfo, undefined);
+assert.equal(minimallySaved.pledge, undefined);
+assert.equal(minimallySaved.residenceCountry, undefined);
+const basicOnly = getAdminBiodataProgress({
+  sections: [{ id: 0, title: 'Basic' }],
+  questions: defaultQuestions.questions.filter(q => q.section === 0),
+}, minimallySaved);
+assert.equal(basicOnly[0].answered, 1);
+useProfileStore.getState().resetForm();
+console.log('PASS: renamed/retyped answers, legacy fields, historic selections, true admin progress and save/reload');

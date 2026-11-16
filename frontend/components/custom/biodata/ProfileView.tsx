@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowUp, BadgeCheck, BookOpen, Briefcase, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Crown, Flag, Gem, GraduationCap, Heart, HeartHandshake, House,
   Loader2, Lock, MapPin, MessageCircle, Phone, Share2, ShieldCheck, User as UserIcon, type LucideIcon,
@@ -32,6 +32,7 @@ import { leadEvent, viewContentEvent } from "@/lib/google-tag-manager";
 import { defaultQuestions, questionDisplayValue, questionUsesSeparateStorage, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { addressQuestionKind, savedBiodataAddress } from "@/lib/biodata-address";
 import { ageFromBirthDate } from "@/lib/birth-date";
+import { currentPublicLabel } from "@/lib/biodata-public-label";
 
 interface ProfileViewProps { id: string }
 type Fact = { path?: string; label: string; value: unknown };
@@ -60,17 +61,17 @@ function extraEntries(user: User, schema: ProfileQuestionSchema, section: number
     user.publicAnswers?.[q.id] !== undefined && user.publicAnswers?.[q.id] !== null && user.publicAnswers?.[q.id] !== "" &&
     !(Array.isArray(user.publicAnswers?.[q.id]) && (user.publicAnswers?.[q.id] as string[]).length === 0),
   ).sort((a, b) => a.order - b.order)
-    .map(q => ({ label: q.publicLabel || q.question, value: questionDisplayValue(user.publicAnswers?.[q.id], q) }))
+    .map(q => ({ label: currentPublicLabel(q, q.question, user.gender), value: questionDisplayValue(user.publicAnswers?.[q.id], q) }))
     .filter(fact => fact.value);
 }
 
 function FactList({ facts }: { facts: ShownFact[] }) {
-  return <dl className="sm:grid sm:grid-cols-2 sm:gap-x-6">
+  return <dl className="grid grid-cols-2 gap-x-3 sm:grid-cols-3 sm:gap-x-5">
     {facts.map((fact, index) => {
-      const long = fact.value.length > 75 || fact.label.length > 65;
-      return <div key={fact.label + index} className={"min-w-0 border-b border-pink-100 py-3.5 last:border-0 sm:border-b " + (long ? "sm:col-span-2" : "")}>
-        <dt className="text-[14px] font-medium leading-6 text-gray-600" dir="auto">{fact.label}</dt>
-        <dd className="mt-1 whitespace-pre-line break-words text-[16px] font-semibold leading-[1.8] text-gray-900" dir="auto">{fact.value}</dd>
+      const long = fact.value.length > 45 || fact.label.length > 40;
+      return <div key={fact.label + index} className={"min-w-0 border-b border-pink-100 py-2.5 " + (long ? "col-span-2 sm:col-span-3" : "")}>
+        <dt className="text-[12px] font-medium leading-5 text-gray-600" dir="auto">{fact.label}</dt>
+        <dd className="mt-0.5 whitespace-pre-line break-words text-[14px] font-semibold leading-6 text-gray-900" dir="auto">{fact.value}</dd>
       </div>;
     })}
   </dl>;
@@ -81,7 +82,7 @@ function SectionCard({ section, expanded, onToggle, showTopicLink }: { section: 
   return <section data-biodata-section id={section.id} className="scroll-mt-24 overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm">
     <h3>
       <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={"details-" + section.id}
-        className="flex min-h-[76px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary sm:px-5">
+        className="flex min-h-[64px] w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-primary sm:px-5">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-primary"><Icon className="size-5" aria-hidden /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-[17px] font-bold leading-7 text-gray-900">{section.title}</span>
@@ -153,15 +154,7 @@ export default function ProfileView({ id }: ProfileViewProps) {
     successMessage: "পছন্দের তালিকায় যুক্ত হয়েছে",
     onSuccess: (data) => { if (data.created) leadEvent(String(id), "interest"); },
   });
-  const { mutateAsync: requestPhone, isPending: requestingPhone } = useMutation({
-    mutationKey: ["request-number"],
-    mutationFn: (payload: { userId: string; requestUserId: string }) => requestNumber(payload),
-    onSuccess: (data) => {
-      if (data?.data) { toast.success("পরিচয় ও যোগাযোগ আনলক হয়েছে"); return; }
-      toast.error(data?.error?.message);
-    },
-  });
-  const unlocking = requestingPhone || checkingAccess;
+  const unlocking = checkingAccess;
 
   if (isLoading) return <div className="min-h-screen bg-gray-50 px-4 py-6">
     <div className="mx-auto max-w-6xl animate-pulse space-y-4 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
@@ -187,12 +180,14 @@ export default function ProfileView({ id }: ProfileViewProps) {
     const original = defaultQuestions.questions.find(row => row.path === path);
     return !q || (q.enabled && q.showPublic && !questionUsesSeparateStorage(q) && (!original || original.section === q.section));
   };
-  const labelFor = (path: string | undefined, fallback: string) => configFor(path)?.publicLabel || fallback;
+  const labelFor = (path: string | undefined, fallback: string) => currentPublicLabel(configFor(path), fallback, userData.gender);
   const shown = (rows: Fact[]): ShownFact[] => rows.filter(row => showField(row.path)).map(row => {
     const q = configFor(row.path);
     const raw = row.path?.split(".").reduce<unknown>((part, key) => (part as Record<string, unknown> | undefined)?.[key], userData);
     const option = q && ["select", "dropdown"].includes(q.type) ? q.options.find(o => o.value === String(raw)) : undefined;
-    const value = option?.label ?? (typeof row.value === "boolean" ? (row.value ? "হ্যাঁ" : "না") : row.value);
+    const value = option?.label ?? (Array.isArray(row.value)
+      ? q ? questionDisplayValue(row.value, q) : row.value.join(", ")
+      : typeof row.value === "boolean" ? (row.value ? "হ্যাঁ" : "না") : row.value);
     return { label: labelFor(row.path, row.label), value: value === undefined || value === null ? "" : String(value) };
   }).filter(fact => fact.value.trim() !== "" && fact.value !== "NaN");
   const extras = (section: number) => extraEntries(userData, questionSchema, section);
@@ -219,11 +214,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
 
   const keyFacts = shown([
     { path: "age", label: "বয়স", value: age ? `${toBn(age)} বছর` : undefined },
-    { path: "personalInformation.height", label: "উচ্চতা", value: p?.height ? formatHeight(p.height) : undefined },
     { path: "maritalStatus", label: "বৈবাহিক অবস্থা", value: maritalLabel },
     { path: "address.district", label: "জেলা", value: bnDistrict(a?.district) },
-    { path: "occupational.profession", label: "পেশা", value: pick(professionOptions, o?.profession) },
     { path: "educationInfo.highestEducation", label: "শিক্ষা", value: e?.highestEducation },
+    { path: "occupational.profession", label: "পেশা", value: pick(professionOptions, o?.profession) },
+    { path: "personalInformation.height", label: "উচ্চতা", value: p?.height ? formatHeight(p.height) : undefined },
+    { path: "bloodGroup", label: "রক্তের গ্রুপ", value: userData.bloodGroup },
+    { path: "nationality", label: "জাতীয়তা", value: userData.nationality },
   ]);
   const contactFacts = shown([
     { path: "name", label: "নাম", value: unlocked ? userData.name : undefined },
@@ -344,6 +341,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
     { id: "extra", title: questionSchema.sections[8]?.title || "অতিরিক্ত তথ্য", icon: MessageCircle, facts: extras(8) },
     { id: "pledge", title: questionSchema.sections[9]?.title || "অঙ্গীকার", icon: ShieldCheck, facts: extras(9) },
   ] as Section[]).filter(section => section.facts.length);
+  // Add other publicly visible answers when the core summary has fewer fields.
+  // Never take private identity/contact fields from the raw profile.
+  const compactSummary = [
+    ...keyFacts,
+    ...sections.flatMap(section => section.facts).filter(fact =>
+      fact.value.length <= 48 && !keyFacts.some(core => core.label === fact.label)),
+  ].filter((fact, index, facts) => facts.findIndex(other => other.label === fact.label) === index).slice(0, 8);
 
   const requireLogin = () => {
     if (user?._id) return true;
@@ -397,6 +401,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
     if (unlocked) { scrollTo("contact"); return; }
     if (requireLogin()) setUnlockOpen(true);
   };
+  const onShowNumber = () => {
+    if (!unlocked) {
+      toast("নম্বর এখনো আনলক করা নেই", { description: "নিচের নম্বর রিকোয়েস্ট বাটন থেকে আনলক করুন।" });
+    }
+    scrollTo("contact");
+  };
   const unlock = async () => {
     if (!user?._id || !userData._id) return;
     setCheckingAccess(true);
@@ -411,12 +421,15 @@ export default function ProfileView({ id }: ProfileViewProps) {
         router.push("/#pricing");
         return;
       }
-      const result = await requestPhone({ userId: currentUser._id ?? user._id, requestUserId: userData._id });
+      const result = await requestNumber({ userId: currentUser._id ?? user._id, requestUserId: userData._id });
       if (result?.data) {
+        toast.success("পরিচয় ও যোগাযোগ আনলক হয়েছে");
         await refetch();
         await Promise.all(["number-request-user-profile", "get-my-profile", "get-my-profile-for-success"].map(key =>
           queryClient.invalidateQueries({ queryKey: [key], exact: false })));
         window.setTimeout(() => scrollTo("contact"), 300);
+      } else {
+        toast.error(result?.error?.message || "নম্বর রিকোয়েস্ট করা যায়নি। আবার চেষ্টা করুন।");
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "কিছু একটা সমস্যা হয়েছে");
@@ -433,18 +446,22 @@ export default function ProfileView({ id }: ProfileViewProps) {
   };
 
   const avatar = gender ? (gender === "male" ? "/male.png" : "/female.png") : null;
-  const likeButton = (full: boolean) => <button type="button" onClick={() => { if (requireLogin()) shortlist({ shortlistedUserId: String(userData._id) }); }} disabled={shortlisting}
-    className={"inline-flex min-h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 bg-white px-3 py-3 font-bold text-primary transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 " + (full ? "w-full text-[15px]" : "text-[12px] sm:text-sm")}>
-    {shortlisting ? <Loader2 className="size-4 animate-spin" /> : <Heart className="size-4" />}
-    {full ? "পছন্দের তালিকায় রাখুন" : "পছন্দে রাখুন"}
+  const likeButton = <button type="button" onClick={() => { if (requireLogin()) shortlist({ shortlistedUserId: String(userData._id) }); }} disabled={shortlisting}
+    className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border-2 border-pink-200 bg-white px-2 py-2 text-center text-[12px] font-bold leading-5 text-primary transition-colors hover:bg-pink-50 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60 sm:text-[13px]">
+    {shortlisting ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Heart className="size-4 shrink-0" />}
+    <span>পছন্দের তালিকায় রাখুন</span>
   </button>;
-  const contactButton = <button type="button" onClick={onContact} disabled={unlocking}
-    className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-3 text-[14px] font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60">
-    {unlocking ? <Loader2 className="size-5 shrink-0 animate-spin" /> : unlocked ? <Phone className="size-5 shrink-0" /> : <Lock className="size-5 shrink-0" />}
-    {unlocked ? "নম্বর দেখুন" : "নম্বর আনলক করুন"}
+  const contactButton = <button type="button" onClick={onShowNumber}
+    className="inline-flex min-h-14 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-2 py-2 text-[13px] font-bold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+    <Phone className="size-4 shrink-0" aria-hidden /> নম্বর দেখুন
+  </button>;
+  const requestButton = <button type="button" onClick={onContact} disabled={unlocking || unlocked}
+    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-pink-50 px-3 py-3 text-[13px] font-bold text-primary transition-colors hover:bg-pink-100 focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-default disabled:opacity-70">
+    {unlocking ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : unlocked ? <Check className="size-4 shrink-0" aria-hidden /> : <Lock className="size-4 shrink-0" aria-hidden />}
+    {unlocked ? "নম্বর ইতিমধ্যে আনলক করা আছে" : "নম্বরের জন্য রিকোয়েস্ট করুন (১ কানেকশন)"}
   </button>;
 
-  return <div className="min-h-screen bg-white pb-32 text-gray-900 lg:pb-12">
+  return <div className="min-h-screen bg-white pb-12 text-gray-900">
     <div className="mx-auto max-w-6xl px-3 pt-4 sm:px-5 lg:pt-7">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href="/biodata" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-white hover:text-primary focus-visible:outline-2 focus-visible:outline-rose-500">
@@ -461,8 +478,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
               <span aria-hidden className="pointer-events-none absolute -right-2 -top-6 size-36 rounded-full border border-white/10" />
               <div className="relative flex items-center justify-between gap-3">
                 <span className="text-[13px] font-bold text-white/95">বায়োডাটা</span>
-                <button type="button" onClick={() => void share()} aria-label="বায়োডাটা শেয়ার করুন" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white">
-                  <Share2 className="size-4" aria-hidden /> শেয়ার
+                <button type="button" onClick={() => void share()} aria-label="বায়োডাটা শেয়ার করুন" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white bg-white px-3.5 text-[13px] font-bold text-sky-800 shadow-sm transition-colors hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                  <Share2 className="size-5" strokeWidth={2.5} aria-hidden /> শেয়ার
                 </button>
               </div>
               <p className="relative mt-3 text-[15px] font-semibold text-white">এক নজরে পরিচয়</p>
@@ -494,12 +511,12 @@ export default function ProfileView({ id }: ProfileViewProps) {
                   userData.isVerified && <span title="Biodata reviewed and published by Niqaha" className="inline-flex items-center gap-1 rounded-full bg-pink-100 px-3 py-1 text-xs font-bold text-pink-800"><BadgeCheck className="size-4" aria-hidden /> Pink Biodata Verified</span>}
               </div>
 
-              {keyFacts.length > 0 && <>
+              {compactSummary.length > 0 && <>
                 <div className="mt-5 flex items-center gap-2"><span className="h-px flex-1 bg-pink-100" /><span className="text-[11px] font-bold tracking-wide text-primary">মূল তথ্য</span><span className="h-px flex-1 bg-pink-100" /></div>
-                <dl className="mt-3 grid grid-cols-2 gap-2">
-                  {keyFacts.map(fact => <div key={fact.label} className="min-w-0 rounded-[14px] border border-pink-100 bg-pink-50/40 px-3 py-2.5">
-                    <dt className="text-xs font-medium text-gray-600">{fact.label}</dt>
-                    <dd className="mt-1 line-clamp-2 break-words text-[14px] font-bold leading-6 text-gray-900" dir="auto">{fact.value}</dd>
+                <dl className="mt-2 grid grid-cols-2 gap-x-4">
+                  {compactSummary.map(fact => <div key={fact.label} className="min-w-0 border-b border-pink-100 py-2">
+                    <dt className="text-[11px] font-medium leading-4 text-gray-600">{fact.label}</dt>
+                    <dd className="mt-0.5 break-words text-[14px] font-bold leading-5 text-gray-900" dir="auto">{fact.value}</dd>
                   </div>)}
                 </dl>
               </>}
@@ -513,10 +530,13 @@ export default function ProfileView({ id }: ProfileViewProps) {
                 </button>}
               </div>
 
-              <div className="mt-5 hidden space-y-2 border-t border-pink-100 pt-5 lg:block">
-                <div className="flex">{contactButton}</div>
-                {likeButton(true)}
-                <button type="button" onClick={() => { if (requireLogin()) setReportOpen(true); }} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-pink-50">
+              <div className="mt-5 space-y-2 border-t border-pink-100 pt-5">
+                <div className="grid grid-cols-2 gap-2">
+                  {contactButton}
+                  {likeButton}
+                </div>
+                {requestButton}
+                <button type="button" onClick={() => { if (requireLogin()) setReportOpen(true); }} className="hidden min-h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-pink-50 lg:flex">
                   <Flag className="size-4" aria-hidden /> প্রোফাইল রিপোর্ট করুন
                 </button>
               </div>
@@ -639,16 +659,6 @@ export default function ProfileView({ id }: ProfileViewProps) {
             <Flag className="size-4" aria-hidden /> কোনো সমস্যা দেখছেন? রিপোর্ট করুন
           </button>
         </main>
-      </div>
-    </div>
-
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-pink-100 bg-white/95 px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2.5 shadow-[0_-5px_24px_-14px_rgba(42,18,30,.18)] backdrop-blur-md lg:hidden">
-      <div className="mx-auto max-w-xl">
-        {!unlocked && <p className="mb-2 text-center text-[11px] font-semibold text-gray-600">নম্বর দেখতে ১টি কানেকশন লাগবে</p>}
-        <div className="flex items-center gap-2">
-          {likeButton(false)}
-          {contactButton}
-        </div>
       </div>
     </div>
 

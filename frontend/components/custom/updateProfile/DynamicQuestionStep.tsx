@@ -5,28 +5,40 @@ import { profileQuestionOptions } from '@/lib/profile-question-options';
 import {useQueryWrapper} from '@/api-hooks/react-query-wrapper';
 import type {LocationEntry,LocationResponse} from '@/lib/location-options';
 import {
- questionApplies,locationQuestionApplies,locationQuestionVisible,locationQuestionLabel,questionInputAttributes,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,questionDisplayValue,questionAnswerFitsInput,questionOptionsWithSavedAnswer,type ProfileQuestion, type ProfileQuestionSchema, type QuestionOption,
+ questionApplies,locationQuestionApplies,locationQuestionVisible,locationQuestionLabel,questionInputAttributes,readQuestionAnswer,questionUsesSeparateStorage,questionRuleErrors,questionDisplayValue,questionAnswerFitsInput,questionOptionsWithSavedAnswer,savedMultiValues,type ProfileQuestion, type ProfileQuestionSchema, type QuestionOption,
 } from '@/lib/profile-questions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import {ageFromBirthDate,latestBirthDate} from '@/lib/birth-date';
+import {ageFromBirthDate} from '@/lib/birth-date';
+import BirthDateSelect from './BirthDateSelect';
+import {adminAnswerIsComplete} from '@/lib/admin-biodata-progress';
 
-export function SavedQuestionAnswer({q,value,options}:{q:ProfileQuestion;value:unknown;options:QuestionOption[]}){
- if(questionAnswerFitsInput(value,q,options))return null;
- return <p className="whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-3 text-sm text-amber-900" data-saved-question-answer={q.id}>
-  Saved answer: <span className="font-medium">{questionDisplayValue(value,{...q,type:'text'})}</span>
- </p>;
+export function SavedQuestionAnswer({q,value,options,onChange}:{q:ProfileQuestion;value:unknown;options:QuestionOption[];onChange?:(next:string|number)=>void}){
+ // The dedicated DOB picker offers the correction path for legacy dates.
+ if(q.path==='dateOfBirth'||questionAnswerFitsInput(value,q,options))return null;
+ const editableScalar=['number','date'].includes(q.type)&&typeof value==='string';
+ return <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900" data-saved-question-answer={q.id}>
+  <p className="font-medium">আগের সংরক্ষিত উত্তরটি বর্তমান {q.type==='number'?'সংখ্যা':q.type==='date'?'তারিখ':'উত্তর'} ফরম্যাটের সঙ্গে মেলে না। নিচে সম্পাদনা করে সঠিক ফরম্যাটে দিন।</p>
+  {editableScalar&&onChange
+    ? <Input type="text" inputMode={q.type==='number'?'decimal':'text'} value={String(value)}
+        onChange={event=>{
+          const next=event.target.value;
+          if(q.type==='number')onChange(next.trim()!==''&&Number.isFinite(Number(next))?Number(next):next);
+          else onChange(next);
+        }} className="border-amber-300 bg-white text-gray-900" aria-label="Edit previously saved answer" />
+    : <p className="whitespace-pre-wrap break-words">Saved answer: {questionDisplayValue(value,{...q,type:'text'})}</p>}
+ </div>;
 }
 
 export function QuestionInput({
- q,value,onChange,gender,profile,preview=false,locations=[],error,
+ q,value,onChange,gender,profile,preview=false,locations=[],error,readOnly=false,
 }:{
  q:ProfileQuestion;value:unknown;
  onChange:(next:string|number|boolean|string[])=>void;
  gender?:string;profile?:Record<string,any>;preview?:boolean;locations?:LocationEntry[];
- error?:string;
+ error?:string;readOnly?:boolean;
 }){
  const [optionSearch,setOptionSearch]=useState('');
  const configuredOptions=profileQuestionOptions(q,gender,profile,locations);
@@ -38,6 +50,7 @@ export function QuestionInput({
    (['number','date'].includes(q.type)&&!questionAnswerFitsInput(value,q,options))?'':value);
  const id='question-'+q.id;
  const choices=q.type==='multi_checkbox';
+ const hasSavedAnswer=adminAnswerIsComplete(q,value);
  const address=profile?.address;
  const emptyOptionsMessage=q.optionSource==='cityCorporations'
    ? !address?.district?'আগে জেলা নির্বাচন করুন।':address?.upazila?'':'এই জেলায় সিটি কর্পোরেশন পাওয়া যায়নি। উপজেলা নির্বাচন করুন।'
@@ -47,22 +60,42 @@ export function QuestionInput({
    ? !address?.district?'আগে জেলা নির্বাচন করুন।':!(address?.upazila||address?.cityCorporation)
      ? 'আগে উপজেলা অথবা সিটি কর্পোরেশন নির্বাচন করুন।':'এই ঠিকানার জন্য কোনো এলাকা যুক্ত করা হয়নি।'
    : 'কোনো অপশন যুক্ত করা হয়নি।';
- return <div className="space-y-2 rounded-xl border border-pink-100 bg-white p-4 shadow-sm" data-profile-question={q.id} data-invalid={!!error||undefined}>
-  <Label htmlFor={id} className="block font-medium leading-relaxed text-gray-800">
-    {locationQuestionLabel(q)} {q.required&&<span className="text-pink-600" aria-label="required">*</span>}
-  </Label>
-  <SavedQuestionAnswer q={q} value={value} options={configuredOptions}/>
+ return <div className={`space-y-2 rounded-xl border p-3 shadow-sm sm:p-4 ${q.required?'border-pink-200 bg-pink-50/70':'border-emerald-200 bg-emerald-50/60'}`} data-profile-question={q.id} data-invalid={!!error||undefined}>
+  <div className="flex items-start justify-between gap-2">
+    <Label htmlFor={id} className="block min-w-0 font-semibold leading-relaxed text-gray-900">
+      {locationQuestionLabel(q)} {q.required&&<span className="text-pink-600" aria-label="required">*</span>}
+    </Label>
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+      {hasSavedAnswer&&<span className="rounded-full bg-sky-100 px-2 py-1 text-[10px] font-bold text-sky-800">✓ উত্তর আছে</span>}
+      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${q.required?'bg-pink-600 text-white':'bg-emerald-100 text-emerald-800'}`}>
+        {q.required?'আবশ্যিক':'ঐচ্ছিক'}
+      </span>
+    </div>
+  </div>
+  <SavedQuestionAnswer q={q} value={value} options={configuredOptions} onChange={onChange}/>
   {q.path==='address.upazila'&&<p className="text-sm text-muted-foreground">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>}
-  {q.type==='checkbox'?(
-   <label className="flex cursor-pointer items-center gap-3 py-2 text-sm">
-    <Checkbox id={id} aria-invalid={!!error} aria-describedby={error?id+'-error':undefined} checked={raw===true} onCheckedChange={checked=>onChange(checked===true)}/>
-    <span>{raw===true?'হ্যাঁ':'না'}</span>
-   </label>
+  {q.path==='dateOfBirth'?(
+   <BirthDateSelect id={id} value={typeof value==='string'?value:''}
+     onChange={onChange} disabled={readOnly} invalid={!!error} required={q.required} />
+  ):q.type==='checkbox'?(
+   <div role="group" aria-label={q.question} className="space-y-2">
+     <div className="grid grid-cols-2 gap-2">
+       {[{value:true,label:'হ্যাঁ'},{value:false,label:'না'}].map(option=>
+         <button key={option.label} type="button" aria-pressed={raw===option.value}
+           onClick={()=>onChange(option.value)}
+           className={`min-h-11 rounded-xl border-2 px-3 py-2 text-sm font-bold transition-colors ${raw===option.value
+             ? 'border-pink-600 bg-pink-600 text-white'
+             : 'border-slate-200 bg-white text-slate-700 hover:border-pink-300'}`}>
+           {option.label} {raw===option.value?'✓':''}
+         </button>)}
+     </div>
+     {typeof raw!=='boolean'&&<p className="text-xs text-gray-600">উত্তর নির্বাচন করুন (আগের উত্তর থাকলে উপরে দেখানো আছে)।</p>}
+   </div>
   ):choices?(
    <fieldset className="grid gap-2 sm:grid-cols-2">
      {options.map(opt=><label key={opt.value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm">
-       <Checkbox checked={Array.isArray(raw)&&raw.includes(opt.value)} onCheckedChange={checked=>{
-         const previous=Array.isArray(raw)?raw.map(String):[];
+       <Checkbox checked={savedMultiValues(raw).includes(opt.value)} onCheckedChange={checked=>{
+         const previous=savedMultiValues(raw);
          onChange(checked===true?[...new Set([...previous,opt.value])]:previous.filter(x=>x!==opt.value));
        }}/><span>{opt.label}</span>
      </label>)}
@@ -90,7 +123,7 @@ export function QuestionInput({
   ):(
    <Input id={id} {...questionInputAttributes(q)} dir="auto"
      aria-invalid={!!error} aria-describedby={error?id+'-error':undefined}
-     required={q.required} max={q.path==='dateOfBirth'?latestBirthDate():undefined}
+     required={q.required} disabled={readOnly}
      value={String(raw)} maxLength={q.type==='number'?undefined:5000}
      onChange={event=>onChange(q.type==='number'?(event.target.value===''?'':Number(event.target.value)):event.target.value)}
      className="border-pink-200" placeholder="আপনার উত্তর লিখুন..." />
@@ -108,9 +141,14 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
  const updateDynamicAnswer=useProfileStore(state=>state.updateDynamicAnswer);
  const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
  const questions=useMemo(()=>schema.questions
-   .filter(q=>q.path!=='age'&&q.section===step&&questionApplies(q,profile.gender)&&locationQuestionVisible(q,profile))
+   .filter(q=>q.section===step&&!q.locked&&questionApplies(q,profile.gender)&&locationQuestionVisible(q,profile))
    .sort((a,b)=>a.order-b.order),[schema,step,profile]);
  const errors=questionRuleErrors(profile,schema.questions);
+ const archivedAnswers=useMemo(()=>schema.questions
+   .filter(q=>q.section===step&&!q.enabled&&!q.locked&&(q.gender==='both'||q.gender===profile.gender))
+   .map(q=>({q,value:readQuestionAnswer(profile,q)}))
+   .filter(({value})=>value!==undefined&&value!==null&&value!==''&&(!Array.isArray(value)||value.length>0)),
+   [schema,step,profile]);
  const setAnswer=(q:ProfileQuestion,answer:string|number|boolean|string[])=>{
    if(q.path==='dateOfBirth'){
      updateField('dateOfBirth',String(answer));
@@ -140,14 +178,25 @@ export function DynamicQuestionStep({step,schema}:{step:number;schema:ProfileQue
      }
    }else updateField(q.path as any,normalized as any);
  };
- if(!questions.length)return <div className="rounded-xl border border-dashed p-8 text-center text-sm text-gray-500">
-    এই ধাপে কোনো প্রশ্ন নেই।
-  </div>;
- return <div className="grid gap-4 md:grid-cols-2">
-  {questions.map(q=><div key={q.id} className={q.type==='textarea'||q.question.length>130?'md:col-span-2':''}>
-   <QuestionInput q={{...q,required:q.required&&locationQuestionApplies(q,profile)}} gender={profile.gender} profile={profile} locations={locations?.entries}
-     error={errors.find(error=>error.questionId===q.id||error.otherQuestionId===q.id)?.message}
-     value={readQuestionAnswer(profile,q)} onChange={answer=>setAnswer(q,answer)}/>
-  </div>)}
- </div>;
+ return <>
+  {questions.length ? <div className="grid gap-3 md:grid-cols-2">
+    {questions.map(q=><div key={q.id} className={q.type==='textarea'||q.question.length>130?'md:col-span-2':''}>
+      <QuestionInput q={{...q,required:q.required&&locationQuestionApplies(q,profile)}} gender={profile.gender} profile={profile} locations={locations?.entries}
+        readOnly={q.path==='age'&&!!profile.dateOfBirth}
+        error={errors.find(error=>error.questionId===q.id||error.otherQuestionId===q.id)?.message}
+        value={readQuestionAnswer(profile,q)} onChange={answer=>setAnswer(q,answer)}/>
+      {q.path==='age'&&!!profile.dateOfBirth&&<p className="mt-1 px-1 text-xs text-slate-500">বয়স জন্ম তারিখ থেকে হিসাব করা হয়েছে। পরিবর্তন করতে জন্ম তারিখ সম্পাদনা করুন।</p>}
+    </div>)}
+  </div> : <p className="rounded-xl border border-dashed p-6 text-center text-sm text-gray-500">এই ধাপে বর্তমানে কোনো সক্রিয় প্রশ্ন নেই।</p>}
+  {archivedAnswers.length>0 && <aside className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-label="Archived saved answers">
+    <h3 className="text-sm font-bold text-amber-900">আগের সংরক্ষিত উত্তর (প্রশ্নটি এখন বন্ধ)</h3>
+    <p className="mt-1 text-xs text-amber-800">এই উত্তরগুলো মুছে যায়নি। বন্ধ প্রশ্নগুলো বর্তমান সম্পূর্ণতার হিসাবে ধরা হয় না।</p>
+    <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+      {archivedAnswers.map(({q,value})=><div key={q.id} className="min-w-0 rounded-lg border border-amber-100 bg-white p-3">
+        <dt className="text-xs text-slate-600">{q.question}</dt>
+        <dd className="mt-1 whitespace-pre-line break-words text-sm font-semibold text-slate-900">{questionDisplayValue(value,q)}</dd>
+      </div>)}
+    </dl>
+  </aside>}
+ </>;
 }
