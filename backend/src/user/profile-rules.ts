@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { BUILTINS, answerForQuestion, type ProfileQuestion } from '../profile-questions/question-config.service';
 import { ageFromBirthDate } from './birth-date';
+import { publicAnswerSanitizer } from './public-answer-privacy';
 
 export const PROFILE_FIELDS = [
   'name',
@@ -194,33 +195,7 @@ export function publicProfile(u: any, unlocked = false) {
       ]),
     );
   if (!unlocked) {
-    const secrets = [
-      u.name,
-      u.fatherName,
-      u.motherName,
-      u.phoneNumber,
-      u.whatsapp,
-      u.guardianPhone,
-      u.email,
-      u.address?.presentAddress,
-      u.address?.permanentAddress,
-    ].filter((v) => typeof v === 'string' && v.length >= 3);
-    const clean = (v: any): any => {
-      if (typeof v === 'string') {
-        for (const secret of secrets) v = v.split(secret).join('[সংরক্ষিত]');
-        return v
-          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[সংরক্ষিত]')
-          .replace(/(?:\+?\d[\d\s()-]{8,}\d)/g, '[সংরক্ষিত]');
-      }
-      if (v instanceof Date || v?.toHexString) return v;
-      if (Array.isArray(v)) return v.map(clean);
-      if (v && typeof v === 'object')
-        return Object.fromEntries(
-          Object.entries(v).map(([k, x]) => [k, k === 'dateOfBirth' ? x : clean(x)]),
-        );
-      return v;
-    };
-    return clean(out);
+    return publicAnswerSanitizer(u)(out);
   }
   return out;
 }

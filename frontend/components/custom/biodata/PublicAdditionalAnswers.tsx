@@ -2,6 +2,7 @@
 import type { User } from '@/@types/user';
 import type { ProfileQuestion,ProfileQuestionSchema } from '@/lib/profile-questions';
 import { defaultQuestions,questionDisplayValue,questionUsesSeparateStorage } from '@/lib/profile-questions';
+import { visiblePublicAnswer } from '@/lib/biodata-visible-answer';
 import { Card,CardContent } from '@/components/ui/card';
 
 function entries(user:User,schema:ProfileQuestionSchema,section:number){
@@ -12,9 +13,9 @@ function entries(user:User,schema:ProfileQuestionSchema,section:number){
     defaultQuestions.questions.find(original=>original.id===q.id)?.section!==q.section)&&
   // Eligibility was checked against the user's actual gender by the backend.
   // user.gender itself may be hidden on the public response.
-  user.publicAnswers?.[q.id]!==undefined&&user.publicAnswers?.[q.id]!==null&&
-  user.publicAnswers?.[q.id]!==''&&
-  !(Array.isArray(user.publicAnswers?.[q.id])&&(user.publicAnswers?.[q.id] as string[]).length===0)
+  visiblePublicAnswer(user.publicAnswers?.[q.id])!==undefined&&
+  visiblePublicAnswer(user.publicAnswers?.[q.id])!==null&&
+  visiblePublicAnswer(user.publicAnswers?.[q.id])!==''
  ).sort((a,b)=>a.order-b.order);
 }
 function ExtraRow({user,q,index}:{user:User;q:ProfileQuestion;index:number}){
@@ -23,7 +24,7 @@ function ExtraRow({user,q,index}:{user:User;q:ProfileQuestion;index:number}){
    {q.publicLabel||q.question}
   </td>
   <td className="border border-gray-300 px-4 py-3 text-sm font-medium text-gray-900" dir="auto">
-   {questionDisplayValue(user.publicAnswers?.[q.id],q)}
+   {questionDisplayValue(visiblePublicAnswer(user.publicAnswers?.[q.id]),q)}
   </td>
  </tr>;
 }

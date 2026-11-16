@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { leadEvent, viewContentEvent } from "@/lib/google-tag-manager";
 import { defaultQuestions, questionDisplayValue, questionUsesSeparateStorage, type ProfileQuestionSchema } from "@/lib/profile-questions";
 import { addressQuestionKind, savedBiodataAddress } from "@/lib/biodata-address";
+import { visiblePublicAnswer } from "@/lib/biodata-visible-answer";
 import { ageFromBirthDate } from "@/lib/birth-date";
 import { currentPublicLabel } from "@/lib/biodata-public-label";
 
@@ -61,7 +62,8 @@ function extraEntries(user: User, schema: ProfileQuestionSchema, section: number
     user.publicAnswers?.[q.id] !== undefined && user.publicAnswers?.[q.id] !== null && user.publicAnswers?.[q.id] !== "" &&
     !(Array.isArray(user.publicAnswers?.[q.id]) && (user.publicAnswers?.[q.id] as string[]).length === 0),
   ).sort((a, b) => a.order - b.order)
-    .map(q => ({ label: currentPublicLabel(q, q.question, user.gender), value: questionDisplayValue(user.publicAnswers?.[q.id], q) }))
+    .map(q => ({ label: currentPublicLabel(q, q.question, user.gender),
+      value: questionDisplayValue(visiblePublicAnswer(user.publicAnswers?.[q.id]), q) }))
     .filter(fact => fact.value);
 }
 
@@ -185,9 +187,10 @@ export default function ProfileView({ id }: ProfileViewProps) {
     const q = configFor(row.path);
     const raw = row.path?.split(".").reduce<unknown>((part, key) => (part as Record<string, unknown> | undefined)?.[key], userData);
     const option = q && ["select", "dropdown"].includes(q.type) ? q.options.find(o => o.value === String(raw)) : undefined;
-    const value = option?.label ?? (Array.isArray(row.value)
-      ? q ? questionDisplayValue(row.value, q) : row.value.join(", ")
-      : typeof row.value === "boolean" ? (row.value ? "হ্যাঁ" : "না") : row.value);
+    const publicValue = visiblePublicAnswer(row.value);
+    const value = publicValue === undefined ? "" : option?.label ?? (Array.isArray(publicValue)
+      ? q ? questionDisplayValue(publicValue, q) : publicValue.join(", ")
+      : typeof publicValue === "boolean" ? (publicValue ? "হ্যাঁ" : "না") : publicValue);
     return { label: labelFor(row.path, row.label), value: value === undefined || value === null ? "" : String(value) };
   }).filter(fact => fact.value.trim() !== "" && fact.value !== "NaN");
   const extras = (section: number) => extraEntries(userData, questionSchema, section);
@@ -201,7 +204,8 @@ export default function ProfileView({ id }: ProfileViewProps) {
   const unlocked = !!userData.identityUnlocked;
   const a = userData.address, e = userData.educationInfo, f = userData.familyInfo, p = userData.personalInformation;
   const o = userData.occupational, w = userData.marriageInformationWomen, m = userData.marriageInformationMan, x = userData.expectedLifePartner;
-  const area = [a?.area, a?.cityCorporation || bnUpazila(a?.upazila), bnDistrict(a?.district)].filter(Boolean).join(", ");
+  const area = [a?.area, a?.cityCorporation || bnUpazila(a?.upazila), bnDistrict(a?.district)]
+    .map(visiblePublicAnswer).filter(part => typeof part === "string" && part.trim()).join(", ");
   const currentAddress = savedBiodataAddress(userData, "presentAddress");
   const permanentAddress = savedBiodataAddress(userData, "permanentAddress");
   const age = ageFromBirthDate(userData.dateOfBirth) ?? userData.age;

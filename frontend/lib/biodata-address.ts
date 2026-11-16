@@ -1,5 +1,6 @@
 import type { User } from "@/@types/user";
 import { defaultQuestions, readQuestionAnswer, type ProfileQuestion } from "./profile-questions";
+import { visiblePublicAnswer } from "./biodata-visible-answer";
 
 export type AddressKind = "presentAddress" | "permanentAddress";
 
@@ -25,7 +26,8 @@ export function savedBiodataAddress(user: User, kind: AddressKind): string {
     (question.gender === "both" || question.gender === user.gender));
   // Read explicit answers before constructing any location fallback.
   for (const question of questions.sort((a, b) => Number(!a.path) - Number(!b.path) || a.order - b.order)) {
-    const value = user.publicAnswers?.[question.id] ?? readQuestionAnswer(user, question);
+    const value = visiblePublicAnswer(user.publicAnswers?.[question.id] ?? readQuestionAnswer(user, question));
+    // A legacy redacted value is not a usable public address.
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   if (!isPublic) {

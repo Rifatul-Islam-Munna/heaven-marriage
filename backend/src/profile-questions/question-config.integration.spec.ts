@@ -133,8 +133,9 @@ describe('Profile question schema database flows',()=>{
     const data={gender:'female',name:'Test User',phoneNumber:'01711111111',
       dynamicAnswers:{[custom.id]:'I am 30, call me 01711111111'}};
     const publicFemale=await ctx.service.publicAnswers(data,false,saved);
-    expect(String(publicFemale[custom.id])).toContain('[সংরক্ষিত]');
-    expect(String(publicFemale[custom.id])).not.toContain('01711111111');
+    expect(publicFemale[custom.id]).toBeUndefined();
+    expect(JSON.stringify(publicFemale)).not.toContain('[সংরক্ষিত]');
+    expect(JSON.stringify(publicFemale)).not.toContain('01711111111');
     expect(await ctx.service.publicAnswers({...data,gender:'male'},false,saved)).toEqual({});
     expect((await ctx.service.publicAnswers(data,true,saved))[custom.id])
       .toContain('01711111111');

@@ -29,6 +29,31 @@ function load(file) {
 const { defaultQuestions, readQuestionAnswer, questionUsesSeparateStorage, questionAnswerFitsInput,
   questionOptionsWithSavedAnswer, savedMultiValues, questionDisplayValue, newQuestionRuleErrors } = load('lib/profile-questions.ts');
 const { currentPublicLabel } = load('lib/biodata-public-label.ts');
+const { savedBiodataAddress } = load('lib/biodata-address.ts');
+const { visiblePublicAnswer } = load('lib/biodata-visible-answer.ts');
+assert.equal(visiblePublicAnswer('[সংরক্ষিত]Sadar'), undefined);
+assert.deepEqual(visiblePublicAnswer(['Safe one','[সংরক্ষিত]Private','Safe two']),
+  ['Safe one','Safe two']);
+assert.deepEqual(visiblePublicAnswer({city:'Jessore',private:'[সংরক্ষিত]Sadar'}),
+  {city:'Jessore'});
+assert.equal(visiblePublicAnswer(false), false);
+assert.equal(visiblePublicAnswer(0), 0);
+console.log('PASS: Legacy redaction fragments omitted for all public field types');
+const permanentQuestion = { ...defaultQuestions.questions.find(q => q.path === 'address.district'),
+  id:'q_' + 'c'.repeat(32),path:'address.permanentAddress',
+  question:'স্থায়ী ঠিকানা',publicLabel:'স্থায়ী ঠিকানা',section:1,
+  gender:'both',enabled:true,showPublic:true };
+const addressProfile = {
+  gender:'female',
+  publicQuestionSchema:{revision:1,sections:[],questions:[permanentQuestion]},
+  publicAnswers:{[permanentQuestion.id]:'[সংরক্ষিত]Sadar, যশোর'},
+};
+assert.equal(savedBiodataAddress(addressProfile,'permanentAddress'),'');
+assert.equal(savedBiodataAddress({
+  ...addressProfile,
+  publicAnswers:{[permanentQuestion.id]:'Jessore Sadar, যশোর'},
+},'permanentAddress'),'Jessore Sadar, যশোর');
+console.log('PASS: Redacted street-address fragments are not displayed as public permanent addresses');
 const { QuestionInput } = load('components/custom/updateProfile/DynamicQuestionStep.tsx');
 const { birthDateParts, completeBirthDate, daysInBirthMonth } = load('lib/birth-date.ts');
 const { default: BirthDateSelect } = load('components/custom/updateProfile/BirthDateSelect.tsx');

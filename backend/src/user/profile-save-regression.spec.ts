@@ -1,8 +1,9 @@
 import {
   assertQuestionRules, newQuestionRuleErrors, sanitizeDynamicAnswers,
-  usesSeparateAnswerStorage, answerForQuestion, BUILTINS, type ProfileQuestion,
+  usesSeparateAnswerStorage, answerForQuestion, BUILTINS, QuestionConfigService,
+  type ProfileQuestion,
 } from '../profile-questions/question-config.service';
-import { profileUpdateSet, profileUpdatePreview } from './profile-rules';
+import { profileUpdateSet, profileUpdatePreview, publicProfile } from './profile-rules';
 import { applyBirthDate } from './birth-date';
 
 describe('Biodata saves after admin Question Builder edits (no database)', () => {
@@ -91,6 +92,56 @@ describe('Biodata saves after admin Question Builder edits (no database)', () =>
     expect(changes.age).toBeUndefined();
     expect(() => applyBirthDate({dateOfBirth:'2002/05/10'},oldProfile))
       .toThrow('Enter a valid birth date');
+  });
+
+  it('preserves public district/upazila names when they overlap private identity', async () => {
+    const source = {
+      gender: 'female',
+      name: 'Jessore',
+      fatherName: 'Private Father',
+      phoneNumber: '01711111111',
+      email: 'hidden@example.com',
+      nationality: 'Bangladesh',
+      address: {
+        district: 'যশোর',
+        upazila: 'Jessore Sadar',
+        cityCorporation: 'Jessore City',
+        area: 'Jessore Bazar',
+        presentAddress: 'House 27, Jessore Sadar, যশোর',
+        permanentAddress: 'Road 3, Jessore Sadar',
+      },
+    };
+    const safe=publicProfile(source,false);
+    expect(safe.address.upazila).toBe('Jessore Sadar');
+    expect(safe.address.cityCorporation).toBe('Jessore City');
+    expect(safe.address.area).toBe('Jessore Bazar');
+    expect(safe.address.district).toBe('যশোর');
+    expect(safe.name).toBeUndefined();
+    expect(safe.address.presentAddress).toBeUndefined();
+    expect(safe.address.permanentAddress).toBeUndefined();
+    expect(JSON.stringify(safe)).not.toContain('House 27');
+    expect(JSON.stringify(safe)).not.toContain('Road 3');
+    expect(JSON.stringify(safe)).not.toContain('hidden@example.com');
+    expect(publicProfile(source,true).address.permanentAddress).toBe(source.address.permanentAddress);
+
+    const cityId='q_'+'a'.repeat(32), textId='q_'+'b'.repeat(32);
+    const city:ProfileQuestion={
+      ...sample(cityId),path:'address.upazila',type:'select',
+      answerStorage:'dynamic',
+    };
+    const notes:ProfileQuestion={...sample(textId),path:undefined};
+    const config = Object.create(QuestionConfigService.prototype) as QuestionConfigService;
+    const answers = await config.publicAnswers({
+      ...source,
+      dynamicAnswers:{
+        [cityId]:'Jessore Sadar',
+        [textId]:'Call my phone 01711111111',
+      },
+    },false,{revision:2,sections:[],questions:[city,notes]});
+    expect(answers[cityId]).toBe('Jessore Sadar');
+    expect(answers[textId]).toBeUndefined();
+    expect(JSON.stringify(answers)).not.toContain('[সংরক্ষিত]');
+    expect(JSON.stringify(answers)).not.toContain('01711111111');
   });
 
   it('preserves map-backed archived answers', () => {

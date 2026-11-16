@@ -67,6 +67,22 @@ assert.equal((html.match(/<dt[^>]*>স্থায়ী ঠিকানা<\/dt
 assert.ok(html.includes(current));
 assert.ok(html.includes(permanent));
 assert.ok(!html.includes('Motijheel, Dhaka South City Corporation, ঢাকা, Bangladesh'));
+// Old cached responses must not render broken redaction tokens in any type.
+const customMulti = { ...custom('old_' + '3'.repeat(24), 'সুবিধা', 700),
+  section: 8, type: 'multi_checkbox', options: [
+    { value: 'safe-a', label: 'Safe A' },
+    { value: '[সংরক্ষিত]Bad', label: '[সংরক্ষিত]Bad' },
+    { value: 'safe-b', label: 'Safe B' },
+  ] };
+profile.publicQuestionSchema.questions.push(customMulti);
+profile.publicAnswers[customMulti.id] = ['safe-a', '[সংরক্ষিত]Bad', 'safe-b'];
+profile.address.area = '[সংরক্ষিত]Sadar';
+const safeMarkup = renderToStaticMarkup(React.createElement(ProfileView, { id: 'test' }));
+assert.ok(safeMarkup.includes('Safe A, Safe B'));
+assert.ok(!safeMarkup.includes('[সংরক্ষিত]'));
+delete profile.publicAnswers[customMulti.id];
+profile.publicQuestionSchema.questions.pop();
+profile.address.area = 'Motijheel';
 const copied = buildBiodataWhatsappText(profile, 'https://example.com');
 assert.ok(copied.includes('*বর্তমান অবস্থানঃ* ' + current));
 assert.ok(copied.includes('*স্থায়ী ঠিকানাঃ* ' + permanent));
@@ -194,12 +210,15 @@ for(const filename of ['DynamicQuestionStep.tsx','ProfileUpdateForm.tsx']){
 }
 useProfileStore.getState().resetForm();
 const form = renderToStaticMarkup(React.createElement(DynamicQuestionStep, { schema: defaultQuestions, step: 0 }));
-assert.ok(form.includes('type="date"'));
+assert.ok(form.includes('data-birth-date-select'));
 const dateInput = renderToStaticMarkup(React.createElement(QuestionInput, {
   q: defaultQuestions.questions.find(q => q.path === 'dateOfBirth'), value: '2000-05-15', onChange: noop,
 }));
-assert.ok(dateInput.includes('value="2000-05-15"'));
-assert.ok(!form.includes('id="question-' + defaultQuestions.questions.find(q => q.path === 'age').id + '"'));
+assert.ok(dateInput.includes('data-birth-date-select'));
+assert.ok(dateInput.includes('selected=""'));
+assert.ok(dateInput.includes('জন্মতারিখ'));
+// Legacy profiles without a saved birth date may still edit their age manually.
+assert.ok(form.includes('id="question-' + defaultQuestions.questions.find(q => q.path === 'age').id + '"'));
 const { questionRuleErrors } = load('lib/profile-questions.ts');
 const { QuestionEditor, questionIssues } = load('components/custom/dashboard/QuestionEditor.tsx');
 const rules = [{ type: 'not_equal', questionId: permanentQuestion.id, message: 'Use different answers' }];

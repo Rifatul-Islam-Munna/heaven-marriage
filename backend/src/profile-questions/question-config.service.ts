@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { ageFromBirthDate } from '../user/birth-date';
+import { publicAnswerSanitizer } from '../user/public-answer-privacy';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { FALLBACK_PROFILE_SCHEMA } from './default-question-registry';
@@ -391,6 +392,7 @@ export class QuestionConfigService {
   async publicAnswers(user:any, unlocked=false, s?:QuestionSchema) {
     s ||= await this.get();
     const output:Record<string,unknown>={};
+    const clean = unlocked ? null : publicAnswerSanitizer(user);
     for(const q of s.questions) {
       if(!q.enabled||!q.showPublic||
         (q.gender!=='both'&&q.gender!==user.gender))continue;
@@ -402,21 +404,12 @@ export class QuestionConfigService {
       if(q.path&&!usesSeparateAnswerStorage(q)&&!moved&&!standalone)continue;
       if(!unlocked&&unlockOnlyFields.has(q.path||''))continue;
       const answer=answerForQuestion(user,q);
-      if(answer!==undefined&&answer!==null&&answer!==''&&
-        !(Array.isArray(answer)&&!answer.length)){
-        const secrets=[user.name,user.fatherName,user.motherName,user.phoneNumber,
-          user.whatsapp,user.guardianPhone,user.email,user.address?.presentAddress,
-          user.address?.permanentAddress].filter((x:unknown)=>typeof x==='string'&&x.length>=3) as string[];
-        const scrub=(input:string)=>{
-          if(unlocked)return input;
-          let text=input;
-          for(const secret of secrets)text=text.split(secret).join('[সংরক্ষিত]');
-          return text.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[সংরক্ষিত]')
-            .replace(/(?:\+?\d[\d\s()-]{8,}\d)/g,'[সংরক্ষিত]');
-        };
-        output[q.id]=q.path==='dateOfBirth'?answer:Array.isArray(answer)?answer.map(x=>scrub(String(x))):
-          typeof answer==='string'?scrub(answer):answer;
-      }
+      // Sanitize every answer shape uniformly, including custom multi-choice
+      // arrays. Never mutate stored answers or emit partial redaction markers.
+      const visible = clean && q.path !== 'dateOfBirth'
+        ? clean(answer, q.path || '') : answer;
+      if(visible!==undefined&&visible!==null&&visible!==''&&
+        !(Array.isArray(visible)&&!visible.length)) output[q.id]=visible;
     }
     return output;
   }
