@@ -192,6 +192,9 @@ export default function ProfileUpdateForm() {
   const [streak, setStreak] = useState(0);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
   const [shake, setShake] = useState(0);
+  const [isAdvancing, setIsAdvancing] = useState(false);
+  const advancePending = useRef(false);
+  const autoAdvanceTimer = useRef<number | null>(null);
   const nextRef = useRef<(skipped?: boolean) => void>(() => {});
 
   useEffect(() => {
@@ -411,13 +414,16 @@ export default function ProfileUpdateForm() {
     const openLevel = requiredLevel >= 0 ? requiredLevel : levels.findIndex(l => l.questions.some(q => !answered(q)));
     if (openLevel >= 0) goLevel(openLevel); else setView("finish");
   };
-  const finishLevel = async () => {
+  const finishLevel = () => {
     setView("levelDone");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    try { await queueSave(); } catch { /* Retry is visible in the save badge. */ }
   };
-  const next = (skipped = false) => {
-    if (!question) return;
+  const next = async (skipped = false) => {
+    if (!question || view !== "play" || advancePending.current) return;
+    if (autoAdvanceTimer.current !== null) {
+      window.clearTimeout(autoAdvanceTimer.current);
+      autoAdvanceTimer.current = null;
+    }
     const fresh = useProfileStore.getState().formData;
     const error=questionRuleErrors(fresh,schema.questions).find(row=>row.questionId===question.id||row.otherQuestionId===question.id);
     if(error){setShake(n=>n+1);toast.error(error.message);return;}
@@ -427,16 +433,36 @@ export default function ProfileUpdateForm() {
       toast.error("এই প্রশ্নের উত্তর দেওয়া আবশ্যিক");
       return;
     }
-    if (skipped || !isDone) setStreak(0);
-    else {
-      setStreak(s => s + 1);
-      setCheer({ text: CHEERS[Math.floor(Math.random() * CHEERS.length)], n: Date.now() });
+    advancePending.current = true;
+    setIsAdvancing(true);
+    try {
+      // Flush debounced edits through the same queue before leaving this answer.
+      await queueSave();
+      if (skipped || !isDone) setStreak(0);
+      else {
+        setStreak(s => s + 1);
+        setCheer({ text: CHEERS[Math.floor(Math.random() * CHEERS.length)], n: Date.now() });
+      }
+      if (qi < levelQuestions.length - 1) setQi(qi + 1);
+      else finishLevel();
+    } catch {
+      // Keep this question and its draft visible so the member can retry.
+    } finally {
+      advancePending.current = false;
+      setIsAdvancing(false);
     }
-    if (qi < levelQuestions.length - 1) setQi(qi + 1);
-    else void finishLevel();
   };
   useEffect(() => { nextRef.current = next; });
-  const autoAdvance = () => window.setTimeout(() => nextRef.current(false), 350);
+  useEffect(() => () => {
+    if (autoAdvanceTimer.current !== null) window.clearTimeout(autoAdvanceTimer.current);
+  }, [question?.id, view]);
+  const autoAdvance = () => {
+    if (autoAdvanceTimer.current !== null) window.clearTimeout(autoAdvanceTimer.current);
+    autoAdvanceTimer.current = window.setTimeout(() => {
+      autoAdvanceTimer.current = null;
+      nextRef.current(false);
+    }, 350);
+  };
   const submit = async () => {
     const errors=questionRuleErrors(useProfileStore.getState().formData,schema.questions);
     if(errors.length){toast.error(errors[0].message);return;}
@@ -510,7 +536,7 @@ export default function ProfileUpdateForm() {
     const Icon = LEVEL_ICONS[level.section.id] || Sparkles;
     return shell(<div className="relative mx-auto flex max-w-2xl flex-col">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => (qi > 0 ? setQi(qi - 1) : setView("journey"))} aria-label="আগের প্রশ্ন"
+        <button type="button" disabled={isAdvancing} onClick={() => (qi > 0 ? setQi(qi - 1) : setView("journey"))} aria-label="আগের প্রশ্ন"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm hover:bg-pink-50"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 text-xs font-semibold text-gray-600">
@@ -522,7 +548,7 @@ export default function ProfileUpdateForm() {
           </div>
         </div>
         {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-pink-700 shadow-sm hover:bg-pink-50" title="বাকি কানেকশন"><Gem className="h-4 w-4" />{bn(connectionBalance)} কানেকশন</Link>}
-        <button type="button" onClick={() => setView("journey")} aria-label="যাত্রার ম্যাপে ফিরুন"
+        <button type="button" disabled={isAdvancing} onClick={() => setView("journey")} aria-label="যাত্রার ম্যাপে ফিরুন"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm hover:bg-pink-50"><X className="h-5 w-5" /></button>
       </div>
 
@@ -540,29 +566,32 @@ export default function ProfileUpdateForm() {
         {(question.path==='address.upazila'||question.path==='address.cityCorporation')&&<div className="mt-3 flex flex-col gap-2">
           <p className="text-sm text-gray-600">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>
           {levelQuestions.map((alternative,index)=>alternative.path===(question.path==='address.upazila'?'address.cityCorporation':'address.upazila')&&
-            <button key={alternative.id} type="button" onClick={()=>setQi(index)}
+            <button key={alternative.id} type="button" disabled={isAdvancing} onClick={()=>setQi(index)}
               className="self-start rounded-lg border border-pink-200 px-3 py-2 text-sm font-semibold text-pink-700 hover:bg-pink-50">
               {alternative.path==='address.upazila'?'উপজেলা নির্বাচন করুন':'সিটি কর্পোরেশন নির্বাচন করুন'}
             </button>)}
         </div>}
-        <div className="mt-6" role="group" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
+        <fieldset disabled={isAdvancing} className="mt-6 min-w-0" aria-labelledby="qb-question" aria-invalid={!!currentRuleError}
           aria-describedby={currentRuleError?'qb-answer-error':undefined}>
           <SavedQuestionAnswer q={question} value={value} options={optionsFor(question)}/>
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
           {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}
-        </div>
+        </fieldset>
       </div>
 
-      <div className="sticky bottom-0 mt-6 flex items-center gap-3 bg-[#fff7f9]/95 py-3 backdrop-blur">
-        <div className="hidden min-w-0 flex-1 sm:block">{saveBadge}</div>
-        {!question.required && <button type="button" onClick={() => next(true)} className="rounded-full px-5 py-3.5 text-sm font-semibold text-gray-600 hover:bg-white">এড়িয়ে যান</button>}
-        <button type="button" onClick={() => next(false)}
-          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-3.5 text-base font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 sm:flex-none sm:min-w-44">
-          {qi < levelQuestions.length - 1 ? "পরবর্তী" : "লেভেল শেষ করুন"} <ChevronRight className="h-5 w-5" />
+      <div data-question-navigation className="sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-2 bg-[#fff7f9]/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur" aria-busy={isAdvancing}>
+        <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">{saveBadge}</div>
+        <button type="button" data-question-action="skip" disabled={isAdvancing} onClick={() => { void next(true); }}
+          className="min-h-12 shrink-0 rounded-full border border-pink-200 bg-white px-4 py-3 text-sm font-semibold whitespace-nowrap text-gray-700 hover:bg-pink-50 disabled:opacity-60">
+          এড়িয়ে যান
+        </button>
+        <button type="button" data-question-action="next" disabled={isAdvancing} onClick={() => { void next(false); }}
+          className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:flex-none sm:min-w-44 sm:text-base">
+          {isAdvancing ? <><Loader2 className="h-5 w-5 shrink-0 animate-spin" /> সংরক্ষণ হচ্ছে…</>
+            : <>{qi < levelQuestions.length - 1 ? "পরবর্তী" : "লেভেল শেষ করুন"} <ChevronRight className="h-5 w-5 shrink-0" /></>}
         </button>
       </div>
-      <div className="sm:hidden">{saveBadge}</div>
     </div>);
   }
 
