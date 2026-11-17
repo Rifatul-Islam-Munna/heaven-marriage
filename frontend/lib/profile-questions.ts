@@ -64,7 +64,9 @@ export function questionUsesSeparateStorage(q:ProfileQuestion):boolean {
  return false;
 }
 export function locationQuestionLabel(q:ProfileQuestion):string {
+ if(q.path==='address.district' && q.question.trim()==='বর্তমান ঠিকানা')return 'জেলা নির্বাচন করুন';
  if(q.path==='address.upazila' && q.question.trim()==='বর্তমান ঠিকানা')return 'উপজেলা নির্বাচন করুন';
+ if(q.path==='address.presentAddress' && q.question.trim()==='বর্তমান ঠিকানা')return 'বর্তমান ঠিকানার বিস্তারিত';
  return q.question;
 }
 export function questionInputAttributes(q:ProfileQuestion){

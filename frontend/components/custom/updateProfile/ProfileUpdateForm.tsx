@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -47,16 +47,123 @@ const CSS = `
 .qb-in{animation:qb-in .28s ease-out both}.qb-confetti{animation:qb-fall 1.7s ease-in forwards}
 .qb-pop{animation:qb-pop .45s cubic-bezier(.2,.8,.2,1) both}.qb-float{animation:qb-float 1.2s ease-out forwards}
 .qb-shake{animation:qb-shake .35s ease-in-out}.qb-pulse{animation:qb-pulse 1.8s ease-out infinite}
+.qb-keyboard .qb-in{animation:none}
+.qb-keyboard textarea{max-height:max(5rem,calc(var(--qb-visible-height) - 13rem))}
 @media (prefers-reduced-motion:reduce){.qb-in,.qb-pop,.qb-float,.qb-shake,.qb-pulse{animation:none!important}.qb-confetti{display:none}}
 `;
+
+type KeyboardViewport = { top: number; left: number; width: number; height: number };
+
+/** Mobile keyboards can shrink the visual viewport without resizing the page. */
+function useQuestionKeyboardViewport(root: RefObject<HTMLDivElement | null>, active: boolean) {
+  const [viewport, setViewport] = useState<KeyboardViewport | null>(null);
+  const baseline = useRef({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const visual = window.visualViewport;
+    let frame = 0;
+    let keyboardOpen = false;
+    const update = () => {
+      const height = visual?.height ?? window.innerHeight;
+      const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      // Reset on rotation; retain the full height when a browser resizes both viewports.
+      if (baseline.current.width !== window.innerWidth) {
+        baseline.current = { width: window.innerWidth, height: layoutHeight };
+      }
+      baseline.current.height = Math.max(baseline.current.height, layoutHeight, height);
+      const focused = document.activeElement;
+      const editing = focused instanceof HTMLElement && root.current?.contains(focused) &&
+        focused.matches('input:not([type="checkbox"]):not([type="radio"]), textarea, [contenteditable="true"]');
+      // Normalize pinch zoom so it does not look like keyboard occlusion.
+      keyboardOpen = active && window.innerWidth < 1024 &&
+        baseline.current.height - height * (visual?.scale ?? 1) > 120 && (!!editing || keyboardOpen);
+      const next = keyboardOpen ? {
+        top: visual?.offsetTop ?? 0, left: visual?.offsetLeft ?? 0,
+        width: visual?.width ?? window.innerWidth, height,
+      } : null;
+      setViewport(previous => previous?.top === next?.top && previous?.left === next?.left &&
+        previous?.width === next?.width && previous?.height === next?.height ? previous : next);
+    };
+    const schedule = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(update);
+    };
+    update();
+    visual?.addEventListener("resize", schedule);
+    visual?.addEventListener("scroll", schedule);
+    window.addEventListener("resize", schedule);
+    document.addEventListener("focusin", schedule);
+    document.addEventListener("focusout", schedule);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      visual?.removeEventListener("resize", schedule);
+      visual?.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      document.removeEventListener("focusin", schedule);
+      document.removeEventListener("focusout", schedule);
+    };
+  }, [active, root]);
+
+  return active ? viewport : null;
+}
+
+/** Consume one browser Back to dismiss the keyboard, preserving Next's router state. */
+function useKeyboardBackGuard(root: RefObject<HTMLDivElement | null>, open: boolean) {
+  const entry = useRef<{ token: string; url: string } | null>(null);
+  const releaseTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    window.clearTimeout(releaseTimer.current);
+    const key = "niqahaProfileKeyboard";
+    const url = window.location.href;
+    let guard = entry.current;
+    if (!guard || guard.url !== url || window.history.state?.[key] !== guard.token) {
+      guard = { token: `${Date.now()}-${Math.random()}`, url };
+      window.history.pushState({ ...window.history.state, [key]: guard.token }, "", url);
+      entry.current = guard;
+    }
+    const current = guard;
+    let consumed = false;
+    const dismiss = () => {
+      if (window.location.href !== url || window.history.state?.[key] === current.token) return;
+      consumed = true;
+      entry.current = null;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && root.current?.contains(focused)) focused.blur();
+    };
+    window.addEventListener("popstate", dismiss);
+    return () => {
+      window.removeEventListener("popstate", dismiss);
+      // Native keyboard dismissal may emit resize before popstate. Let that Back
+      // settle before removing an unused entry, avoiding a second page traversal.
+      if (!consumed) releaseTimer.current = window.setTimeout(() => {
+        if (window.location.href === url && window.history.state?.[key] === current.token) {
+          entry.current = null;
+          window.history.back();
+        }
+      }, 100);
+    };
+  }, [open, root]);
+}
+
+function questionFlow(schema: ProfileQuestionSchema, profile: Record<string, any>) {
+  return schema.questions.filter(q => q.path !== "age" && !q.locked &&
+    questionApplies(q, profile.gender) && locationQuestionVisible(q, profile))
+    // Sort by configured priority, before deriving conditional required flags.
+    .sort((a, b) => a.section - b.section || (a.path === "gender" ? -1 : b.path === "gender" ? 1 : 0) ||
+      Number(b.required) - Number(a.required) || a.order - b.order)
+    .map(q => ({ ...q, question: locationQuestionLabel(q), required: q.required && locationQuestionApplies(q, profile) }));
+}
 
 /** Same rules the server uses to count a question as answered. */
 function isAnswered(q: ProfileQuestion, value: unknown) {
   if(q.path==='dateOfBirth')return ageFromBirthDate(value as string)!==undefined;
   if (value === undefined || value === null || value === "") return false;
+  if (typeof value === "string" && !value.trim()) return false;
   if (Array.isArray(value)) return value.length > 0;
   if (q.type === "checkbox") return q.required ? value === true : typeof value === "boolean";
-  if (q.type === "number") return Number(value) !== 0 && !Number.isNaN(Number(value));
+  if (q.type === "number") return Number(value) !== 0 && Number.isFinite(Number(value));
+  if (q.type === "date") return questionAnswerFitsInput(value, q);
   return true;
 }
 
@@ -289,6 +396,7 @@ export default function ProfileUpdateForm() {
   const queryClient = useQueryClient();
   const {data:locations}=useQueryWrapper<LocationResponse>(['public-location-options'],'/profile-questions/locations',{staleTime:60000});
   const [activeQuestionId, setActiveQuestionId] = useState<string|null>(null);
+  const passedQuestions = useRef(new Set<string>());
   const [streak, setStreak] = useState(0);
   const [cheer, setCheer] = useState<{ text: string; n: number } | null>(null);
   const [shake, setShake] = useState(0);
@@ -418,10 +526,7 @@ export default function ProfileUpdateForm() {
   }, []);
 
   const gender = formData.gender as string | undefined;
-  const flow = useMemo(() => schema.questions.filter(q => q.path!=='age' && !q.locked && questionApplies(q, gender) && locationQuestionVisible(q,formData))
-    .map(q => ({...q,question:locationQuestionLabel(q),required:q.required&&locationQuestionApplies(q,formData)}))
-    .sort((a, b) => a.section - b.section || (a.path==='gender'?-1:b.path==='gender'?1:0) ||
-      Number(b.required)-Number(a.required) || a.order-b.order), [schema, gender, formData]);
+  const flow = useMemo(() => questionFlow(schema, formData), [schema, formData]);
   const levels = useMemo(() => schema.sections
     .map(section => ({ section, questions: flow.filter(q => q.section === section.id) }))
     .filter(level => level.questions.length), [schema.sections, flow]);
@@ -437,6 +542,39 @@ export default function ProfileUpdateForm() {
   const qi = Math.max(0,levelQuestions.findIndex(q=>q.id===activeQuestionId));
   const setQi = (index:number) => setActiveQuestionId(levelQuestions[index]?.id??null);
   const question = levelQuestions[Math.min(qi, Math.max(0, levelQuestions.length - 1))];
+  const questionRoot = useRef<HTMLDivElement>(null);
+  const questionContent = useRef<HTMLDivElement>(null);
+  const keyboardViewport = useQuestionKeyboardViewport(questionRoot, view === "play" && !!question);
+  useKeyboardBackGuard(questionRoot, !!keyboardViewport);
+
+  useEffect(() => {
+    if (!keyboardViewport) return;
+    let frame = 0;
+    const root = questionRoot.current;
+    const revealInput = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const content = questionContent.current;
+        const focused = document.activeElement;
+        if (!content || !(focused instanceof HTMLElement) || !content.contains(focused)) return;
+        const bounds = focused.getBoundingClientRect();
+        const visible = content.getBoundingClientRect();
+        // Scroll only the answer area, leaving both navigation controls in place.
+        if (bounds.top < visible.top + 12 || bounds.height > visible.height - 24) {
+          content.scrollTop += bounds.top - visible.top - 12;
+        } else if (bounds.bottom > visible.bottom - 12) {
+          content.scrollTop += bounds.bottom - visible.bottom + 12;
+        }
+      });
+    };
+    revealInput();
+    root?.addEventListener("focusin", revealInput);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      root?.removeEventListener("focusin", revealInput);
+    };
+  }, [keyboardViewport, question?.id, shake]);
+
   const answeredCount = flow.filter(q => answered(q)).length;
   // Mirrors the live Dynamic Question Builder rules in backend profile-rules.ts.
   // Includes locked required fields and counts optional fields as optional.
@@ -451,6 +589,7 @@ export default function ProfileUpdateForm() {
   const requiredMissing=requiredProgress.remaining;
   const ruleErrors=questionRuleErrors(formData,schema.questions);
   const currentRuleError=ruleErrors.find(error=>error.questionId===question?.id||error.otherQuestionId===question?.id)?.message;
+  const nextDisabled = isAdvancing || !!currentRuleError || !!question?.required && !answered(question);
   const name = typeof formData.name === "string" ? formData.name.split(" ")[0] : "";
 
   useEffect(() => {
@@ -478,22 +617,31 @@ export default function ProfileUpdateForm() {
     if (questionUsesSeparateStorage(q)) { updateDynamicAnswer(q.id, answer); return; }
     if (q.legacyKey) { updateCustomField(q.legacyKey, String(answer)); return; }
     if (!q.path) return;
+    const answerChanged = readQuestionAnswer(useProfileStore.getState().formData, q) !== answer;
+    if (answerChanged &&
+      ["address.district", "address.upazila", "address.cityCorporation"].includes(q.path)) {
+      const dependents = q.path === "address.district"
+        ? ["address.upazila", "address.cityCorporation", "address.area"] : ["address.area"];
+      for (const dependent of schema.questions) {
+        if (dependents.includes(dependent.path || "")) passedQuestions.current.delete(dependent.id);
+      }
+    }
     const normalized = typeof answer === "string" && NUMERIC_PATHS.includes(q.path) ? (answer === "" ? undefined : Number(answer)) : answer;
     const [parent, field] = q.path.split(".");
     if (field) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateNestedField(parent as any, field, normalized);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (q.path === "address.district") {
+      if (q.path === "address.district" && answerChanged) {
         updateNestedField("address" as any, "upazila", "");
         updateNestedField("address" as any, "cityCorporation", "");
         updateNestedField("address" as any, "area", "");
       }
-      if (q.path === "address.cityCorporation") {
+      if (q.path === "address.cityCorporation" && answerChanged) {
         if(answer)updateNestedField("address" as any, "upazila", "");
         if(answer||formData.address?.cityCorporation)updateNestedField("address" as any, "area", "");
       }
-      if (q.path === "address.upazila") {
+      if (q.path === "address.upazila" && answerChanged) {
         if(answer)updateNestedField("address" as any, "cityCorporation", "");
         if(answer||formData.address?.upazila)updateNestedField("address" as any, "area", "");
       }
@@ -504,31 +652,17 @@ export default function ProfileUpdateForm() {
   const goLevel = (index: number, startAt?: number) => {
     const target = levels[index];
     if (!target) return;
+    passedQuestions.current.clear();
     setCurrentStep(target.section.id);
-    const firstOpen = target.questions.findIndex(q => !answered(q));
+    const firstOpen = target.questions.findIndex(q => locationQuestionApplies(q, formData) && !answered(q));
     setActiveQuestionId(target.questions[startAt ?? (firstOpen >= 0 ? firstOpen : 0)]?.id??null);
     setView("play");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const continueJourney = () => {
     const requiredLevel = levels.findIndex(l => l.questions.some(q => q.required && !answered(q)));
-    const openLevel = requiredLevel >= 0 ? requiredLevel : levels.findIndex(l => l.questions.some(q => !answered(q)));
+    const openLevel = requiredLevel >= 0 ? requiredLevel : levels.findIndex(l => l.questions.some(q => locationQuestionApplies(q, formData) && !answered(q)));
     if (openLevel >= 0) goLevel(openLevel); else setView("finish");
-  };
-  const finishLevel = () => {
-    const following = levels[levelIndex + 1];
-    if (following) {
-      const fresh = useProfileStore.getState().formData;
-      const nextRequired = following.questions.findIndex(q => q.required && !answered(q, fresh));
-      const nextUnanswered = following.questions.findIndex(q => !answered(q, fresh));
-      setCurrentStep(following.section.id);
-      setActiveQuestionId(following.questions[nextRequired >= 0 ? nextRequired : nextUnanswered >= 0 ? nextUnanswered : 0]?.id ?? null);
-      setView("play");
-      toast.info(`পরবর্তী বিভাগ: ${following.section.title}`);
-    } else {
-      setView("finish");
-    }
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const next = async (skipped = false) => {
     if (!question || view !== "play" || advancePending.current) return;
@@ -555,8 +689,27 @@ export default function ProfileUpdateForm() {
         setStreak(s => s + 1);
         setCheer({ text: CHEERS[Math.floor(Math.random() * CHEERS.length)], n: Date.now() });
       }
-      if (qi < levelQuestions.length - 1) setQi(qi + 1);
-      else finishLevel();
+      // Answers can reveal location questions or change required flags while the
+      // save is pending. Resolve the next ID from the latest profile, never qi.
+      const latest = useProfileStore.getState().formData;
+      const latestFlow = questionFlow(schema, latest);
+      const currentIndex = latestFlow.findIndex(q => q.id === question.id);
+      passedQuestions.current.add(question.id);
+      const available = (q: ProfileQuestion) => !passedQuestions.current.has(q.id) &&
+        locationQuestionApplies(q, latest) && !answered(q, latest);
+      // Newly revealed fields (e.g. Area) may sort before the current question.
+      // Visit those once; never loop back to an answer already given or skipped.
+      const sameSection = latestFlow.filter(q => q.section === question.section);
+      const sectionIndex = sameSection.findIndex(q => q.id === question.id);
+      const following = currentIndex < 0 ? undefined :
+        sameSection.slice(sectionIndex + 1).find(available) ||
+        sameSection.slice(0, sectionIndex).find(available) ||
+        latestFlow.slice(currentIndex + 1).find(q => q.section !== question.section && available(q));
+      if (following) {
+        setCurrentStep(following.section);
+        setActiveQuestionId(following.id);
+      } else setView("finish");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       // Keep this question and its draft visible so the member can retry.
     } finally {
@@ -646,9 +799,22 @@ export default function ProfileUpdateForm() {
   if (view === "play" && question) {
     const value = readQuestionAnswer(formData, question);
     const Icon = LEVEL_ICONS[level.section.id] || Sparkles;
-    return shell(<div className="relative mx-auto flex max-w-3xl flex-col">
-      <div data-question-header className="flex items-center gap-2 sm:gap-3">
-        <button type="button" disabled={isAdvancing} onClick={() => (qi > 0 ? setQi(qi - 1) : setView("journey"))} aria-label="আগের প্রশ্ন"
+    return shell(<div ref={questionRoot} data-question-viewport data-keyboard-open={!!keyboardViewport}
+      className={`flex min-h-0 flex-col ${keyboardViewport ? "qb-keyboard fixed z-[70] bg-[#fff7f9] p-3" : "relative mx-auto max-w-3xl"}`}
+      style={keyboardViewport ? {
+        top: keyboardViewport.top, left: keyboardViewport.left,
+        width: keyboardViewport.width, height: keyboardViewport.height,
+        "--qb-visible-height": `${keyboardViewport.height}px`,
+      } as React.CSSProperties : undefined}>
+      <div data-question-header className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <button type="button" data-question-action="back" disabled={isAdvancing} onClick={() => {
+          if (keyboardViewport) {
+            const focused = document.activeElement;
+            if (focused instanceof HTMLElement && questionRoot.current?.contains(focused)) focused.blur();
+            return;
+          }
+          if (qi > 0) setQi(qi - 1); else setView("journey");
+        }} aria-label={keyboardViewport ? "কিবোর্ড বন্ধ করুন" : "আগের প্রশ্ন"}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm hover:bg-pink-50"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 text-xs font-semibold text-gray-600">
@@ -670,7 +836,8 @@ export default function ProfileUpdateForm() {
         {cheer.text}
       </div>}
 
-      <div key={question.id + ":" + shake} className={`qb-in mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:mt-7 sm:p-8 ${shake ? "qb-shake" : ""}`}>
+      <div ref={questionContent} data-question-content className={keyboardViewport ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : undefined}>
+      <div key={question.id + ":" + shake} className={`qb-in rounded-3xl border border-slate-200 bg-white shadow-sm ${keyboardViewport ? "my-3 p-4" : "mt-5 p-5 sm:mt-7 sm:p-8"} ${shake ? "qb-shake" : ""}`}>
         <div className="flex flex-wrap items-center gap-2">
           {question.required ? <span className="rounded-full bg-pink-50 px-3 py-1.5 text-xs font-bold text-pink-700 ring-1 ring-pink-100">আবশ্যিক</span>
             : <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">ঐচ্ছিক · চাইলে পরে দিতে পারবেন</span>}
@@ -691,13 +858,16 @@ export default function ProfileUpdateForm() {
           <BigAnswer key={question.id} q={question} value={value} options={optionsFor(question)}
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
           {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}
+          {question.required && !answered(question) && <p id="qb-next-help" className="mt-3 text-sm text-gray-500">উত্তর দিলে পরবর্তী প্রশ্নে যেতে পারবেন।</p>}
         </fieldset>
       </div>
+      </div>
 
-      <div data-question-navigation className="sticky bottom-0 z-20 mt-6 flex flex-col gap-2 border-t border-slate-200 bg-white/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:flex-row sm:items-center sm:gap-3" aria-busy={isAdvancing}>
-        <div className="order-2 min-w-0 sm:order-1 sm:flex-1">{saveBadge}</div>
-        <button type="button" data-question-action="next" disabled={isAdvancing} onClick={() => { void next(false); }}
-          className="order-1 flex min-h-14 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:order-2 sm:w-auto sm:min-w-44 sm:text-base">
+      <div data-question-navigation className={`z-20 flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-white/95 backdrop-blur sm:flex-row sm:items-center sm:gap-3 ${keyboardViewport ? "pt-2" : "sticky bottom-0 mt-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"}`} aria-busy={isAdvancing}>
+        <div className={`order-2 min-w-0 sm:order-1 sm:flex-1 ${keyboardViewport ? "max-h-14 overflow-y-auto" : ""}`}>{saveBadge}</div>
+        <button type="button" data-question-action="next" disabled={nextDisabled}
+          aria-describedby={question.required && !answered(question) ? "qb-next-help" : undefined} onClick={() => { void next(false); }}
+          className="order-1 flex min-h-14 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-60 sm:order-2 sm:w-auto sm:min-w-44 sm:text-base">
           {isAdvancing ? <><Loader2 className="h-5 w-5 shrink-0 animate-spin" /> সংরক্ষণ হচ্ছে…</>
             : <>{qi < levelQuestions.length - 1 ? "পরবর্তী প্রশ্ন" : levelIndex < levels.length-1 ? "পরবর্তী বিভাগে যান" : "শেষ ধাপে যান"} <ChevronRight className="h-5 w-5 shrink-0" /></>}
         </button>
