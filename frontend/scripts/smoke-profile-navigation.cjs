@@ -16,15 +16,20 @@ const transpile = file => ts.transpileModule(read(file), { compilerOptions: {
   jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
 } }).outputText;
 const ids = ['a', 'b', 'c', 'd'].map(letter => 'q_' + letter.repeat(32));
+const countryOptions = [
+  'Bangladesh', 'Afghanistan', 'India', 'Saudi Arabia', 'United Arab Emirates', 'Malaysia',
+  'United Kingdom', 'United States', 'Canada', 'Australia', 'Pakistan', 'Nepal', 'Sri Lanka',
+  'Qatar', 'Oman', 'Choice A',
+].map(value => ({ value, label: value }));
 const schema = { revision: 12, sections: [{ id: 0, title: 'Test details' }],
-  questions: ids.map((id, index) => ({ id, question: 'Question ' + (index + 1),
-    publicLabel: 'Answer ' + (index + 1), section: 0, gender: 'both',
+  questions: ids.map((id, index) => ({ id, path: index === 2 ? 'residenceCountry' : undefined,
+    question: 'Question ' + (index + 1), publicLabel: 'Answer ' + (index + 1), section: 0, gender: 'both',
     type: index === 2 ? 'select' : index === 3 ? 'textarea' : 'text',
-    options: index === 2 ? [{ value: 'a', label: 'Choice A' }] : [],
-    optionSource: '', required: index < 2, enabled: true, showPublic: false, order: index, locked: false,
+    options: index === 2 ? countryOptions : [],
+    optionSource: index === 2 ? 'countries' : '', required: index < 2, enabled: true, showPublic: false, order: index, locked: false,
   })) };
 const profile = { _id: 'fixture-member', name: 'Test member', gender: 'male', role: 'user',
-  biodataStage: 'draft', biodataStatus: 'draft', dynamicAnswers: {}, draftStep: 0 };
+  biodataStage: 'draft', biodataStatus: 'draft', dynamicAnswers: { [ids[2]]: 'Bangladesh' }, draftStep: 0 };
 const modules = {
   react: read('node_modules/react/cjs/react.development.js'),
   'react/jsx-runtime': read('node_modules/react/cjs/react-jsx-runtime.development.js'),
@@ -45,6 +50,7 @@ const modules = {
   '@/lib/biodata-status': transpile('lib/biodata-status.ts'),
   '@/lib/profile-completion': transpile('lib/profile-completion.ts'),
   '@/lib/profile-question-options': 'exports.profileQuestionOptions=q=>q.options;',
+  '@/staticData/countries': 'exports.countries=[{code:"BD",en:"Bangladesh"}];',
   'next/link': 'exports.__esModule=true;exports.default=({children,...props})=>require("react").createElement("a",props,children);',
   'next/navigation': 'exports.useRouter=()=>({push:path=>window.routes.push(path)});',
   'lucide-react': 'module.exports=new Proxy({},{get:(_,name)=>name==="__esModule"?true:props=>require("react").createElement("svg",{...props,width:20,height:20,"aria-hidden":true})});',
@@ -57,6 +63,7 @@ const modules = {
     const data=await response.json();return response.ok?[data,null]:[null,data];
   };`,
   './AiBiodataAssistant': 'exports.__esModule=true;exports.default=()=>null;',
+  './BirthDateSelect': 'exports.__esModule=true;exports.default=()=>null;',
   './DynamicQuestionStep': 'exports.SavedQuestionAnswer=()=>null;',
 };
 const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -108,24 +115,32 @@ function respond(res, status, data) {
     browser = await puppeteer.launch({ headless: true, executablePath: chrome, args: ['--no-sandbox'] });
     const page = await browser.newPage();
     const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => errors.push(error.stack || error.message));
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     await page.goto('http://127.0.0.1:' + server.address().port);
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('শুরু করুন')));
-    await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('শুরু করুন')).click());
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('যেখানে থেমেছিলেন')))
+      .catch(async error => {
+        console.error('PAGE_ERRORS:', errors.join('\n'));
+        console.error('PAGE_TEXT:', await page.evaluate(() => document.body.innerText));
+        throw error;
+      });
+    await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('যেখানে থেমেছিলেন')).click());
     await page.waitForSelector('#qb-question');
     await page.waitForSelector(nextButton);
-    for (const width of [320, 390, 768]) {
+    for (const width of [320, 390, 515, 768]) {
       await page.setViewport({ width, height: 844, isMobile: true, hasTouch: true });
       const boxes = await page.evaluate(() => {
         const box = selector => { const rect = document.querySelector(selector).getBoundingClientRect();
           return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height }; };
-        return { skip: box('[data-question-action="skip"]'), next: box('[data-question-action="next"]'),
-          width: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth };
+        return { header: box('[data-question-header]'), skip: box('[data-question-action="skip"]'),
+          next: box('[data-question-action="next"]'), width: innerWidth,
+          overflow: document.documentElement.scrollWidth > innerWidth };
       });
-      assert(boxes.skip.left >= 0 && boxes.next.right <= boxes.width, 'Navigation must fit ' + width + 'px');
+      assert(boxes.skip.left >= boxes.header.left && boxes.skip.right <= boxes.header.right &&
+        boxes.skip.right >= boxes.header.right - 2, 'Skip must stay at the top-right at ' + width + 'px');
+      assert(boxes.next.left >= 0 && boxes.next.right <= boxes.width, 'Next must fit ' + width + 'px');
       assert(boxes.skip.height >= 44 && boxes.next.height >= 44, 'Mobile buttons must remain tappable');
-      assert(Math.abs(boxes.skip.top - boxes.next.top) < 2, 'Skip and Next must share a row');
+      assert(boxes.skip.bottom <= boxes.next.top, 'Skip must appear above the main Next button');
       assert(!boxes.overflow, 'No horizontal overflow at ' + width + 'px');
     }
     await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
@@ -159,6 +174,15 @@ function respond(res, status, data) {
     assert.equal(profile.dynamicAnswers[ids[1]], 'Latest typed answer');
     assert(await page.$eval(skipButton, el => !el.disabled), 'Optional questions also show Skip');
 
+    // A saved country should be compact; changing it reveals a searchable list only on demand.
+    await page.waitForFunction(() => document.body.textContent.includes('বাংলাদেশ · Bangladesh') &&
+      document.body.textContent.includes('অন্য দেশ বেছে নিন'));
+    assert.equal(await page.$('fieldset input'), null, 'A saved country must not show the long list or search by default');
+    await page.evaluate(() => [...document.querySelectorAll('fieldset button')]
+      .find(button => button.textContent.includes('অন্য দেশ বেছে নিন')).click());
+    await page.waitForSelector('fieldset input');
+    await page.type('fieldset input', 'Choice A');
+
     // Select + immediate Next must cancel the delayed auto-advance callback.
     await page.evaluate(() => {
       [...document.querySelectorAll('fieldset button')].find(button => button.textContent.includes('Choice A')).click();
@@ -167,17 +191,15 @@ function respond(res, status, data) {
     await page.waitForFunction(() => document.querySelector('#qb-question')?.textContent === 'Question 4');
     await new Promise(resolve => setTimeout(resolve, 450));
     assert.equal(await page.$eval('#qb-question', el => el.textContent), 'Question 4', 'Old timer must not skip the following question');
-    assert.equal(profile.dynamicAnswers[ids[2]], 'a');
+    assert.equal(profile.dynamicAnswers[ids[2]], 'Choice A');
 
     await page.type('fieldset textarea', 'Final saved answer');
     hold = true; received = once(events, 'save');
     await page.click(nextButton); await received;
     assert.equal(await page.$eval('#qb-question', el => el.textContent), 'Question 4', 'Level completion must wait for its save');
     hold = false; pending.splice(0).forEach(finish => finish());
-    await page.waitForFunction(() => !document.querySelector('#qb-question') && document.body.textContent.includes('ব্যাজ অর্জন'));
+    await page.waitForFunction(() => !document.querySelector('#qb-question') && document.body.textContent.includes('প্রায় শেষ'));
     assert.equal(profile.dynamicAnswers[ids[3]], 'Final saved answer');
-    await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('শেষ ধাপে যান')).click());
-    await page.waitForFunction(() => document.body.textContent.includes('প্রায় শেষ'));
     assert(await page.evaluate(() => ![...document.querySelectorAll('button')].some(button => button.textContent.includes('বায়োডাটা জমা দিন'))),
       'Skipping must not bypass final required answers');
     assert.deepEqual(errors, []);

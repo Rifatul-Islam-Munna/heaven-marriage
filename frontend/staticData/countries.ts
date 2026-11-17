@@ -9,5 +9,5 @@ export const countries = codes.map((code,index)=>{
   const old=legacyCountries.find(item=>item.en.toLowerCase()===name.toLowerCase());
   const en=old?.en||name;
   return {id:index+1,code,en,bn:en};
-}).sort((a,b)=>a.en.localeCompare(b.en,'en'));
+}).sort((a,b)=>a.code==='BD'?-1:b.code==='BD'?1:a.en.localeCompare(b.en,'en'));
 export const countryOptions=countries.map(item=>({value:item.en,label:item.en}));

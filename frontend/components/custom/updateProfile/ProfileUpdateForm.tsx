@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { currentBiodataStage, isSubmittedBiodata, type BiodataStatusSource } from "@/lib/biodata-status";
 import {
   ArrowLeft, AlertCircle, Briefcase, Check, ChevronRight, Flame, Gem, GraduationCap, HeartHandshake, House, ListChecks,
-  Loader2, MapPin, MessageCircle, PartyPopper, Pencil, RefreshCw, Search, ShieldCheck, Sparkles, Trophy, User, X,
+  Loader2, MapPin, MessageCircle, PartyPopper, Pencil, RefreshCw, Search, ShieldCheck, Sparkles, Trophy, User,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import {
   type ProfileQuestion, type ProfileQuestionSchema,
 } from "@/lib/profile-questions";
 import { profileQuestionOptions } from "@/lib/profile-question-options";
+import { countries as countryCatalog } from "@/staticData/countries";
 import type {LocationResponse} from '@/lib/location-options';
 import AiBiodataAssistant from "./AiBiodataAssistant";
 import { applyBiodataDraft, diffBiodataDraft, hasBiodataChanges } from "@/lib/biodata-draft";
@@ -88,6 +89,11 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
   onChange: (next: Answer) => void; onPicked: () => void; onEnter: () => void;
 }) {
   const [filter, setFilter] = useState("");
+  const [editingOptions, setEditingOptions] = useState(false);
+  // Saved profile data may arrive after mount. Derive the collapsed state from
+  // the live value so an existing answer never opens a long picker by default.
+  const hasAnswer = value !== undefined && value !== null && value !== "";
+  const showOptions = !hasAnswer || editingOptions;
   const raw = value === undefined || value === null ||
     (["number", "date"].includes(q.type) && !questionAnswerFitsInput(value,q,options)) ? "" : value;
   const chip = (active: boolean) => `flex w-full items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3.5 text-left text-[15px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600 ${
@@ -97,6 +103,51 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
   if (q.path === "dateOfBirth") return <BirthDateSelect
     id="member-birth-date" value={typeof value === "string" ? value : ""}
     onChange={onChange} required={q.required} large />;
+
+  if (q.path === "address.area") {
+    const term = String(raw ?? "").trim();
+    const normalize = (text: string) => text.normalize("NFKC").toLocaleLowerCase().trim();
+    const needle = normalize(term);
+    const matches = needle ? options.filter(option =>
+      normalize(option.label).includes(needle) || normalize(option.value).includes(needle)
+    ).slice(0, 8) : [];
+    const exact = needle ? options.find(option =>
+      normalize(option.value) === needle || normalize(option.label) === needle
+    ) : undefined;
+    const updateArea = (next: string) => {
+      const key = normalize(next);
+      const match = options.find(option =>
+        normalize(option.value) === key || normalize(option.label) === key
+      );
+      onChange(match?.value ?? next);
+    };
+    return <div className="space-y-3">
+      <div className="space-y-1.5">
+        <label htmlFor="qb-area-answer" className="block text-sm font-semibold text-gray-700">আপনার এলাকার নাম</label>
+        <input autoFocus id="qb-area-answer" dir="auto" type="text" maxLength={120} value={String(raw ?? "")}
+          onChange={event => updateArea(event.target.value)}
+          onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }}
+          placeholder="যেমন: গুলশান, মিরপুর, সাভার..."
+          className={`${big} text-base`} />
+      </div>
+      {term ? (
+        <div className="rounded-2xl border border-emerald-200 bg-white p-3">
+          {exact ? <p className="text-sm font-semibold text-emerald-700">✓ এই এলাকা তালিকায় আছে</p>
+            : matches.length ? <p className="text-sm font-semibold text-gray-600">কাছাকাছি নাম পাওয়া গেছে। চাইলে বেছে নিন; না হলে নিজের লেখা নামই থাকবে।</p>
+              : <p className="text-sm font-semibold text-emerald-700">তালিকায় নেই। আপনার লেখা নামেই সংরক্ষণ হবে।</p>}
+          {matches.length > 0 && <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {matches.map(option => <button key={option.value} type="button"
+              aria-pressed={normalize(String(raw ?? "")) === normalize(option.value)}
+              className={chip(normalize(String(raw ?? "")) === normalize(option.value))}
+              onClick={() => { onChange(option.value); onPicked(); }}>
+              <span>{option.label}</span>
+              {normalize(String(raw ?? "")) === normalize(option.value) && <Check className="h-5 w-5 shrink-0" />}
+            </button>)}
+          </div>}
+        </div>
+      ) : <p className="text-sm leading-6 text-gray-600">আপনার এলাকার নাম লিখুন। তালিকায় মিল পেলে বেছে নিন; না থাকলে নিজের এলাকার নাম লিখেই এগিয়ে যান।</p>}
+    </div>;
+  }
 
   if (q.type === "checkbox") return <div className="grid grid-cols-2 gap-3">
     {[{ v: true, label: "হ্যাঁ" }, { v: false, label: "না" }].map(item => <button key={String(item.v)} type="button" aria-pressed={raw === item.v}
@@ -133,24 +184,69 @@ function BigAnswer({ q, value, options, onChange, onPicked, onEnter }: {
         <span>{option.label}</span>{current === option.value && <Check className="h-5 w-5 shrink-0" />}
       </button>)}
     </div>;
-    const term = filter.trim().toLowerCase();
-    const shown = options.filter(option => !term || option.label.toLowerCase().includes(term) || option.value.toLowerCase().includes(term));
-    return <div className="space-y-2">
+    const selectedOption = options.find(option => option.value === current);
+    const selectedLabel = selectedOption?.label || current;
+    const isCountry = q.optionSource === "countries" || q.path === "residenceCountry" || q.path === "nationality";
+    const normalize = (text: string) => text.normalize("NFKC").toLocaleLowerCase().trim();
+    const term = normalize(filter);
+    const matches = term ? options.filter(option =>
+      normalize(option.label).includes(term) || normalize(option.value).includes(term)
+    ) : [];
+    const shown = matches.slice(0, 12);
+    const selectedCountry = isCountry ? countryCatalog.find(country => country.en === current) : undefined;
+    const flag = selectedCountry?.code
+      ? [...selectedCountry.code.toUpperCase()].map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join("")
+      : "";
+    const bangladesh = isCountry ? options.find(option => option.value === "Bangladesh") : undefined;
+
+    if (current && !showOptions) return <div className="space-y-3">
+      <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-2xl">
+          {flag || <Check className="h-5 w-5 text-emerald-600" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-gray-500">{isCountry ? "নির্বাচিত দেশ" : "নির্বাচিত উত্তর"}</p>
+          <p className="mt-0.5 break-words text-base font-bold text-gray-900">
+            {isCountry && current === "Bangladesh" ? "বাংলাদেশ · Bangladesh" : selectedLabel}
+          </p>
+        </div>
+      </div>
+      <button type="button" onClick={() => { setFilter(""); setEditingOptions(true); }}
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-pink-700 transition-colors hover:border-pink-300 hover:bg-pink-50">
+        <Pencil className="h-4 w-4" /> {isCountry ? "অন্য দেশ বেছে নিন" : "উত্তর পরিবর্তন করুন"}
+      </button>
+    </div>;
+
+    return <div className="space-y-3">
+      {!current && isCountry && bangladesh && <button type="button" className={chip(false)}
+        onClick={() => { onChange(bangladesh.value); setEditingOptions(false); onPicked(); }}>
+        <span className="flex items-center gap-3"><span className="text-xl">🇧🇩</span>বাংলাদেশ · Bangladesh</span>
+        <ChevronRight className="h-4 w-4 shrink-0" />
+      </button>}
       <label className="relative block">
-        <span className="sr-only">খুঁজুন</span>
+        <span className="sr-only">{isCountry ? "দেশ খুঁজুন" : "উত্তর খুঁজুন"}</span>
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-        <input autoFocus value={filter} onChange={event => setFilter(event.target.value)} placeholder="টাইপ করে খুঁজুন..." className={`${big} pl-12 text-base`} />
+        <input autoFocus value={filter} onChange={event => setFilter(event.target.value)}
+          placeholder={isCountry ? "দেশের নাম লিখে খুঁজুন..." : "নাম লিখে খুঁজুন..."}
+          className={`${big} pl-12 text-base`} />
       </label>
-      {current && <p className="text-sm text-gray-600">নির্বাচিত: <span className="font-semibold text-pink-700">{options.find(option => option.value === current)?.label || current}</span></p>}
-      <ul className="max-h-72 space-y-1.5 overflow-y-auto rounded-2xl pr-1">
-        {shown.slice(0, 120).map(option => <li key={option.value}>
+      {current && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm">
+        <span className="text-gray-600">এখন নির্বাচিত: <strong className="text-gray-900">{selectedLabel}</strong></span>
+        <button type="button" onClick={() => setEditingOptions(false)} className="font-semibold text-pink-700 hover:underline">এটাই রাখুন</button>
+      </div>}
+      {!term && <p className="text-sm leading-6 text-gray-500">
+        {isCountry ? "বাংলাদেশে থাকলে উপরের অপশনটি বেছে নিন। অন্য দেশ হলে নাম লিখে খুঁজুন।" : "নাম লিখলেই মিল থাকা উত্তরগুলো দেখাবে।"}
+      </p>}
+      {term && <ul className="grid gap-2 sm:grid-cols-2">
+        {shown.map(option => <li key={option.value}>
           <button type="button" aria-pressed={current === option.value} className={chip(current === option.value)}
-            onClick={() => { onChange(option.value); onPicked(); }}>
+            onClick={() => { onChange(option.value); setEditingOptions(false); onPicked(); }}>
             <span>{option.label}</span>{current === option.value && <Check className="h-5 w-5 shrink-0" />}
           </button>
         </li>)}
-        {!shown.length && <li className="px-2 py-6 text-center text-sm text-gray-500">“{filter}” মিলছে না</li>}
-      </ul>
+        {!shown.length && <li className="rounded-xl bg-gray-50 px-3 py-5 text-center text-sm text-gray-500">“{filter}” মেলেনি। বানান ঠিক করে আবার খুঁজুন।</li>}
+        {matches.length > shown.length && <li className="px-2 py-2 text-xs text-gray-500 sm:col-span-2">আরও ফলাফল আছে। আরও নির্দিষ্ট করে লিখুন।</li>}
+      </ul>}
     </div>;
   }
 
@@ -468,29 +564,6 @@ export default function ProfileUpdateForm() {
       setIsAdvancing(false);
     }
   };
-  const skipRemainingOptional = async () => {
-    if (!question || question.required || advancePending.current) return;
-    if (autoAdvanceTimer.current !== null) {
-      window.clearTimeout(autoAdvanceTimer.current);
-      autoAdvanceTimer.current = null;
-    }
-    advancePending.current = true;
-    setIsAdvancing(true);
-    try {
-      await queueSave();
-      const fresh = useProfileStore.getState().formData;
-      const nextRequired = levelQuestions.findIndex((item, index) =>
-        index > qi && item.required && !answered(item, fresh));
-      setStreak(0);
-      if (nextRequired >= 0) setQi(nextRequired);
-      else finishLevel();
-    } catch {
-      toast.error("সংরক্ষণ ব্যর্থ হয়েছে। আবার চেষ্টা করুন।");
-    } finally {
-      advancePending.current = false;
-      setIsAdvancing(false);
-    }
-  };
   useEffect(() => { nextRef.current = next; });
   useEffect(() => () => {
     if (autoAdvanceTimer.current !== null) window.clearTimeout(autoAdvanceTimer.current);
@@ -573,35 +646,37 @@ export default function ProfileUpdateForm() {
   if (view === "play" && question) {
     const value = readQuestionAnswer(formData, question);
     const Icon = LEVEL_ICONS[level.section.id] || Sparkles;
-    return shell(<div className="relative mx-auto flex max-w-2xl flex-col">
-      <div className="flex items-center gap-3">
+    return shell(<div className="relative mx-auto flex max-w-3xl flex-col">
+      <div data-question-header className="flex items-center gap-2 sm:gap-3">
         <button type="button" disabled={isAdvancing} onClick={() => (qi > 0 ? setQi(qi - 1) : setView("journey"))} aria-label="আগের প্রশ্ন"
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm hover:bg-pink-50"><ArrowLeft className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 text-xs font-semibold text-gray-600">
-            <span className="flex min-w-0 items-center gap-1.5 truncate"><Icon className="h-4 w-4 shrink-0 text-pink-600" /> লেভেল {bn(levelIndex + 1)}: {level.section.title}</span>
+            <span className="flex min-w-0 items-center gap-1.5 truncate"><Icon className="h-4 w-4 shrink-0 text-pink-600" /> ধাপ {bn(levelIndex + 1)}: {level.section.title}</span>
             <span className="shrink-0">{bn(Math.min(qi + 1, levelQuestions.length))}/{bn(levelQuestions.length)}</span>
           </div>
           <div className="mt-1.5 flex gap-1" aria-hidden>
             {levelQuestions.map((q, i) => <span key={q.id} className={`h-1.5 flex-1 rounded-full transition-colors ${i < qi || (i === qi && answered(q)) ? "bg-pink-600" : i === qi ? "bg-pink-300" : answered(q) ? "bg-pink-200" : "bg-gray-200"}`} />)}
           </div>
         </div>
-        {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-pink-700 shadow-sm hover:bg-pink-50" title="বাকি কানেকশন"><Gem className="h-4 w-4" />{bn(connectionBalance)} কানেকশন</Link>}
-        <button type="button" disabled={isAdvancing} onClick={() => setView("journey")} aria-label="যাত্রার ম্যাপে ফিরুন"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm hover:bg-pink-50"><X className="h-5 w-5" /></button>
+        <button type="button" data-question-action="skip" disabled={isAdvancing} onClick={() => { void next(true); }}
+          aria-label={question.required ? "প্রশ্নটি পরে দিন" : "প্রশ্নটি এড়িয়ে যান"}
+          className="flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-full border border-pink-200 bg-white px-3 text-xs font-bold text-pink-700 shadow-sm transition-colors hover:bg-pink-50 disabled:opacity-60 sm:px-4 sm:text-sm">
+          {question.required ? "পরে দেব" : "এড়িয়ে যান"} <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
 
       {cheer && <div key={cheer.n} className="qb-float pointer-events-none absolute right-2 top-16 z-10 rounded-full bg-emerald-500 px-3 py-1 text-sm font-bold text-white shadow-lg">
         {cheer.text}
       </div>}
 
-      <div key={question.id + ":" + shake} className={`qb-in mt-6 rounded-3xl border-2 p-5 shadow-[0_10px_30px_rgba(219,39,119,0.08)] sm:p-8 ${question.required ? "border-pink-300 bg-pink-50" : "border-emerald-200 bg-emerald-50"} ${shake ? "qb-shake" : ""}`}>
+      <div key={question.id + ":" + shake} className={`qb-in mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:mt-7 sm:p-8 ${shake ? "qb-shake" : ""}`}>
         <div className="flex flex-wrap items-center gap-2">
-          {question.required ? <span className="rounded-full bg-pink-600 px-3 py-1.5 text-xs font-bold text-white">আবশ্যিক · আগে উত্তর দিন</span>
-            : <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">ঐচ্ছিক · চাইলে এড়িয়ে যান</span>}
-          {streak >= 2 && <span className="qb-pop inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-600"><Flame className="h-3.5 w-3.5" /> {bn(streak)} টানা উত্তর</span>}
+          {question.required ? <span className="rounded-full bg-pink-50 px-3 py-1.5 text-xs font-bold text-pink-700 ring-1 ring-pink-100">আবশ্যিক</span>
+            : <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">ঐচ্ছিক · চাইলে পরে দিতে পারবেন</span>}
         </div>
         <h1 id="qb-question" dir="auto" className="mt-4 text-2xl font-bold leading-snug text-gray-900 sm:text-[28px]">{question.question}</h1>
+        {question.path === "residenceCountry" && <p className="mt-2 text-sm leading-6 text-gray-600">আপনি বর্তমানে যে দেশে থাকেন, সেটি বেছে নিন।</p>}
         {(question.path==='address.upazila'||question.path==='address.cityCorporation')&&<div className="mt-3 flex flex-col gap-2">
           <p className="text-sm text-gray-600">উপজেলা অথবা সিটি কর্পোরেশন — যেকোনো একটি নির্বাচন করুন।</p>
           {levelQuestions.map((alternative,index)=>alternative.path===(question.path==='address.upazila'?'address.cityCorporation':'address.upazila')&&
@@ -617,21 +692,12 @@ export default function ProfileUpdateForm() {
             onChange={answer => setAnswer(question, answer)} onPicked={autoAdvance} onEnter={() => next(false)} />
           {currentRuleError&&<p id="qb-answer-error" role="alert" className="mt-2 text-sm text-destructive">{currentRuleError}</p>}
         </fieldset>
-        {!question.required && levelQuestions.slice(qi + 1).some(item => !item.required) &&
-          <button type="button" disabled={isAdvancing} onClick={() => { void skipRemainingOptional(); }}
-            className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-bold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:opacity-60">
-            এই বিভাগের বাকি ঐচ্ছিক প্রশ্নগুলো এড়িয়ে যান
-          </button>}
       </div>
 
-      <div data-question-navigation className="sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-2 bg-[#fff7f9]/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur" aria-busy={isAdvancing}>
-        <div className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">{saveBadge}</div>
-        <button type="button" data-question-action="skip" disabled={isAdvancing} onClick={() => { void next(true); }}
-          className={`min-h-14 shrink-0 rounded-2xl border-2 px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors disabled:opacity-60 ${question.required ? "border-pink-300 bg-white text-pink-700 hover:bg-pink-50" : "border-emerald-500 bg-emerald-100 text-emerald-800 hover:bg-emerald-200"}`}>
-          {question.required ? "পরে উত্তর দেব" : "এড়িয়ে যান"}
-        </button>
+      <div data-question-navigation className="sticky bottom-0 z-20 mt-6 flex flex-col gap-2 border-t border-slate-200 bg-white/95 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:flex-row sm:items-center sm:gap-3" aria-busy={isAdvancing}>
+        <div className="order-2 min-w-0 sm:order-1 sm:flex-1">{saveBadge}</div>
         <button type="button" data-question-action="next" disabled={isAdvancing} onClick={() => { void next(false); }}
-          className="flex min-h-14 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:flex-none sm:min-w-44 sm:text-base">
+          className="order-1 flex min-h-14 w-full min-w-0 items-center justify-center gap-2 rounded-2xl bg-pink-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:opacity-60 sm:order-2 sm:w-auto sm:min-w-44 sm:text-base">
           {isAdvancing ? <><Loader2 className="h-5 w-5 shrink-0 animate-spin" /> সংরক্ষণ হচ্ছে…</>
             : <>{qi < levelQuestions.length - 1 ? "পরবর্তী প্রশ্ন" : levelIndex < levels.length-1 ? "পরবর্তী বিভাগে যান" : "শেষ ধাপে যান"} <ChevronRight className="h-5 w-5 shrink-0" /></>}
         </button>
@@ -646,8 +712,8 @@ export default function ProfileUpdateForm() {
     return shell(<div className="relative mx-auto max-w-lg overflow-hidden rounded-3xl bg-white p-6 text-center shadow-[0_10px_30px_rgba(219,39,119,0.1)] sm:p-10">
       <Confetti />
       <div className="qb-pop mx-auto flex size-24 items-center justify-center rounded-full bg-pink-600 text-white shadow-lg shadow-pink-600/30"><Icon className="h-11 w-11" /></div>
-      <p className="mt-5 text-sm font-semibold text-pink-700">লেভেল {bn(levelIndex + 1)} সম্পন্ন!</p>
-      <h1 className="mt-1 text-2xl font-extrabold text-gray-900">“{level.section.title}” ব্যাজ অর্জন</h1>
+      <p className="mt-5 text-sm font-semibold text-pink-700">ধাপ {bn(levelIndex + 1)} সম্পন্ন!</p>
+      <h1 className="mt-1 text-2xl font-extrabold text-gray-900">“{level.section.title}” বিভাগ শেষ হয়েছে</h1>
       <p className="mt-2 text-gray-600">{bn(level.questions.length)}টির মধ্যে {bn(done)}টি প্রশ্নের উত্তর দিয়েছেন।</p>
       <div className="mt-6 grid grid-cols-3 gap-2">
         <div className="rounded-2xl bg-amber-50 p-3"><p className="flex items-center justify-center gap-1 text-lg font-extrabold text-amber-600">{bn(answeredCount)}</p><p className="text-xs text-gray-600">মোট উত্তর</p></div>
@@ -657,7 +723,7 @@ export default function ProfileUpdateForm() {
       <div className="mt-6 space-y-2">
         {nextLevel ? <button type="button" onClick={() => goLevel(levelIndex + 1)}
           className="flex w-full items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-3.5 font-bold text-white shadow-lg shadow-pink-600/20 hover:bg-pink-700">
-          পরবর্তী লেভেল: {nextLevel.section.title} <ChevronRight className="h-5 w-5" />
+          পরবর্তী বিভাগ: {nextLevel.section.title} <ChevronRight className="h-5 w-5" />
         </button> : <button type="button" onClick={() => setView("finish")}
           className="flex w-full items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-3.5 font-bold text-white hover:bg-pink-700"><Trophy className="h-5 w-5" /> শেষ ধাপে যান</button>}
         <button type="button" onClick={() => setView("journey")} className="w-full rounded-full px-6 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50">যাত্রার ম্যাপ দেখুন</button>
@@ -692,7 +758,7 @@ export default function ProfileUpdateForm() {
       </ul>
     </> : <>
       <h1 className="mt-5 text-2xl font-extrabold text-gray-900">{savedStage === "rejected" ? "সংশোধিত বায়োডাটা আবার জমা দিন" : "মাশাআল্লাহ, আপনার বায়োডাটা তৈরি!"}</h1>
-      <p className="mt-2 text-gray-600">{savedStage === "rejected" ? "আগের উত্তরগুলো সংরক্ষিত আছে। প্রয়োজনীয় সংশোধন করে পুনরায় Submit করুন।" : `${bn(answeredCount)}টি প্রশ্নের উত্তর দিয়েছেন এবং ${bn(completedLevels)}টি ব্যাজ অর্জন করেছেন। এবার জমা দিন, যাচাইয়ের পর প্রকাশ করা হবে।`}</p>
+      <p className="mt-2 text-gray-600">{savedStage === "rejected" ? "আগের উত্তরগুলো সংরক্ষিত আছে। প্রয়োজনীয় সংশোধন করে পুনরায় জমা দিন।" : `${bn(answeredCount)}টি প্রশ্নের উত্তর দিয়েছেন এবং ${bn(completedLevels)}টি বিভাগ সম্পন্ন করেছেন। এবার জমা দিন; যাচাইয়ের পর প্রকাশ করা হবে।`}</p>
       <button type="button" onClick={() => void submit()} disabled={isPending}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-pink-600/25 hover:bg-pink-700 disabled:opacity-60">
         {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} বায়োডাটা জমা দিন
@@ -753,18 +819,18 @@ export default function ProfileUpdateForm() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-pink-700">{name ? `স্বাগতম, ${name}!` : "স্বাগতম!"}</p>
           <h1 className="mt-1 text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl">{percent >= 100 ? "আপনার বায়োডাটা সম্পূর্ণ" : started ? "আপনার বায়োডাটা যাত্রা চলছে" : "চলুন বায়োডাটা তৈরি শুরু করি"}</h1>
-          <p className="mt-1.5 text-sm text-gray-600">একবারে একটি প্রশ্ন। প্রতিটি উত্তরে বায়োডাটা এগোবে এবং প্রতিটি লেভেলে নতুন ব্যাজ পাবেন। উত্তরগুলো স্বয়ংক্রিয়ভাবে সংরক্ষিত হয়।</p>
+          <p className="mt-1.5 text-sm leading-6 text-gray-600">একবারে একটি প্রশ্নের উত্তর দিন। আপনার উত্তর নিজে থেকেই সংরক্ষিত হবে। কোনো প্রশ্ন পরে দিতে চাইলে উপরের “এড়িয়ে যান” চাপুন।</p>
           <p className="mt-2 text-[13px] font-semibold text-slate-700" aria-live="polite">
             {requiredProgress.requiredCount>0
               ? `আবশ্যিক প্রশ্নের উত্তর: ${bn(requiredProgress.answeredCount)} / ${bn(requiredProgress.requiredCount)}`
               : !gender ? 'বায়োডাটা শুরু করলে আবশ্যিক প্রশ্ন গণনা হবে' : 'বর্তমানে কোনো আবশ্যিক প্রশ্ন নেই'}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-gray-500">
-            আপনার জন্য প্রযোজ্য Required প্রশ্ন অনুযায়ী অগ্রগতি। Save হলে একই হিসাব Admin-এও দেখা যাবে।
+            আপনার জন্য প্রযোজ্য আবশ্যিক প্রশ্ন অনুযায়ী অগ্রগতি। সংরক্ষণ হলে এই হিসাব প্রশাসকও দেখতে পারবেন।
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             {typeof connectionBalance === "number" && <Link href="/profile/numbers" className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-bold text-amber-700 hover:bg-amber-100"><Gem className="h-4 w-4" />{bn(connectionBalance)} বাকি কানেকশন</Link>}
-            <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-sm font-bold text-pink-700"><Trophy className="h-4 w-4" />{bn(completedLevels)}/{bn(levels.length)} ব্যাজ</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-3 py-1 text-sm font-bold text-pink-700"><Trophy className="h-4 w-4" />{bn(completedLevels)}/{bn(levels.length)} ধাপ</span>
             {saveBadge}
           </div>
         </div>
@@ -778,7 +844,7 @@ export default function ProfileUpdateForm() {
       </div>
     </section>
 
-    <section aria-label="লেভেলসমূহ" className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+    <section aria-label="ধাপসমূহ" className="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
       <h2 className="mb-4 font-bold text-gray-900">আপনার যাত্রা</h2>
       <ol className="relative space-y-3 before:absolute before:bottom-6 before:left-[27px] before:top-6 before:w-0.5 before:bg-pink-100">
         {levels.map((l, li) => {
@@ -794,15 +860,15 @@ export default function ProfileUpdateForm() {
                 {complete ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold text-gray-500">লেভেল {bn(li + 1)}</span>
+                <span className="block text-xs font-semibold text-gray-500">ধাপ {bn(li + 1)}</span>
                 <span className="block truncate font-bold text-gray-900">{l.section.title}</span>
                 <span className="mt-1 flex items-center gap-2">
                   <span className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-100"><span className="block h-full rounded-full bg-pink-500" style={{ width: `${(done / l.questions.length) * 100}%` }} /></span>
                   <span className="text-xs text-gray-500">{bn(done)}/{bn(l.questions.length)}</span>
                 </span>
               </span>
-              {complete ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">ব্যাজ অর্জিত</span>
-                : isCurrent ? <span className="rounded-full bg-pink-600 px-3 py-1 text-xs font-bold text-white">খেলুন</span>
+              {complete ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">সম্পন্ন</span>
+                : isCurrent ? <span className="rounded-full bg-pink-600 px-3 py-1 text-xs font-bold text-white">চালিয়ে যান</span>
                   : <ChevronRight className="h-5 w-5 text-gray-300" />}
             </button>
           </li>;
