@@ -4,7 +4,8 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandSearch,
+  CommandInput,
+  CommandList,
   CommandItem,
 } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
@@ -63,32 +64,34 @@ export function AddressStep() {
           </PopoverTrigger>
           <PopoverContent className="w-[260px] p-0" align="start">
             <Command>
-              <CommandSearch placeholder="জেলা খুঁজুন..." className="h-10" />
-              <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
-              <CommandGroup className="max-h-48 overflow-y-auto">
-                {districts.map((d) => (
-                  <CommandItem
-                    key={d.id}
-                    value={d.bn_name}
-                    onSelect={() => {
-                      updateNestedField("address", "district", d.name);
-                      updateNestedField("address", "upazila", ""); // Reset upazila
-                      setDistrictOpen(false);
-                    }}
-                    className="py-3"
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4 text-pink-600",
-                        selectedDistrict?.id === d.id
-                          ? "opacity-100"
-                          : "opacity-0",
-                      )}
-                    />
-                    {d.bn_name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              <CommandInput placeholder="জেলা খুঁজুন..." className="h-10" />
+              <CommandList>
+                <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                <CommandGroup className="max-h-48 overflow-y-auto">
+                  {districts.map((d) => (
+                    <CommandItem
+                      key={d.id}
+                      value={d.bn_name}
+                      onSelect={() => {
+                        updateNestedField("address", "district", d.name);
+                        updateNestedField("address", "upazila", ""); // Reset upazila
+                        setDistrictOpen(false);
+                      }}
+                      className="py-3"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4 text-pink-600",
+                          selectedDistrict?.id === d.id
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {d.bn_name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
             </Command>
           </PopoverContent>
         </Popover>
@@ -111,31 +114,33 @@ export function AddressStep() {
           </PopoverTrigger>
           <PopoverContent className="w-[260px] p-0" align="start">
             <Command>
-              <CommandSearch placeholder="উপজেলা খুঁজুন..." className="h-10" />
-              <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
-              <CommandGroup className="max-h-48 overflow-y-auto">
-                {availableUpazilas.map((upazila) => (
-                  <CommandItem
-                    key={upazila.id}
-                    value={upazila.bn_name}
-                    onSelect={() => {
-                      updateNestedField("address", "upazila", upazila.name);
-                      setUpazilaOpen(false);
-                    }}
-                    className="py-3"
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4 text-pink-600",
-                        selectedUpazila?.id === upazila.id
-                          ? "opacity-100"
-                          : "opacity-0",
-                      )}
-                    />
-                    {upazila.bn_name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              <CommandInput placeholder="উপজেলা খুঁজুন..." className="h-10" />
+              <CommandList>
+                <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
+                <CommandGroup className="max-h-48 overflow-y-auto">
+                  {availableUpazilas.map((upazila) => (
+                    <CommandItem
+                      key={upazila.id}
+                      value={upazila.bn_name}
+                      onSelect={() => {
+                        updateNestedField("address", "upazila", upazila.name);
+                        setUpazilaOpen(false);
+                      }}
+                      className="py-3"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4 text-pink-600",
+                          selectedUpazila?.id === upazila.id
+                            ? "opacity-100"
+                            : "opacity-0",
+                        )}
+                      />
+                      {upazila.bn_name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
             </Command>
           </PopoverContent>
         </Popover>

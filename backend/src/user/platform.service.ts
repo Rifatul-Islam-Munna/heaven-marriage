@@ -650,10 +650,18 @@ export class PlatformService implements OnModuleInit {
         .updateOne({ id }, { $set: { paymentId: payment.paymentId } });
       return payment;
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      this.logger.error(
+        `Connection package payment creation failed orderId=${id} packageId=${pkgId} amount=${amount} gateway=zinipay reason=${reason.slice(0, 700)}`,
+        e instanceof Error ? e.stack : undefined,
+      );
       await this.db
         .collection('connection_orders')
-        .updateOne({ id }, { $set: { status: 'failed' } });
-      throw new BadRequestException('Unable to create payment. Please retry.');
+        .updateOne(
+          { id },
+          { $set: { status: 'failed', paymentFailure: { gateway: 'zinipay', reason: reason.slice(0, 700), failedAt: new Date() } } },
+        );
+      throw new BadRequestException('Unable to create payment. Please retry. Check backend logs for the ZiniPay failure reason.');
     }
   }
   async executePayment(paymentId: string) {

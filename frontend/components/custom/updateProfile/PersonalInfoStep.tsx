@@ -14,7 +14,8 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandSearch,
+  CommandInput,
+  CommandList,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -104,35 +105,37 @@ export function PersonalInfoStep() {
             </PopoverTrigger>
             <PopoverContent className="w-full p-0">
               <Command>
-                <CommandSearch placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
-                <CommandEmpty>কোনো উচ্চতা পাওয়া যায়নি।</CommandEmpty>
-                <CommandGroup className="max-h-64 overflow-auto">
-                  {heightOptions.map((option) => (
-                    <CommandItem
-                      key={option.value}
-                      value={option.searchText}
-                      onSelect={() => {
-                        updateNestedField(
-                          "personalInformation",
-                          "height",
-                          option.value,
-                        );
-                        setHeightOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          formData.personalInformation?.height?.toString() ===
-                            option.value
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {option.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+                <CommandInput placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
+                <CommandList>
+                  <CommandEmpty>কোনো উচ্চতা পাওয়া যায়নি।</CommandEmpty>
+                  <CommandGroup className="max-h-64 overflow-auto">
+                    {heightOptions.map((option) => (
+                      <CommandItem
+                        key={option.value}
+                        value={option.searchText}
+                        onSelect={() => {
+                          updateNestedField(
+                            "personalInformation",
+                            "height",
+                            option.value,
+                          );
+                          setHeightOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.personalInformation?.height?.toString() ===
+                              option.value
+                              ? "opacity-100"
+                              : "opacity-0",
+                          )}
+                        />
+                        {option.label}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
@@ -288,9 +291,7 @@ export function PersonalInfoStep() {
 
         {formData.gender === "female" && (
           <div className="space-y-2">
-            <Label htmlFor="womenNiqbYear">
-              কবে থেকে নিকাব সহ পর্দা করছেন?
-            </Label>
+            <Label htmlFor="womenNiqbYear">কবে থেকে নিকাব সহ পর্দা করছেন?</Label>
             <Input
               id="womenNiqbYear"
               value={formData.personalInformation?.womenNiqbYear || ""}

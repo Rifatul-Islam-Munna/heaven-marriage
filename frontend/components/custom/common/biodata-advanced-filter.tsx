@@ -51,7 +51,8 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandSearch,
+  CommandInput,
+  CommandList,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -62,7 +63,11 @@ import {
 import { cn } from "@/lib/utils";
 import { districts } from "@/staticData/districts";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
-import {defaultCityCorporations,defaultCityAreas,type LocationResponse} from "@/lib/location-options";
+import {
+  defaultCityCorporations,
+  defaultCityAreas,
+  type LocationResponse,
+} from "@/lib/location-options";
 import { upazilas } from "@/staticData/upazilas";
 import { useDebounce } from "use-debounce";
 import {
@@ -134,11 +139,32 @@ function FilterContent({
   selectedDistrict,
   selectedUpazila,
 }: FilterContentProps) {
-  const {data:locations}=useQueryWrapper<LocationResponse>(["public-location-options"],"/profile-questions/locations",{staleTime:60000});
-  const extra=locations?.entries||[];
-  const availableLocalUpazilas=[...availableUpazilas,...extra.filter(x=>x.kind==="upazila"&&x.district===filters.districtId).map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))];
-  const cityOptions=[...defaultCityCorporations,...extra.filter(x=>x.kind==="cityCorporation")].filter(x=>x.district===filters.districtId);
-  const areaOptions=[...defaultCityAreas,...extra.filter(x=>x.kind==="area")].filter(x=>x.district===filters.districtId && (filters.cityCorporation?x.cityCorporation===filters.cityCorporation:x.upazila===filters.upazilaId));
+  const { data: locations } = useQueryWrapper<LocationResponse>(
+    ["public-location-options"],
+    "/profile-questions/locations",
+    { staleTime: 60000 },
+  );
+  const extra = locations?.entries || [];
+  const availableLocalUpazilas = [
+    ...availableUpazilas,
+    ...extra
+      .filter((x) => x.kind === "upazila" && x.district === filters.districtId)
+      .map((x, i) => ({ id: "custom-" + i, name: x.name, bn_name: x.label })),
+  ];
+  const cityOptions = [
+    ...defaultCityCorporations,
+    ...extra.filter((x) => x.kind === "cityCorporation"),
+  ].filter((x) => x.district === filters.districtId);
+  const areaOptions = [
+    ...defaultCityAreas,
+    ...extra.filter((x) => x.kind === "area"),
+  ].filter(
+    (x) =>
+      x.district === filters.districtId &&
+      (filters.cityCorporation
+        ? x.cityCorporation === filters.cityCorporation
+        : x.upazila === filters.upazilaId),
+  );
   const [age, setAge] = useState({
     min: 10,
     max: 40,
@@ -150,16 +176,25 @@ function FilterContent({
   const [newAge] = useDebounce(age, 600);
   const [newHeight] = useDebounce(height, 600);
 
-  const lastAge=useRef(newAge),lastHeight=useRef(newHeight);
+  const lastAge = useRef(newAge),
+    lastHeight = useRef(newHeight);
   useEffect(() => {
-    if(lastAge.current.min===newAge.min&&lastAge.current.max===newAge.max)return;
-    lastAge.current=newAge;
+    if (
+      lastAge.current.min === newAge.min &&
+      lastAge.current.max === newAge.max
+    )
+      return;
+    lastAge.current = newAge;
     setFilters({ ageMin: newAge.min, ageMax: newAge.max });
   }, [newAge]);
 
   useEffect(() => {
-    if(lastHeight.current.min===newHeight.min&&lastHeight.current.max===newHeight.max)return;
-    lastHeight.current=newHeight;
+    if (
+      lastHeight.current.min === newHeight.min &&
+      lastHeight.current.max === newHeight.max
+    )
+      return;
+    lastHeight.current = newHeight;
     setFilters({
       heightMin: newHeight.min,
       heightMax: newHeight.max,
@@ -321,44 +356,56 @@ function FilterContent({
                       <DialogTitle>জেলা নির্বাচন করুন</DialogTitle>
                     </DialogHeader>
                     <Command className="rounded-none">
-                      <CommandSearch
-                        placeholder="জেলা খুঁজুন..."
-                        className="h-9"
-                      />
-                      <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-[50vh] overflow-y-auto">
-                        {[...districts,...extra.filter(x=>x.kind==='district').map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))].map((d) => (
-                          <CommandItem
-                            key={d.id}
-                            value={d.bn_name}
-                            onSelect={() => {
-                              setFilters({
-                                districtId:
-                                  filters.districtId === d.name ? null : d.name,
-                                upazilaId: null,
-                                cityCorporation: null,
-                                area: null,
-                              });
-                              // Close dialog - you'll need to manage this state
-                              document
-                                .querySelector('[data-state="open"]')
-                                ?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
-                                ?.click();
-                            }}
-                            className="text-sm"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                filters.districtId === d.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {d.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandInput placeholder="জেলা খুঁজুন..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-[50vh] overflow-y-auto">
+                          {[
+                            ...districts,
+                            ...extra
+                              .filter((x) => x.kind === "district")
+                              .map((x, i) => ({
+                                id: "custom-" + i,
+                                name: x.name,
+                                bn_name: x.label,
+                              })),
+                          ].map((d) => (
+                            <CommandItem
+                              key={d.id}
+                              value={d.bn_name}
+                              onSelect={() => {
+                                setFilters({
+                                  districtId:
+                                    filters.districtId === d.name
+                                      ? null
+                                      : d.name,
+                                  upazilaId: null,
+                                  cityCorporation: null,
+                                  area: null,
+                                });
+                                // Close dialog - you'll need to manage this state
+                                document
+                                  .querySelector('[data-state="open"]')
+                                  ?.querySelector<HTMLButtonElement>(
+                                    'button[aria-label="Close"]',
+                                  )
+                                  ?.click();
+                              }}
+                              className="text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  filters.districtId === d.name
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {d.bn_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </DialogContent>
                 </Dialog>
@@ -386,40 +433,50 @@ function FilterContent({
                   </PopoverTrigger>
                   <PopoverContent className="w-[260px] p-0" align="start">
                     <Command>
-                      <CommandSearch
-                        placeholder="জেলা খুঁজুন..."
-                        className="h-9"
-                      />
-                      <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-48 overflow-y-auto">
-                        {[...districts,...extra.filter(x=>x.kind==='district').map((x,i)=>({id:'custom-'+i,name:x.name,bn_name:x.label}))].map((d) => (
-                          <CommandItem
-                            key={d.id}
-                            value={d.bn_name}
-                            onSelect={() => {
-                              setFilters({
-                                districtId:
-                                  filters.districtId === d.name ? null : d.name,
-                                upazilaId: null,
-                                cityCorporation: null,
-                                area: null,
-                              });
-                              setDistrictOpen(false);
-                            }}
-                            className="text-sm"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                filters.districtId === d.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {d.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandInput placeholder="জেলা খুঁজুন..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto">
+                          {[
+                            ...districts,
+                            ...extra
+                              .filter((x) => x.kind === "district")
+                              .map((x, i) => ({
+                                id: "custom-" + i,
+                                name: x.name,
+                                bn_name: x.label,
+                              })),
+                          ].map((d) => (
+                            <CommandItem
+                              key={d.id}
+                              value={d.bn_name}
+                              onSelect={() => {
+                                setFilters({
+                                  districtId:
+                                    filters.districtId === d.name
+                                      ? null
+                                      : d.name,
+                                  upazilaId: null,
+                                  cityCorporation: null,
+                                  area: null,
+                                });
+                                setDistrictOpen(false);
+                              }}
+                              className="text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  filters.districtId === d.name
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {d.bn_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -454,43 +511,48 @@ function FilterContent({
                       <DialogTitle>উপজেলা নির্বাচন করুন</DialogTitle>
                     </DialogHeader>
                     <Command className="rounded-none">
-                      <CommandSearch
+                      <CommandInput
                         placeholder="উপজেলা খুঁজুন..."
                         className="h-9"
                       />
-                      <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-[50vh] overflow-y-auto">
-                        {availableLocalUpazilas.map((upazila) => (
-                          <CommandItem
-                            key={upazila.id}
-                            value={upazila.bn_name}
-                            onSelect={() => {
-                              setFilters({
-                                upazilaId:
+                      <CommandList>
+                        <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-[50vh] overflow-y-auto">
+                          {availableLocalUpazilas.map((upazila) => (
+                            <CommandItem
+                              key={upazila.id}
+                              value={upazila.bn_name}
+                              onSelect={() => {
+                                setFilters({
+                                  upazilaId:
+                                    filters.upazilaId === upazila.name
+                                      ? null
+                                      : upazila.name,
+                                  cityCorporation: null,
+                                  area: null,
+                                });
+                                document
+                                  .querySelector('[data-state="open"]')
+                                  ?.querySelector<HTMLButtonElement>(
+                                    'button[aria-label="Close"]',
+                                  )
+                                  ?.click();
+                              }}
+                              className="text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
                                   filters.upazilaId === upazila.name
-                                    ? null
-                                    : upazila.name,
-                                cityCorporation: null,area: null,
-                              });
-                              document
-                                .querySelector('[data-state="open"]')
-                                ?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')
-                                ?.click();
-                            }}
-                            className="text-sm"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                filters.upazilaId === upazila.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {upazila.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {upazila.bn_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </DialogContent>
                 </Dialog>
@@ -519,62 +581,90 @@ function FilterContent({
                   </PopoverTrigger>
                   <PopoverContent className="w-[260px] p-0" align="start">
                     <Command>
-                      <CommandSearch
+                      <CommandInput
                         placeholder="উপজেলা খুঁজুন..."
                         className="h-9"
                       />
-                      <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-48 overflow-y-auto">
-                        {availableLocalUpazilas.map((upazila) => (
-                          <CommandItem
-                            key={upazila.id}
-                            value={upazila.bn_name}
-                            onSelect={() => {
-                              setFilters({
-                                upazilaId:
+                      <CommandList>
+                        <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto">
+                          {availableLocalUpazilas.map((upazila) => (
+                            <CommandItem
+                              key={upazila.id}
+                              value={upazila.bn_name}
+                              onSelect={() => {
+                                setFilters({
+                                  upazilaId:
+                                    filters.upazilaId === upazila.name
+                                      ? null
+                                      : upazila.name,
+                                  cityCorporation: null,
+                                  area: null,
+                                });
+                                setUpazilaOpen(false);
+                              }}
+                              className="text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
                                   filters.upazilaId === upazila.name
-                                    ? null
-                                    : upazila.name,
-                                cityCorporation: null,area: null,
-                              });
-                              setUpazilaOpen(false);
-                            }}
-                            className="text-sm"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                filters.upazilaId === upazila.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {upazila.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {upazila.bn_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
               </div>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1.5 text-xs font-semibold">সিটি কর্পোরেশন
-                <select aria-label="সিটি কর্পোরেশন" value={filters.cityCorporation||""}
+              <label className="space-y-1.5 text-xs font-semibold">
+                সিটি কর্পোরেশন
+                <select
+                  aria-label="সিটি কর্পোরেশন"
+                  value={filters.cityCorporation || ""}
                   disabled={!filters.districtId}
-                  onChange={e=>setFilters({cityCorporation:e.target.value||null,upazilaId:null,area:null})}
-                  className="h-9 w-full rounded-md border bg-white px-2 text-sm">
+                  onChange={(e) =>
+                    setFilters({
+                      cityCorporation: e.target.value || null,
+                      upazilaId: null,
+                      area: null,
+                    })
+                  }
+                  className="h-9 w-full rounded-md border bg-white px-2 text-sm"
+                >
                   <option value="">সব সিটি কর্পোরেশন</option>
-                  {cityOptions.map(x=><option key={x.name} value={x.name}>{x.label}</option>)}
+                  {cityOptions.map((x) => (
+                    <option key={x.name} value={x.name}>
+                      {x.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="space-y-1.5 text-xs font-semibold">এলাকা / মহল্লা
-                <select aria-label="এলাকা / মহল্লা" value={filters.area||""}
-                  disabled={!filters.districtId || !(filters.cityCorporation||filters.upazilaId)}
-                  onChange={e=>setFilters({area:e.target.value||null})}
-                  className="h-9 w-full rounded-md border bg-white px-2 text-sm">
+              <label className="space-y-1.5 text-xs font-semibold">
+                এলাকা / মহল্লা
+                <select
+                  aria-label="এলাকা / মহল্লা"
+                  value={filters.area || ""}
+                  disabled={
+                    !filters.districtId ||
+                    !(filters.cityCorporation || filters.upazilaId)
+                  }
+                  onChange={(e) => setFilters({ area: e.target.value || null })}
+                  className="h-9 w-full rounded-md border bg-white px-2 text-sm"
+                >
                   <option value="">সব এলাকা</option>
-                  {areaOptions.map(x=><option key={x.name} value={x.name}>{x.label}</option>)}
+                  {areaOptions.map((x) => (
+                    <option key={x.name} value={x.name}>
+                      {x.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -712,9 +802,7 @@ function FilterContent({
 
             {/* Skin Color - 2 Columns */}
             <div>
-              <Label className="mb-2 block text-xs font-medium">
-                গাত্রবর্ণ
-              </Label>
+              <Label className="mb-2 block text-xs font-medium">গাত্রবর্ণ</Label>
               <div className="grid grid-cols-2 gap-2">
                 {skinColorOptions.map((option) => (
                   <div
@@ -886,9 +974,7 @@ function FilterContent({
 
             {/* Category - 2 Columns */}
             <div>
-              <Label className="mb-2 block text-xs font-medium">
-                ক্যাটাগরি
-              </Label>
+              <Label className="mb-2 block text-xs font-medium">ক্যাটাগরি</Label>
               <div className="grid grid-cols-2 gap-2">
                 {categoryOptions.map((option) => (
                   <div
@@ -985,7 +1071,10 @@ export default function BiodataAdvancedFilter() {
     polygamy: parseAsArrayOf(parseAsString).withDefault([]),
   });
 
-  const setFilters:typeof setRawFilters=(values,options)=>{searchEvent();return setRawFilters(values,options);};
+  const setFilters: typeof setRawFilters = (values, options) => {
+    searchEvent();
+    return setRawFilters(values, options);
+  };
   // Collapsible sections state
   const [openSections, setOpenSections] = useState({
     primary: true,
@@ -997,7 +1086,10 @@ export default function BiodataAdvancedFilter() {
   });
 
   const toggleSection = (section: string) => {
-    setOpenSections((prev) => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
+    setOpenSections((prev) => ({
+      ...prev,
+      [section]: !prev[section as keyof typeof prev],
+    }));
   };
 
   const handleCheckboxChange = (
@@ -1053,7 +1145,8 @@ export default function BiodataAdvancedFilter() {
     filters.ageMax !== 40 ||
     filters.districtId ||
     filters.upazilaId ||
-    filters.cityCorporation || filters.area ||
+    filters.cityCorporation ||
+    filters.area ||
     filters.educationMedium.length > 0 ||
     filters.religiousEducation.length > 0 ||
     filters.heightMin !== 4 ||
@@ -1062,7 +1155,8 @@ export default function BiodataAdvancedFilter() {
     filters.fiqh.length > 0 ||
     filters.profession.length > 0 ||
     filters.economicStatus.length > 0 ||
-    filters.category.length > 0);
+    filters.category.length > 0,
+  );
 
   return (
     <>

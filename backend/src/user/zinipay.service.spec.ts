@@ -92,10 +92,10 @@ describe('ZiniPayService', () => {
     ).toThrow('ZiniPay API base URL must be a valid HTTPS URL');
   });
 
-  it('uses dedicated public callback URL overrides for sandbox testing', async () => {
+  it('uses the existing public FRONTEND_URL and BACKEND_URL for payment callbacks', async () => {
     const ctx = setup(undefined, {
-      ZINIPAY_FRONTEND_URL: 'https://staging.niqaha.com',
-      ZINIPAY_BACKEND_URL: 'https://api-staging.niqaha.com',
+      FRONTEND_URL: 'https://staging.niqaha.com',
+      BACKEND_URL: 'https://api-staging.niqaha.com',
     });
     await ctx.service.createInvoice(500, 'order-staging', 'connections');
     const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
@@ -108,15 +108,36 @@ describe('ZiniPayService', () => {
     );
   });
 
-  it('rejects localhost return and webhook URLs because ZiniPay requires public HTTPS URLs', async () => {
+  it('reports exactly which public callback configuration values are missing', async () => {
+    const ctx = setup(undefined, {
+      FRONTEND_URL: '',
+      BACKEND_URL: '',
+    });
+    expect(ctx.service.configurationStatus()).toMatchObject({
+      apiKeyConfigured: true,
+      frontendUrlConfigured: false,
+      backendUrlConfigured: false,
+    });
+    await expect(
+      ctx.service.createInvoice(500, 'order-missing-callbacks', 'connections'),
+    ).rejects.toThrow('frontendUrlConfigured, backendUrlConfigured');
+  });
+
+  it("uses the project's public Niqaha URLs when local FRONTEND_URL and BACKEND_URL are localhost", async () => {
     const ctx = setup(undefined, {
       FRONTEND_URL: 'http://localhost:3000',
       BACKEND_URL: 'http://localhost:4000',
     });
-    expect(ctx.service.isConfigured()).toBe(false);
-    await expect(
-      ctx.service.createInvoice(500, 'order-local', 'connections'),
-    ).rejects.toThrow('ZiniPay API key and frontend/backend URLs are required');
+    expect(ctx.service.isConfigured()).toBe(true);
+    await ctx.service.createInvoice(500, 'order-local', 'connections');
+    const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(payload.redirect_url).toContain('https://niqaha.com/');
+    expect(payload.webhook_url).toBe(
+      'https://api.niqaha.com/user/zinipay-payment-webhook',
+    );
   });
 
   it('verifies an invoice through the backend-only verify endpoint', async () => {

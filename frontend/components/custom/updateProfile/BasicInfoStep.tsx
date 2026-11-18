@@ -22,7 +22,8 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandSearch,
+  CommandInput,
+  CommandList,
   CommandItem,
 } from "@/components/ui/command";
 import { useMemo, useState } from "react";
@@ -240,35 +241,37 @@ export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
               align="start"
             >
               <Command>
-                <CommandSearch placeholder="দেশ খুঁজুন..." className="h-10" />
-                <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
-                <CommandGroup className="max-h-48 overflow-y-auto">
-                  {countries.map((country) => (
-                    <CommandItem
-                      key={country.id}
-                      value={country.bn}
-                      onSelect={(value) => {
-                        updateField(
-                          "nationality",
-                          countries.find((c) => c.bn === value)!.en,
-                        );
+                <CommandInput placeholder="দেশ খুঁজুন..." className="h-10" />
+                <CommandList>
+                  <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
+                  <CommandGroup className="max-h-48 overflow-y-auto">
+                    {countries.map((country) => (
+                      <CommandItem
+                        key={country.id}
+                        value={country.bn}
+                        onSelect={(value) => {
+                          updateField(
+                            "nationality",
+                            countries.find((c) => c.bn === value)!.en,
+                          );
 
-                        setCountryOpen(false);
-                      }}
-                      className="py-2.5 sm:py-3"
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4 text-pink-600",
-                          formData.nationality === country.en
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      {country.bn}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+                          setCountryOpen(false);
+                        }}
+                        className="py-2.5 sm:py-3"
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4 text-pink-600",
+                            formData.nationality === country.en
+                              ? "opacity-100"
+                              : "opacity-0",
+                          )}
+                        />
+                        {country.bn}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
               </Command>
             </PopoverContent>
           </Popover>

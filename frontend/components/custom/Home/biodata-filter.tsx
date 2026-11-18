@@ -21,7 +21,8 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandSearch,
+  CommandInput,
+  CommandList,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -33,9 +34,14 @@ import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { marriedStatus } from "@/staticData/all-data";
 import { countries } from "@/staticData/countries";
-import {useQueryWrapper} from "@/api-hooks/react-query-wrapper";
-import {defaultCityCorporations,defaultCityAreas,defaultMunicipalityUpazilas,type LocationResponse} from "@/lib/location-options";
-import SearchLocationPicker from './SearchLocationPicker';
+import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
+import {
+  defaultCityCorporations,
+  defaultCityAreas,
+  defaultMunicipalityUpazilas,
+  type LocationResponse,
+} from "@/lib/location-options";
+import SearchLocationPicker from "./SearchLocationPicker";
 
 // Data
 const genderOptions = [
@@ -52,10 +58,14 @@ export default function BiodataFilter() {
   const [districtName, setDistrictName] = useState("");
   const [upazilaName, setUpazilaName] = useState("");
   const [countryName, setCountryName] = useState("");
-  const [cityName,setCityName]=useState("");
-  const [areaName,setAreaName]=useState("");
-  const {data:locations}=useQueryWrapper<LocationResponse>(["public-location-options"],"/profile-questions/locations",{staleTime:60000});
-  const extra=locations?.entries||[];
+  const [cityName, setCityName] = useState("");
+  const [areaName, setAreaName] = useState("");
+  const { data: locations } = useQueryWrapper<LocationResponse>(
+    ["public-location-options"],
+    "/profile-questions/locations",
+    { staleTime: 60000 },
+  );
+  const extra = locations?.entries || [];
   const [query, setQuery] = useState("");
   const [premiumOnly, setPremiumOnly] = useState(false);
 
@@ -82,8 +92,8 @@ export default function BiodataFilter() {
     if (maritalStatus !== "all") params.set("maritalStatus", maritalStatus);
     if (districtName) params.set("districtId", districtName);
     if (upazilaName) params.set("upazilaId", upazilaName);
-    if (cityName) params.set("cityCorporation",cityName);
-    if (areaName) params.set("area",areaName);
+    if (cityName) params.set("cityCorporation", cityName);
+    if (areaName) params.set("area", areaName);
     if (countryName) params.set("country", countryName);
     if (query.trim()) params.set("query", query.trim());
     if (premiumOnly) params.set("category", "premium");
@@ -126,33 +136,54 @@ export default function BiodataFilter() {
 
   const selectedDistrictData = districts.find((d) => d.name === districtName);
   const availableUpazilas = [
-    ...upazilas.filter(u=>selectedDistrictData&&u.district_id===selectedDistrictData.id),
-    ...defaultMunicipalityUpazilas.filter(u=>u.district===districtName).map((u,i)=>({
-      id:'municipality-'+i,name:u.name,bn_name:u.label,district_id:'municipality',
-    })),
-    ...extra.filter(u=>u.kind==="upazila"&&u.district===districtName).map((u,i)=>({
-      id:"custom-"+i,name:u.name,bn_name:u.label,district_id:"custom",
-    })),
+    ...upazilas.filter(
+      (u) => selectedDistrictData && u.district_id === selectedDistrictData.id,
+    ),
+    ...defaultMunicipalityUpazilas
+      .filter((u) => u.district === districtName)
+      .map((u, i) => ({
+        id: "municipality-" + i,
+        name: u.name,
+        bn_name: u.label,
+        district_id: "municipality",
+      })),
+    ...extra
+      .filter((u) => u.kind === "upazila" && u.district === districtName)
+      .map((u, i) => ({
+        id: "custom-" + i,
+        name: u.name,
+        bn_name: u.label,
+        district_id: "custom",
+      })),
   ];
-  const cities=[...defaultCityCorporations,...extra.filter(e=>e.kind==="cityCorporation")]
-    .filter(c=>c.district===districtName);
-  const areas=[...defaultCityAreas,...extra.filter(e=>e.kind==="area")]
-    .filter(e=>e.district===districtName && e.enabled!==false);
+  const cities = [
+    ...defaultCityCorporations,
+    ...extra.filter((e) => e.kind === "cityCorporation"),
+  ].filter((c) => c.district === districtName);
+  const areas = [
+    ...defaultCityAreas,
+    ...extra.filter((e) => e.kind === "area"),
+  ].filter((e) => e.district === districtName && e.enabled !== false);
 
   const hasFilters =
     gender !== "all" ||
     maritalStatus !== "all" ||
     districtName ||
     upazilaName ||
-    cityName || areaName ||
+    cityName ||
+    areaName ||
     countryName ||
     query.trim() ||
     premiumOnly;
 
   const selectedDistrict = districts.find((d) => d.name === districtName);
   const selectedUpazila = availableUpazilas.find((u) => u.name === upazilaName);
-  const selectedCountry = countries.find((c) => c.en === countryName) ||
-    extra.filter(x=>x.kind==='country').map((x,i)=>({id:i+1000,en:x.name,bn:x.label})).find(x=>x.en===countryName);
+  const selectedCountry =
+    countries.find((c) => c.en === countryName) ||
+    extra
+      .filter((x) => x.kind === "country")
+      .map((x, i) => ({ id: i + 1000, en: x.name, bn: x.label }))
+      .find((x) => x.en === countryName);
 
   return (
     <section className="w-full bg-gradient-to-br from-pink-50/50 via-purple-50/30 to-white py-8 md:py-10 lg:py-12">
@@ -222,28 +253,30 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandSearch placeholder="খুঁজুন..." className="h-10" />
-                      <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup>
-                        {genderOptions.map((option) => (
-                          <CommandItem
-                            key={option.value}
-                            value={option.value}
-                            onSelect={(value) => handleGenderChange(value)}
-                            className="py-2.5 sm:py-3"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                gender === option.value
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {option.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandInput placeholder="খুঁজুন..." className="h-10" />
+                      <CommandList>
+                        <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup>
+                          {genderOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.value}
+                              onSelect={(value) => handleGenderChange(value)}
+                              className="py-2.5 sm:py-3"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  gender === option.value
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -277,31 +310,33 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandSearch placeholder="খুঁজুন..." className="h-10" />
-                      <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup>
-                        {filteredMaritalStatus.map((option) => (
-                          <CommandItem
-                            key={option.en}
-                            value={option.en}
-                            onSelect={(value) => {
-                              setMaritalStatus(value);
-                              setMaritalOpen(false);
-                            }}
-                            className="py-2.5 sm:py-3"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                maritalStatus === option.en
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {option.bn}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandInput placeholder="খুঁজুন..." className="h-10" />
+                      <CommandList>
+                        <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup>
+                          {filteredMaritalStatus.map((option) => (
+                            <CommandItem
+                              key={option.en}
+                              value={option.en}
+                              onSelect={(value) => {
+                                setMaritalStatus(value);
+                                setMaritalOpen(false);
+                              }}
+                              className="py-2.5 sm:py-3"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  maritalStatus === option.en
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {option.bn}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -324,7 +359,9 @@ export default function BiodataFilter() {
                       className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
                     >
                       <span className="truncate">
-                        {selectedCountry?.bn || countryName || "দেশ নির্বাচন করুন"}
+                        {selectedCountry?.bn ||
+                          countryName ||
+                          "দেশ নির্বাচন করুন"}
                       </span>
                       <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -334,36 +371,44 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandSearch
-                        placeholder="দেশ খুঁজুন..."
-                        className="h-10"
-                      />
-                      <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-48 overflow-y-auto">
-                        {[...countries,...extra.filter(x=>x.kind==='country').map((x,i)=>({id:i+1000,en:x.name,bn:x.label}))].map((country) => (
-                          <CommandItem
-                            key={country.id}
-                            value={country.bn}
-                            onSelect={() => {
-                              setCountryName(
-                                countryName === country.en ? "" : country.en,
-                              );
-                              setCountryOpen(false);
-                            }}
-                            className="py-2.5 sm:py-3"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                countryName === country.en
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {country.bn}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandInput placeholder="দেশ খুঁজুন..." className="h-10" />
+                      <CommandList>
+                        <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto">
+                          {[
+                            ...countries,
+                            ...extra
+                              .filter((x) => x.kind === "country")
+                              .map((x, i) => ({
+                                id: i + 1000,
+                                en: x.name,
+                                bn: x.label,
+                              })),
+                          ].map((country) => (
+                            <CommandItem
+                              key={country.id}
+                              value={country.bn}
+                              onSelect={() => {
+                                setCountryName(
+                                  countryName === country.en ? "" : country.en,
+                                );
+                                setCountryOpen(false);
+                              }}
+                              className="py-2.5 sm:py-3"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  countryName === country.en
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {country.bn}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -386,7 +431,9 @@ export default function BiodataFilter() {
                       className="h-11 w-full justify-between rounded-xl border-2 border-gray-200 bg-gray-50/50 text-sm font-medium transition-all hover:border-pink-300 hover:bg-white focus:border-pink-400 focus:ring-2 focus:ring-pink-200 sm:h-12 sm:text-base"
                     >
                       <span className="truncate">
-                        {selectedDistrict?.bn_name || districtName || "জেলা নির্বাচন করুন"}
+                        {selectedDistrict?.bn_name ||
+                          districtName ||
+                          "জেলা নির্বাচন করুন"}
                       </span>
                       <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -396,38 +443,50 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandSearch
+                      <CommandInput
                         placeholder="জেলা খুঁজুন..."
                         className="h-10"
                       />
-                      <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
-                      <CommandGroup className="max-h-48 overflow-y-auto">
-                        {[...districts,...extra.filter(e=>e.kind==='district').map((e,i)=>({id:'custom-'+i,name:e.name,bn_name:e.label}))].map((d) => (
-                          <CommandItem
-                            key={d.id}
-                            value={d.bn_name}
-                            onSelect={() => {
-                              setDistrictName(
-                                districtName === d.name ? "" : d.name,
-                              );
-                              setUpazilaName("");
-                              setCityName("");setAreaName("");
-                              setDistrictOpen(false);
-                            }}
-                            className="py-2.5 sm:py-3"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4 text-pink-600",
-                                districtName === d.name
-                                  ? "opacity-100"
-                                  : "opacity-0",
-                              )}
-                            />
-                            {d.bn_name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      <CommandList>
+                        <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto">
+                          {[
+                            ...districts,
+                            ...extra
+                              .filter((e) => e.kind === "district")
+                              .map((e, i) => ({
+                                id: "custom-" + i,
+                                name: e.name,
+                                bn_name: e.label,
+                              })),
+                          ].map((d) => (
+                            <CommandItem
+                              key={d.id}
+                              value={d.bn_name}
+                              onSelect={() => {
+                                setDistrictName(
+                                  districtName === d.name ? "" : d.name,
+                                );
+                                setUpazilaName("");
+                                setCityName("");
+                                setAreaName("");
+                                setDistrictOpen(false);
+                              }}
+                              className="py-2.5 sm:py-3"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-pink-600",
+                                  districtName === d.name
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              {d.bn_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -439,8 +498,8 @@ export default function BiodataFilter() {
                 upazilas={availableUpazilas}
                 cities={cities}
                 areas={areas}
-                value={{upazilaName,cityName,areaName}}
-                onChange={next=>{
+                value={{ upazilaName, cityName, areaName }}
+                onChange={(next) => {
                   setUpazilaName(next.upazilaName);
                   setCityName(next.cityName);
                   setAreaName(next.areaName);
@@ -449,8 +508,12 @@ export default function BiodataFilter() {
             </div>
 
             <label className="mt-4 inline-flex cursor-pointer items-center gap-2.5 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm font-semibold text-pink-900">
-              <input type="checkbox" checked={premiumOnly} onChange={(event) => setPremiumOnly(event.target.checked)}
-                className="size-4 accent-pink-600" />
+              <input
+                type="checkbox"
+                checked={premiumOnly}
+                onChange={(event) => setPremiumOnly(event.target.checked)}
+                className="size-4 accent-pink-600"
+              />
               শুধু প্রিমিয়াম সদস্য দেখুন
             </label>
 
@@ -485,8 +548,11 @@ export default function BiodataFilter() {
                   সক্রিয় ফিল্টার:
                 </span>
                 {premiumOnly && (
-                  <button type="button" onClick={() => setPremiumOnly(false)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1 text-xs font-medium text-pink-700">
+                  <button
+                    type="button"
+                    onClick={() => setPremiumOnly(false)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1 text-xs font-medium text-pink-700"
+                  >
                     প্রিমিয়াম সদস্য <X className="size-3" aria-hidden />
                   </button>
                 )}
@@ -531,22 +597,33 @@ export default function BiodataFilter() {
                     />
                   </span>
                 )}
-                {(upazilaName||cityName) && (
-                  <button type="button"
+                {(upazilaName || cityName) && (
+                  <button
+                    type="button"
                     aria-label="নির্বাচিত উপজেলা বা সিটি কর্পোরেশন মুছুন"
-                    onClick={() => {setUpazilaName("");setCityName("");setAreaName("");}}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200">
-                    {cityName?(cities.find(c=>c.name===cityName)?.label||cityName):(selectedUpazila?.bn_name||upazilaName)}
-                    <X className="size-3" aria-hidden/>
+                    onClick={() => {
+                      setUpazilaName("");
+                      setCityName("");
+                      setAreaName("");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200"
+                  >
+                    {cityName
+                      ? cities.find((c) => c.name === cityName)?.label ||
+                        cityName
+                      : selectedUpazila?.bn_name || upazilaName}
+                    <X className="size-3" aria-hidden />
                   </button>
                 )}
                 {areaName && (
-                  <button type="button"
+                  <button
+                    type="button"
                     aria-label="নির্বাচিত এলাকা বা ওয়ার্ড মুছুন"
-                    onClick={()=>setAreaName("")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200">
-                    {areas.find(e=>e.name===areaName)?.label||areaName}
-                    <X className="size-3" aria-hidden/>
+                    onClick={() => setAreaName("")}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-200"
+                  >
+                    {areas.find((e) => e.name === areaName)?.label || areaName}
+                    <X className="size-3" aria-hidden />
                   </button>
                 )}
                 {query.trim() && (

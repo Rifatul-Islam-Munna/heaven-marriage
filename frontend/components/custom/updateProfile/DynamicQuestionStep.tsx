@@ -29,7 +29,8 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandItem,
-  CommandSearch,
+  CommandInput,
+  CommandList,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -306,37 +307,39 @@ export function QuestionInput({
               className="w-[var(--radix-popover-trigger-width)] min-w-[220px] p-0"
             >
               <Command>
-                <CommandSearch
+                <CommandInput
                   placeholder={
                     q.optionSource === "countries"
                       ? "দেশ খুঁজুন..."
                       : "উত্তর খুঁজুন..."
                   }
                 />
-                <CommandEmpty>কোনো মিল পাওয়া যায়নি।</CommandEmpty>
-                <CommandGroup className="max-h-64 overflow-y-auto">
-                  {options.map((opt) => (
-                    <CommandItem
-                      key={opt.value}
-                      value={`${opt.label} ${opt.value}`}
-                      onSelect={() => {
-                        onChange(opt.value);
-                        setOptionOpen(false);
-                      }}
-                      className="py-2.5"
-                    >
-                      <Check
-                        className={cn(
-                          "h-4 w-4 text-pink-600",
-                          String(raw) === opt.value
-                            ? "opacity-100"
-                            : "opacity-0",
-                        )}
-                      />
-                      <span className="min-w-0 flex-1">{opt.label}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+                <CommandList>
+                  <CommandEmpty>কোনো মিল পাওয়া যায়নি।</CommandEmpty>
+                  <CommandGroup className="max-h-64 overflow-y-auto">
+                    {options.map((opt) => (
+                      <CommandItem
+                        key={opt.value}
+                        value={`${opt.label} ${opt.value}`}
+                        onSelect={() => {
+                          onChange(opt.value);
+                          setOptionOpen(false);
+                        }}
+                        className="py-2.5"
+                      >
+                        <Check
+                          className={cn(
+                            "h-4 w-4 text-pink-600",
+                            String(raw) === opt.value
+                              ? "opacity-100"
+                              : "opacity-0",
+                          )}
+                        />
+                        <span className="min-w-0 flex-1">{opt.label}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
               </Command>
             </PopoverContent>
           </Popover>

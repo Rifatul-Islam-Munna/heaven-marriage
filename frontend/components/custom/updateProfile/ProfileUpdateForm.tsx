@@ -78,6 +78,14 @@ import { ageFromBirthDate } from "@/lib/birth-date";
 import BirthDateSelect from "./BirthDateSelect";
 import { SavedQuestionAnswer } from "./DynamicQuestionStep";
 import PhoneNumberInput from "@/components/custom/common/PhoneNumberInput";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 type View = "journey" | "play" | "levelDone" | "review" | "finish";
 type Answer = string | number | boolean | string[];
@@ -631,57 +639,14 @@ function BigAnswer({
     );
   }
 
-  if ((q.type === "select" || q.type === "dropdown") && options.length) {
+  if (q.type === "select" || q.type === "dropdown") {
     const current = String(raw);
-    const savedOther =
-      current && !options.some((option) => option.value === current);
-    if (options.length <= 12)
-      return (
-        <div
-          className={`grid gap-2 ${options.length > 4 ? "sm:grid-cols-2" : ""}`}
-        >
-          {savedOther && (
-            <button type="button" aria-pressed className={chip(true)}>
-              <span>{current}</span>
-              <Check className="h-5 w-5" />
-            </button>
-          )}
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={current === option.value}
-              className={chip(current === option.value)}
-              onClick={() => {
-                onChange(option.value);
-                onPicked();
-              }}
-            >
-              <span>{option.label}</span>
-              {current === option.value && (
-                <Check className="h-5 w-5 shrink-0" />
-              )}
-            </button>
-          ))}
-        </div>
-      );
     const selectedOption = options.find((option) => option.value === current);
     const selectedLabel = selectedOption?.label || current;
     const isCountry =
       q.optionSource === "countries" ||
       q.path === "residenceCountry" ||
       q.path === "nationality";
-    const normalize = (text: string) =>
-      text.normalize("NFKC").toLocaleLowerCase().trim();
-    const term = normalize(filter);
-    const matches = term
-      ? options.filter(
-          (option) =>
-            normalize(option.label).includes(term) ||
-            normalize(option.value).includes(term),
-        )
-      : [];
-    const shown = matches.slice(0, 12);
     const selectedCountry = isCountry
       ? countryCatalog.find((country) => country.en === current)
       : undefined;
@@ -744,19 +709,54 @@ function BigAnswer({
             <ChevronRight className="h-4 w-4 shrink-0" />
           </button>
         )}
-        <label className="relative block">
-          <span className="sr-only">{isCountry ? "দেশ খুঁজুন" : "উত্তর খুঁজুন"}</span>
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-          <input
-            autoFocus
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-            placeholder={
-              isCountry ? "দেশের নাম লিখে খুঁজুন..." : "নাম লিখে খুঁজুন..."
-            }
-            className={`${big} pl-12 text-base`}
-          />
-        </label>
+        <div className="overflow-hidden rounded-xl border border-pink-200 bg-white shadow-sm">
+          <Command shouldFilter>
+            <CommandInput
+              value={filter}
+              onValueChange={setFilter}
+              placeholder={
+                isCountry
+                  ? "দেশ খুঁজুন (ঐচ্ছিক)..."
+                  : "তালিকা থেকে বেছে নিন অথবা খুঁজুন..."
+              }
+              className="h-11 text-sm"
+            />
+            <CommandList className="max-h-64 sm:max-h-72">
+              <CommandEmpty>
+                {options.length === 0
+                  ? "এই প্রশ্নের জন্য কোনো অপশন যোগ করা হয়নি।"
+                  : isCountry
+                    ? "কোনো দেশ পাওয়া যায়নি।"
+                    : "কোনো অপশন পাওয়া যায়নি।"}
+              </CommandEmpty>
+              <CommandGroup>
+                {options.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={`${option.label} ${option.value}`}
+                    onSelect={() => {
+                      onChange(option.value);
+                      setFilter("");
+                      setEditingOptions(false);
+                      onPicked();
+                    }}
+                    className="min-h-10 cursor-pointer px-3 py-2.5 text-sm"
+                  >
+                    <Check
+                      className={`h-4 w-4 shrink-0 text-pink-600 ${current === option.value ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <span className="min-w-0 flex-1">{option.label}</span>
+                    {current === option.value && (
+                      <span className="text-xs font-semibold text-pink-700">
+                        নির্বাচিত
+                      </span>
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </div>
         {current && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm">
             <span className="text-gray-600">
@@ -771,46 +771,6 @@ function BigAnswer({
               এটাই রাখুন
             </button>
           </div>
-        )}
-        {!term && (
-          <p className="text-sm leading-6 text-gray-500">
-            {isCountry
-              ? "বাংলাদেশে থাকলে উপরের অপশনটি বেছে নিন। অন্য দেশ হলে নাম লিখে খুঁজুন।"
-              : "নাম লিখলেই মিল থাকা উত্তরগুলো দেখাবে।"}
-          </p>
-        )}
-        {term && (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {shown.map((option) => (
-              <li key={option.value}>
-                <button
-                  type="button"
-                  aria-pressed={current === option.value}
-                  className={chip(current === option.value)}
-                  onClick={() => {
-                    onChange(option.value);
-                    setEditingOptions(false);
-                    onPicked();
-                  }}
-                >
-                  <span>{option.label}</span>
-                  {current === option.value && (
-                    <Check className="h-5 w-5 shrink-0" />
-                  )}
-                </button>
-              </li>
-            ))}
-            {!shown.length && (
-              <li className="rounded-xl bg-gray-50 px-3 py-5 text-center text-sm text-gray-500">
-                “{filter}” মেলেনি। বানান ঠিক করে আবার খুঁজুন।
-              </li>
-            )}
-            {matches.length > shown.length && (
-              <li className="px-2 py-2 text-xs text-gray-500 sm:col-span-2">
-                আরও ফলাফল আছে। আরও নির্দিষ্ট করে লিখুন।
-              </li>
-            )}
-          </ul>
         )}
       </div>
     );

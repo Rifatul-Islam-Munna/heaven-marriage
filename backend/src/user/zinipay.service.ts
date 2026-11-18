@@ -68,14 +68,32 @@ export class ZiniPayService {
       throw new Error('ZiniPay API base URL must be a valid HTTPS URL');
     }
     this.baseUrl = parsedBaseUrl.toString().replace(/\/+$/, '');
-    this.frontendUrl =
-      this.configService.get<string>('ZINIPAY_FRONTEND_URL') ||
-      this.configService.get<string>('FRONTEND_URL') ||
-      '';
-    this.backendUrl =
-      this.configService.get<string>('ZINIPAY_BACKEND_URL') ||
-      this.configService.get<string>('BACKEND_URL') ||
-      '';
+    // Reuse the application's existing URL configuration. Local development
+    // URLs cannot be sent to ZiniPay, so map localhost to this project's public
+    // brand/API origins without adding duplicate environment variables.
+    const configuredFrontend =
+      this.configService.get<string>('FRONTEND_URL') || '';
+    const configuredBackend =
+      this.configService.get<string>('BACKEND_URL') || '';
+    this.frontendUrl = this.isLocalUrl(configuredFrontend)
+      ? 'https://niqaha.com'
+      : configuredFrontend;
+    this.backendUrl = this.isLocalUrl(configuredBackend)
+      ? 'https://api.niqaha.com'
+      : configuredBackend;
+  }
+
+  private isLocalUrl(value: string): boolean {
+    try {
+      const parsed = new URL(value.split(',')[0].trim());
+      return (
+        ['localhost', '127.0.0.1', '0.0.0.0', '::1'].includes(
+          parsed.hostname,
+        ) || parsed.hostname.endsWith('.localhost')
+      );
+    } catch {
+      return false;
+    }
   }
 
   private isPublicHttpsUrl(value: string): boolean {
@@ -95,12 +113,52 @@ export class ZiniPayService {
     }
   }
 
+  configurationStatus() {
+    return {
+      apiKeyConfigured: Boolean(this.apiKey),
+      frontendUrlConfigured: this.isPublicHttpsUrl(this.frontendUrl),
+      backendUrlConfigured: this.isPublicHttpsUrl(this.backendUrl),
+      apiBaseUrlConfigured: Boolean(this.baseUrl),
+    };
+  }
+
   isConfigured(): boolean {
-    return Boolean(
-      this.apiKey &&
-      this.isPublicHttpsUrl(this.frontendUrl) &&
-      this.isPublicHttpsUrl(this.backendUrl),
+    const status = this.configurationStatus();
+    return (
+      status.apiKeyConfigured &&
+      status.frontendUrlConfigured &&
+      status.backendUrlConfigured &&
+      status.apiBaseUrlConfigured
     );
+  }
+
+  private gatewayResponseSummary(data: unknown): string {
+    if (typeof data === 'string') return data.slice(0, 400);
+    if (data === null || data === undefined) return 'empty response';
+    if (typeof data === 'number' || typeof data === 'boolean')
+      return String(data);
+    if (typeof data !== 'object') return 'unrecognized response type';
+    const source = data as Record<string, unknown>;
+    const summary: Record<string, string> = {};
+    for (const key of [
+      'message',
+      'error',
+      'code',
+      'status',
+      'details',
+      'reason',
+    ]) {
+      const value = source[key];
+      if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+      )
+        summary[key] = String(value).slice(0, 250);
+    }
+    return Object.keys(summary).length
+      ? JSON.stringify(summary)
+      : 'Gateway returned an unrecognized error response';
   }
 
   private headers() {
@@ -118,7 +176,16 @@ export class ZiniPayService {
     customer: ZiniPayCustomer = {},
   ): Promise<ZiniPayInvoice> {
     if (!this.isConfigured()) {
-      throw new Error('ZiniPay API key and frontend/backend URLs are required');
+      const status = this.configurationStatus();
+      const missing = Object.entries(status)
+        .filter(([, configured]) => !configured)
+        .map(([key]) => key);
+      this.logger.error(
+        'ZiniPay configuration incomplete: ' + missing.join(', '),
+      );
+      throw new Error(
+        'ZiniPay configuration incomplete: ' + missing.join(', '),
+      );
     }
     if (
       !Number.isFinite(amount) ||
@@ -167,7 +234,9 @@ export class ZiniPayService {
 
       const data = response.data;
       if (data?.status !== true && data?.status !== 'true') {
-        throw new Error('ZiniPay did not confirm invoice creation');
+        const summary = this.gatewayResponseSummary(data);
+        this.logger.error('ZiniPay rejected invoice creation: ' + summary);
+        throw new Error('ZiniPay rejected invoice creation: ' + summary);
       }
 
       const paymentUrl =
@@ -201,11 +270,22 @@ export class ZiniPayService {
 
       return { paymentUrl, paymentId };
     } catch (error: unknown) {
-      const status = isAxiosError(error) ? error.response?.status : undefined;
-      this.logger.error(
-        'ZiniPay invoice creation failed',
-        status ? 'HTTP ' + status : undefined,
-      );
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+        const code = error.code || 'UNKNOWN';
+        const summary =
+          error.response?.data !== undefined
+            ? this.gatewayResponseSummary(error.response.data)
+            : (error.message || 'No response body').slice(0, 400);
+        this.logger.error(
+          `ZiniPay invoice creation failed: HTTP ${status ?? 'NO_RESPONSE'} code=${code} response=${summary}`,
+        );
+      } else {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          'ZiniPay invoice creation failed: ' + message.slice(0, 600),
+        );
+      }
       throw error;
     }
   }
