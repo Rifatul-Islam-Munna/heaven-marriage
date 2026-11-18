@@ -9,6 +9,7 @@ export type ZiniPayPurpose = 'connections' | 'premium';
 export type ZiniPayCustomer = {
   name?: string;
   email?: string;
+  customerId?: string;
 };
 
 export type ZiniPayInvoice = {
@@ -216,11 +217,24 @@ export class ZiniPayService {
       ...(customer.name ? { cus_name: customer.name.slice(0, 120) } : {}),
       ...(customer.email ? { cus_email: customer.email.slice(0, 254) } : {}),
       amount,
-      metadata: { order_id: orderId, purpose },
+      metadata: {
+        order_id: orderId,
+        customer_id: customer.customerId,
+        purpose,
+      },
       redirect_url: redirectUrl.toString(),
       cancel_url: cancelUrl.toString(),
       webhook_url: backendBase + '/user/zinipay-payment-webhook',
     };
+
+    // Log request shape only (never customer PII or API credentials) to make
+    // provider-side VALIDATION_ERROR responses diagnosable in production.
+    this.logger.log(
+      `Creating ZiniPay invoice orderId=${orderId} purpose=${purpose} amount=${amount} ` +
+        `metadataBytes=${Buffer.byteLength(JSON.stringify(payload.metadata), 'utf8')} ` +
+        `customerIdPresent=${Boolean(customer.customerId)} ` +
+        `redirectHost=${new URL(redirectUrl).hostname} webhookHost=${new URL(backendBase).hostname}`,
+    );
 
     try {
       const response: AxiosResponse<ZiniPayCreateResponse> =

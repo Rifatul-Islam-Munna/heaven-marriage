@@ -482,6 +482,7 @@ export class PlatformService implements OnModuleInit {
       const payment = await this.ziniPay.createInvoice(amount, id, 'premium', {
         name: member?.name || undefined,
         email: member?.email || undefined,
+        customerId: actor,
       });
       if (!payment.paymentId || !payment.paymentUrl)
         throw new Error('Missing ZiniPay checkout URL');
@@ -641,6 +642,7 @@ export class PlatformService implements OnModuleInit {
         {
           name: member?.name || undefined,
           email: member?.email || undefined,
+          customerId: actor,
         },
       );
       if (!payment.paymentId || !payment.paymentUrl)

@@ -38,7 +38,11 @@ describe('ZiniPayService', () => {
       1250,
       'order-123',
       'premium',
-      { name: 'Member Name', email: 'member@example.test' },
+      {
+        name: 'Member Name',
+        email: 'member@example.test',
+        customerId: 'customer-123',
+      },
     );
 
     expect(invoice).toEqual({
@@ -55,7 +59,11 @@ describe('ZiniPayService', () => {
       cus_name: 'Member Name',
       cus_email: 'member@example.test',
       amount: 1250,
-      metadata: { order_id: 'order-123', purpose: 'premium' },
+      metadata: {
+        order_id: 'order-123',
+        customer_id: 'customer-123',
+        purpose: 'premium',
+      },
       redirect_url:
         'https://niqaha.com/payment/successfull?purpose=premium&order_id=order-123',
       cancel_url:
