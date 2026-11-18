@@ -2,15 +2,15 @@
 export type SettledOrder = {
   status?: string; amount?: unknown; currency?: string;
   paidAt?: Date | string; refundedAt?: Date | string;
-  paymentId?: string; id?: string; transactionId?: string; refundReference?: string;
+  paymentId?: string; gateway?: string; id?: string; transactionId?: string; refundReference?: string;
 };
 export type IncomeTransaction = {
-  id: string; source: 'connections' | 'premium'; method: 'bKash' | 'Manual';
+  id: string; source: 'connections' | 'premium'; method: 'ZiniPay' | 'bKash' | 'Manual';
   event: 'paid' | 'refund'; amount: number; at: string; reference: string;
 };
 export type IncomeBucket = {
   month: string; connectionGross: number; premiumGross: number; gross: number;
-  refunds: number; net: number; manualNet: number; bkashNet: number; payments: number;
+  refunds: number; net: number; manualNet: number; zinipayNet: number; bkashNet: number; payments: number;
 };
 export type IncomeReport = {
   currency: 'BDT'; timezone: 'Asia/Dhaka'; month: string; previousMonth: string;
@@ -30,7 +30,7 @@ export function bangladeshMonth(date: Date): string {
   return local.getUTCFullYear()+'-'+String(local.getUTCMonth()+1).padStart(2,'0');
 }
 function empty(month:string): IncomeBucket {
-  return {month,connectionGross:0,premiumGross:0,gross:0,refunds:0,net:0,manualNet:0,bkashNet:0,payments:0};
+  return {month,connectionGross:0,premiumGross:0,gross:0,refunds:0,net:0,manualNet:0,zinipayNet:0,bkashNet:0,payments:0};
 }
 function prevComparableCutoff(now:Date):Date {
   const local=new Date(now.getTime()+BD_OFFSET);
@@ -42,7 +42,7 @@ function prevComparableCutoff(now:Date):Date {
 }
 const moneyRound=(value:number)=>Math.round(value*100)/100;
 function addMoney(bucket: IncomeBucket, amount:number, kind:'connections'|'premium',
-  manual:boolean,refunded:boolean){
+  method:'manual'|'zinipay'|'bkash',refunded:boolean){
   if(refunded) bucket.refunds=moneyRound(bucket.refunds+amount);
   else {
     bucket.gross=moneyRound(bucket.gross+amount);
@@ -52,7 +52,9 @@ function addMoney(bucket: IncomeBucket, amount:number, kind:'connections'|'premi
   }
   const delta=refunded?-amount:amount;
   bucket.net=moneyRound(bucket.net+delta);
-  if(manual)bucket.manualNet=moneyRound(bucket.manualNet+delta);else bucket.bkashNet=moneyRound(bucket.bkashNet+delta);
+  if(method==='manual')bucket.manualNet=moneyRound(bucket.manualNet+delta);
+  else if(method==='zinipay')bucket.zinipayNet=moneyRound(bucket.zinipayNet+delta);
+  else bucket.bkashNet=moneyRound(bucket.bkashNet+delta);
 }
 export function buildIncomeReport(
   connectionOrders: readonly SettledOrder[],
@@ -81,25 +83,26 @@ export function buildIncomeReport(
     if(!Number.isFinite(rawAmount)||rawAmount<=0||rawAmount>Number.MAX_SAFE_INTEGER/100)continue;
     const amount=moneyRound(rawAmount);
     const manual=kind==='connections' && String(order.paymentId||'').startsWith('manual:');
+    const method=manual?'manual':order.gateway==='zinipay'?'zinipay':'bkash';
     const paidAt=dateOf(order.paidAt);
     const refundedAt=order.status==='refunded'?dateOf(order.refundedAt):null;
     if(paidAt && paidAt<=now) {
-      addMoney(allTime,amount,kind,manual,false);
-      recent.push({id:String(order.id||''),source:kind,method:manual?'Manual':'bKash',
+      addMoney(allTime,amount,kind,method,false);
+      recent.push({id:String(order.id||''),source:kind,method:method==='manual'?'Manual':method==='zinipay'?'ZiniPay':'bKash',
         event:'paid',amount,at:paidAt.toISOString(),reference:String(order.transactionId||'')});
       const key=bangladeshMonth(paidAt);
       const bucket=monthly.get(key);
-      if(bucket)addMoney(bucket,amount,kind,manual,false);
+      if(bucket)addMoney(bucket,amount,kind,method,false);
       if(key===prevMonth&&paidAt<=comparisonCutoff)previousComparableNet=moneyRound(previousComparableNet+amount);
     } else missingPaidDates++;
     if(order.status==='refunded') {
       if(refundedAt&&refundedAt<=now) {
-        addMoney(allTime,amount,kind,manual,true);
-        recent.push({id:String(order.id||''),source:kind,method:manual?'Manual':'bKash',
+        addMoney(allTime,amount,kind,method,true);
+        recent.push({id:String(order.id||''),source:kind,method:method==='manual'?'Manual':method==='zinipay'?'ZiniPay':'bKash',
           event:'refund',amount,at:refundedAt.toISOString(),reference:String(order.refundReference||'')});
         const key=bangladeshMonth(refundedAt);
         const bucket=monthly.get(key);
-        if(bucket)addMoney(bucket,amount,kind,manual,true);
+        if(bucket)addMoney(bucket,amount,kind,method,true);
         if(key===prevMonth&&refundedAt<=comparisonCutoff)previousComparableNet=moneyRound(previousComparableNet-amount);
       } else missingRefundDates++;
     }

@@ -16,7 +16,7 @@ import { UserController } from './user.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './entities/user.entity';
 import { Shortlist, ShortlistSchema } from './entities/shortlist.schema';
-import { BkashService } from './bkash.service';
+import { ZiniPayService } from './zinipay.service';
 import { HttpModule } from '@nestjs/axios';
 import { PricingModule } from 'src/pricing/pricing.module';
 import { RequestNumber,RequestNumberSchema } from './entities/RequestNumber.schema';
@@ -29,7 +29,7 @@ import { PdfService } from './pdf.service';
 @Module({
   imports: [QuestionConfigModule,MongooseModule.forFeature([{ name: User.name, schema: UserSchema },{name:Shortlist.name,schema:ShortlistSchema},{name:RequestNumber.name, schema:RequestNumberSchema},{name:Counter.name,schema:CounterSchema}]),HttpModule,PricingModule],
   controllers: [UserController,PlatformController,AiController,PublicController,ProfileAiController,PremiumAdminController],
-  providers: [PremiumAdminService,GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,BkashService,TelegramService,SmsService,OtpService,PdfService],
+  providers: [PremiumAdminService,GeminiService,ProfileAiService,PlatformService,IdentityService,MessagingService,UserService,ZiniPayService,TelegramService,SmsService,OtpService,PdfService],
   exports: [MessagingService],
 })
 export class UserModule {}

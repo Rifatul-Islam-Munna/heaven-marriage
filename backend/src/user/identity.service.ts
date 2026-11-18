@@ -8,7 +8,12 @@ import { Connection, Model, Types } from 'mongoose';
 import { User, UserDocument } from './entities/user.entity';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, randomInt, randomUUID } from 'node:crypto';
+import {
+  createHmac,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { MessagingService, normalizePhone } from './messaging.service';
 import { applyBirthDate } from './birth-date';
@@ -40,6 +45,12 @@ export class IdentityService {
       return email;
     }
     return normalizePhone(p.phoneNumber);
+  }
+  private normalizeOtp(value: unknown): string {
+    return (typeof value === 'string' || typeof value === 'number' ? String(value) : '')
+      .trim()
+      .replace(/[০-৯]/g, (digit) => String('০১২৩৪৫৬৭৮৯'.indexOf(digit)))
+      .replace(/[\s-]/g, '');
   }
   private digest(id: string, code: string) {
     const secret = this.config.get<string>('ACCESS_TOKEN');
@@ -192,24 +203,49 @@ export class IdentityService {
       expiresAt: { $gt: new Date() },
       attempts: { $lt: 5 },
     };
-    if (p.challengeId) query.id = p.challengeId;
+    if (typeof p.challengeId === 'string' && p.challengeId.trim())
+      query.id = p.challengeId.trim();
     else if (p.phoneNumber || p.email) query.subject = this.subject(p);
     else
       throw new BadRequestException(
         'Verification session is missing. Please start again.',
       );
-    const row = await c.findOneAndUpdate(
-      query,
-      { $inc: { attempts: 1 } },
-      { sort: { sentAt: -1 }, returnDocument: 'after' },
-    );
-    if (!row || row.hash !== this.digest(row.id, String(p.otp)))
+
+    const row = await c.findOne(query, { sort: { sentAt: -1 } });
+    if (!row) throw new BadRequestException('Invalid or expired OTP');
+
+    const code = this.normalizeOtp(p.otp);
+    const suppliedHash = this.digest(row.id, code);
+    const expectedHash = String(row.hash || '');
+    const matches =
+      /^\d{6}$/.test(code) &&
+      /^[a-f0-9]{64}$/i.test(expectedHash) &&
+      timingSafeEqual(
+        Buffer.from(suppliedHash, 'hex'),
+        Buffer.from(expectedHash, 'hex'),
+      );
+
+    if (!matches) {
+      await c.updateOne(
+        { _id: row._id, used: false, attempts: { $lt: 5 } },
+        { $inc: { attempts: 1 } },
+      );
       throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    // Consume only after a correct code; the conditional update prevents two
+    // concurrent requests from verifying the same challenge.
     const used = await c.updateOne(
-      { _id: row._id, used: false },
-      { $set: { used: true } },
+      {
+        _id: row._id,
+        used: false,
+        expiresAt: { $gt: new Date() },
+        attempts: { $lt: 5 },
+      },
+      { $set: { used: true }, $inc: { attempts: 1 } },
     );
-    if (!used.modifiedCount) throw new BadRequestException('OTP already used');
+    if (!used.modifiedCount)
+      throw new BadRequestException('OTP already used or expired');
     return row;
   }
   async verify(p: any) {

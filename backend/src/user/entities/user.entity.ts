@@ -77,7 +77,7 @@ export class User {
     @Prop({type:Number,default:0}) offlineRecommendations:number;
     @Prop({type:Object})
     premiumService?:{
-      source?:'bkash'|'admin';stage?:string;startedAt?:Date;expiresAt?:Date;
+      source?:'bkash'|'zinipay'|'admin';stage?:string;startedAt?:Date;expiresAt?:Date;
       assistedAllowance?:number;assistedUsed?:number;includedConnections?:number;
       baseFee?:number;serviceCharge?:number;updatedAt?:Date;adminNotes?:string;
     };

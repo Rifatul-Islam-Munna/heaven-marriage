@@ -22,13 +22,14 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
+  CommandSearch,
   CommandItem,
 } from "@/components/ui/command";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ageFromBirthDate } from "@/lib/birth-date";
 import BirthDateSelect from "./BirthDateSelect";
+import PhoneNumberInput from "@/components/custom/common/PhoneNumberInput";
 
 export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
   const formData = useProfileStore((state) => state.formData);
@@ -49,9 +50,43 @@ export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
   const [countryOpen, setCountryOpen] = useState(false);
   return (
     <div className="space-y-6">
-      {!admin && <p className="text-sm text-gray-600">ফোন বা ইমেইল যোগ/পরিবর্তন করতে <a className="text-pink-600 underline" href="/profile">ড্যাশবোর্ডের যাচাই অপশন</a> ব্যবহার করুন।</p>}
+      {!admin && (
+        <p className="text-sm text-gray-600">
+          ফোন বা ইমেইল যোগ/পরিবর্তন করতে{" "}
+          <a className="text-pink-600 underline" href="/profile">
+            ড্যাশবোর্ডের যাচাই অপশন
+          </a>{" "}
+          ব্যবহার করুন।
+        </p>
+      )}
       <div className="grid md:grid-cols-2 gap-4">
-        {(["fatherName","motherName","guardianPhone"] as const).map((field)=><div key={field} className="space-y-2"><Label htmlFor={field}>{field==="fatherName"?"পিতার নাম":field==="motherName"?"মাতার নাম":"অভিভাবকের মোবাইল নম্বর"}</Label><Input id={field} type={field==="guardianPhone"?"tel":"text"} value={formData[field]||""} onChange={e=>updateField(field,e.target.value)} className="border-pink-200" /></div>)}
+        {(["fatherName", "motherName", "guardianPhone"] as const).map(
+          (field) => (
+            <div key={field} className="space-y-2">
+              <Label htmlFor={field}>
+                {field === "fatherName"
+                  ? "পিতার নাম"
+                  : field === "motherName"
+                    ? "মাতার নাম"
+                    : "অভিভাবকের মোবাইল নম্বর"}
+              </Label>
+              {field === "guardianPhone" ? (
+                <PhoneNumberInput
+                  id={field}
+                  value={formData[field] || ""}
+                  onChange={(value) => updateField(field, value)}
+                />
+              ) : (
+                <Input
+                  id={field}
+                  value={formData[field] || ""}
+                  onChange={(e) => updateField(field, e.target.value)}
+                  className="border-pink-200"
+                />
+              )}
+            </div>
+          ),
+        )}
         <div className="space-y-2">
           <Label htmlFor="name">নাম *</Label>
           <Input
@@ -88,11 +123,11 @@ export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
 
         <div className="space-y-2">
           <Label htmlFor="whatsapp">whatsapp নম্বর </Label>
-          <Input
+          <PhoneNumberInput
             id="whatsapp"
             value={formData.whatsapp || ""}
-            onChange={(e) => updateField("whatsapp", e.target.value)}
-            placeholder="whatsapp নম্বর"
+            onChange={(value) => updateField("whatsapp", value)}
+            placeholder="WhatsApp নম্বর লিখুন"
           />
         </div>
 
@@ -205,7 +240,7 @@ export function BasicInfoStep({ admin = false }: { admin?: boolean }) {
               align="start"
             >
               <Command>
-                <CommandInput placeholder="দেশ খুঁজুন..." className="h-10" />
+                <CommandSearch placeholder="দেশ খুঁজুন..." className="h-10" />
                 <CommandEmpty>কোনো দেশ পাওয়া যায়নি।</CommandEmpty>
                 <CommandGroup className="max-h-48 overflow-y-auto">
                   {countries.map((country) => (

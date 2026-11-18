@@ -84,16 +84,17 @@ export function locationQuestionVisible(q: ProfileQuestion, profile: Record<stri
  if(['address.district','address.upazila','address.cityCorporation','address.area'].includes(path)) {
    if(profile?.residenceCountry && profile.residenceCountry!=='Bangladesh')return false;
    if(['address.upazila','address.cityCorporation'].includes(path) && !profile?.address?.district)return false;
+   // Upazila and city corporation are alternatives. If legacy data contains both,
+   // keep upazila visible as the deterministic source of truth so it can be corrected.
+   if(path==='address.cityCorporation' && profile?.address?.upazila)return false;
+   if(path==='address.upazila' && profile?.address?.cityCorporation && !profile?.address?.upazila)return false;
    if(path==='address.area' && (!profile?.address?.district ||
      !(profile?.address?.cityCorporation || profile?.address?.upazila)))return false;
  }
  return true;
 }
 export function locationQuestionApplies(q: ProfileQuestion, profile: Record<string,any>):boolean {
- if(!locationQuestionVisible(q,profile))return false;
- if(q.path==='address.upazila' && profile?.address?.cityCorporation)return false;
- if(q.path==='address.cityCorporation' && profile?.address?.upazila)return false;
- return true;
+ return locationQuestionVisible(q,profile);
 }
 export function questionApplies(q:ProfileQuestion,gender?:string){
  return q.enabled&&(q.gender==='both'||q.gender===gender);

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft } from "lucide-react";
 import { useQueryWrapper } from "@/api-hooks/react-query-wrapper";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PremiumOfferCard from "@/components/custom/profile/PremiumOfferCard";
 
@@ -28,8 +27,6 @@ const toBanglaNumber = (num: number): string => {
 };
 
 const PricingPage = () => {
-  const router = useRouter();
-
   // Fetch all pricings
   const { data: pricings = [], isLoading } = useQueryWrapper<Pricing[]>(
     ["public-pricings"],
@@ -43,8 +40,22 @@ const PricingPage = () => {
     method: "POST",
     url: "/user/Buy-packages",
     onSuccess: (data) => {
-      console.log(data);
-      router.push(data?.paymentUrl);
+      if (!data?.paymentUrl) return;
+      try {
+        const checkoutUrl = new URL(data.paymentUrl);
+        const trustedHost =
+          checkoutUrl.hostname === "secure.zinipay.com" && !checkoutUrl.port;
+        if (
+          checkoutUrl.protocol !== "https:" ||
+          !trustedHost ||
+          checkoutUrl.username ||
+          checkoutUrl.password
+        )
+          return;
+        window.location.assign(checkoutUrl.toString());
+      } catch {
+        // Never navigate to an invalid or untrusted payment destination.
+      }
     },
   });
 
@@ -130,12 +141,14 @@ const PricingPage = () => {
             আমাদের সকল প্রাইসিং প্ল্যান
           </h1>
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
-            আপনার জীবনসঙ্গী খুঁজে পেতে সঠিক প্যাকেজ বেছে নিন। সব প্যাকেজ দেখুন
-            এবং আপনার জন্য উপযুক্ত একটি নির্বাচন করুন
+            আপনার জীবনসঙ্গী খুঁজে পেতে সঠিক প্যাকেজ বেছে নিন। সব প্যাকেজ দেখুন এবং
+            আপনার জন্য উপযুক্ত একটি নির্বাচন করুন
           </p>
         </div>
 
-        <div className="mb-10"><PremiumOfferCard source="pricing" /></div>
+        <div className="mb-10">
+          <PremiumOfferCard source="pricing" />
+        </div>
         {/* Pricing Cards */}
         <div
           className={`grid grid-cols-1 ${getGridClass()} gap-6 md:gap-6 lg:gap-8`}
@@ -210,7 +223,10 @@ const PricingPage = () => {
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-600 mb-3">একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।</p><PolicyLinks />
+                  <p className="text-xs text-gray-600 mb-3">
+                    একটি কানেকশন একটি পৃথক প্রোফাইলের পরিচয় ও যোগাযোগ আনলক করবে।
+                  </p>
+                  <PolicyLinks />
                   {/* CTA Button */}
                   <Button
                     onClick={() => mutate({ id: pricing._id })}
@@ -262,8 +278,8 @@ const PricingPage = () => {
             এখনও সিদ্ধান্ত নিতে পারছেন না?
           </h3>
           <p className="text-base md:text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
-            আমাদের সাথে যোগাযোগ করুন এবং আপনার জন্য সবচেয়ে উপযুক্ত প্যাকেজ
-            খুঁজে নিতে সাহায্য নিন
+            আমাদের সাথে যোগাযোগ করুন এবং আপনার জন্য সবচেয়ে উপযুক্ত প্যাকেজ খুঁজে নিতে
+            সাহায্য নিন
           </p>
           <Link href="/contact">
             <Button className="bg-pink-600 hover:bg-pink-700 text-white px-8 py-6 text-base md:text-lg font-semibold rounded-xl">

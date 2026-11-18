@@ -41,8 +41,9 @@ function rawProfileQuestionOptions(q:ProfileQuestion,gender?:string,formData?:Lo
  const entries=(kind:LocationEntry['kind'])=>additional.filter(item=>item.kind===kind && item.enabled!==false);
  const toOptions=(items:Pick<LocationEntry,'name'|'label'>[])=>items.map(i=>({value:i.name,label:i.label}));
  const district=formData?.address?.district;
- const city=formData?.address?.cityCorporation;
  const upazila=formData?.address?.upazila;
+ // Match the editor visibility rule for legacy profiles that contain both.
+ const city=upazila ? undefined : formData?.address?.cityCorporation;
  switch(q.optionSource) {
  case 'gender':return [{value:'male',label:'পুরুষ'},{value:'female',label:'মহিলা'}];
  case 'maritalStatus':return format(filtered(marriedStatus).filter(i=>i.en!=='all'),'en','bn');

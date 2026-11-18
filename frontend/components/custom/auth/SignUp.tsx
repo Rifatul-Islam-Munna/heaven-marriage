@@ -20,10 +20,11 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
 import { normalizeBangladeshMobile } from "@/lib/bangladesh-mobile";
+import PhoneNumberInput from "@/components/custom/common/PhoneNumberInput";
 
 export default function SignUp() {
   const router = useRouter();
-  const [mode,setMode]=useState<"phone"|"email">("phone");
+  const [mode, setMode] = useState<"phone" | "email">("phone");
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
@@ -35,20 +36,28 @@ export default function SignUp() {
   const { mutate, isPending } = useCommonMutationApi({
     url: "/user",
     method: "POST",
-    successMessage: mode === "email" ? "আপনার ইমেইলে OTP পাঠানো হয়েছে" : "আপনার মোবাইল নম্বরে OTP পাঠানো হয়েছে",
+    successMessage:
+      mode === "email"
+        ? "আপনার ইমেইলে OTP পাঠানো হয়েছে"
+        : "আপনার মোবাইল নম্বরে OTP পাঠানো হয়েছে",
     mutationKey: ["user-created"],
     onSuccess: (data) => {
-      sessionStorage.setItem("niqaha_challenge",data.challengeId);
-      sessionStorage.setItem("niqaha_registration_method",mode);
+      sessionStorage.setItem("niqaha_challenge", data.challengeId);
+      sessionStorage.setItem("niqaha_registration_method", mode);
       router.push("/otp");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const phoneNumber = mode === "phone" ? normalizeBangladeshMobile(formData.phoneNumber) : undefined;
+    const phoneNumber =
+      mode === "phone"
+        ? normalizeBangladeshMobile(formData.phoneNumber)
+        : undefined;
     if (mode === "phone" && !phoneNumber) {
-      toast.error("বাংলাদেশের সঠিক মোবাইল নম্বর লিখুন (যেমন 01712345678)।");
+      toast.error(
+        "ফোন OTP আপাতত শুধু বাংলাদেশের নম্বরে পাঠানো যায়। বিদেশি নম্বর হলে ইমেইল OTP নির্বাচন করুন এবং নম্বরের ফরম্যাট যাচাই করুন।",
+      );
       return;
     }
     mutate({
@@ -75,151 +84,183 @@ export default function SignUp() {
   return (
     <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100 px-3 py-6 sm:items-center sm:p-4">
       <div className="w-full max-w-md space-y-3">
-      <Card className="w-full border-pink-200">
-        <CardHeader className="space-y-2 px-5 pb-2 text-center sm:space-y-3 sm:px-6">
-          <div className="mx-auto flex size-12 items-center justify-center sm:size-16">
-            <Image src={"/logo.png"} width={64} height={64} alt="logo" />
-          </div>
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent sm:text-3xl">
-            অ্যাকাউন্ট তৈরি করুন
-          </CardTitle>
-          <CardDescription className="text-sm text-gray-600 sm:text-base">
-            আপনার নিখুঁত জীবনসঙ্গী খুঁজে পেতে হালাল যাত্রা শুরু করুন
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-5 sm:px-6">
-          <div className="space-y-2">
-            <p className="text-center text-sm font-medium text-gray-700">
-              সবচেয়ে সহজ: Google দিয়ে এক ক্লিকে অ্যাকাউন্ট খুলুন
-            </p>
-            <LoginWithGoogle signup />
-          </div>
-          <AuthDivider label="অথবা মোবাইল / ইমেইল দিয়ে" />
-          <div role="radiogroup" aria-label="যাচাইয়ের মাধ্যম" className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-pink-50 p-1">
-            {([["phone", "মোবাইল OTP"], ["email", "ইমেইল OTP"]] as const).map(([value, label]) => (
-              <button key={value} type="button" role="radio" aria-checked={mode === value} onClick={() => setMode(value)}
-                className={`h-10 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-pink-600 ${mode === value ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-pink-700"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <Card className="w-full border-pink-200">
+          <CardHeader className="space-y-2 px-5 pb-2 text-center sm:space-y-3 sm:px-6">
+            <div className="mx-auto flex size-12 items-center justify-center sm:size-16">
+              <Image src={"/logo.png"} width={64} height={64} alt="logo" />
+            </div>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent sm:text-3xl">
+              অ্যাকাউন্ট তৈরি করুন
+            </CardTitle>
+            <CardDescription className="text-sm text-gray-600 sm:text-base">
+              আপনার নিখুঁত জীবনসঙ্গী খুঁজে পেতে হালাল যাত্রা শুরু করুন
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-5 sm:px-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-gray-700 font-medium">
-                পুরো নাম
-              </Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="আপনার পুরো নাম লিখুন"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
-              />
+              <p className="text-center text-sm font-medium text-gray-700">
+                সবচেয়ে সহজ: Google দিয়ে এক ক্লিকে অ্যাকাউন্ট খুলুন
+              </p>
+              <LoginWithGoogle signup />
             </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="phoneNumber"
-                className="text-gray-700 font-medium"
-              >
-                {mode==="email"?"ইমেইল":"বাংলাদেশি মোবাইল নম্বর"}
-              </Label>
-              <Input
-                id="phoneNumber"
-                name={mode==="email"?"email":"phoneNumber"}
-                type={mode==="email"?"email":"tel"}
-                placeholder={mode==="email"?"name@example.com":"01712345678"}
-                inputMode={mode==="phone"?"tel":undefined}
-                autoComplete={mode==="phone"?"tel-national":"email"}
-                maxLength={mode==="phone"?20:undefined}
-                value={mode==="email"?formData.email:formData.phoneNumber}
-                onChange={handleChange}
-                required
-                className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
-              />
-              {mode === "phone" && (
-                <p className="text-xs text-gray-500">
-                  বাংলাদেশের নম্বর 01XXXXXXXXX লিখুন। +880 বা 880 দিয়েও লিখতে পারবেন।
-                </p>
-              )}
-            </div>
-
-            {/* Gender Field */}
-            <div className="space-y-3">
-              <Label className="text-gray-700 font-medium">লিঙ্গ</Label>
-              <RadioGroup
-                value={formData.gender}
-                onValueChange={handleGenderChange}
-                required
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="male"
-                    id="male"
-                    className="border-pink-300 text-pink-600"
-                  />
-                  <Label htmlFor="male" className="cursor-pointer font-normal">
-                    পুরুষ
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem
-                    value="female"
-                    id="female"
-                    className="border-pink-300 text-pink-600"
-                  />
-                  <Label
-                    htmlFor="female"
-                    className="cursor-pointer font-normal"
-                  >
-                    মহিলা
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-700 font-medium">
-                পাসওয়ার্ড
-              </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                minLength={8}
-                autoComplete="new-password"
-                placeholder="একটি শক্তিশালী পাসওয়ার্ড তৈরি করুন"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
-              disabled={isPending}
+            <AuthDivider label="অথবা মোবাইল / ইমেইল দিয়ে" />
+            <div
+              role="radiogroup"
+              aria-label="যাচাইয়ের মাধ্যম"
+              className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-pink-50 p-1"
             >
-              {isPending ? "সাইন আপ হচ্ছে..." : "সাইন আপ করুন"}
-            </Button>
+              {(
+                [
+                  ["phone", "মোবাইল OTP"],
+                  ["email", "ইমেইল OTP"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === value}
+                  onClick={() => setMode(value)}
+                  className={`h-10 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-pink-600 ${mode === value ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-pink-700"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-gray-700 font-medium">
+                  পুরো নাম
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="আপনার পুরো নাম লিখুন"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
+                />
+              </div>
 
-            <p className="text-center text-sm text-gray-600 pt-2">
-              ইতিমধ্যে একটি অ্যাকাউন্ট আছে?{" "}
-              <a
-                href="/login"
-                className="text-pink-600 hover:text-pink-700 font-semibold hover:underline"
+              <div className="space-y-2">
+                <Label
+                  htmlFor="phoneNumber"
+                  className="text-gray-700 font-medium"
+                >
+                  {mode === "email" ? "ইমেইল" : "বাংলাদেশি মোবাইল নম্বর"}
+                </Label>
+                {mode === "phone" ? (
+                  <PhoneNumberInput
+                    id="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={(value) =>
+                      setFormData((current) => ({
+                        ...current,
+                        phoneNumber: value,
+                      }))
+                    }
+                    required
+                    placeholder="01712345678"
+                  />
+                ) : (
+                  <Input
+                    id="phoneNumber"
+                    name="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    autoComplete="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
+                  />
+                )}
+                {mode === "phone" && (
+                  <p className="text-xs text-gray-500">
+                    বাংলাদেশের নম্বর 01XXXXXXXXX লিখুন। +880 বা 880 দিয়েও লিখতে
+                    পারবেন।
+                  </p>
+                )}
+              </div>
+
+              {/* Gender Field */}
+              <div className="space-y-3">
+                <Label className="text-gray-700 font-medium">লিঙ্গ</Label>
+                <RadioGroup
+                  value={formData.gender}
+                  onValueChange={handleGenderChange}
+                  required
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="male"
+                      id="male"
+                      className="border-pink-300 text-pink-600"
+                    />
+                    <Label
+                      htmlFor="male"
+                      className="cursor-pointer font-normal"
+                    >
+                      পুরুষ
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value="female"
+                      id="female"
+                      className="border-pink-300 text-pink-600"
+                    />
+                    <Label
+                      htmlFor="female"
+                      className="cursor-pointer font-normal"
+                    >
+                      মহিলা
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-gray-700 font-medium">
+                  পাসওয়ার্ড
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="একটি শক্তিশালী পাসওয়ার্ড তৈরি করুন"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isPending}
               >
-                লগইন করুন
-              </a>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+                {isPending ? "সাইন আপ হচ্ছে..." : "সাইন আপ করুন"}
+              </Button>
+
+              <p className="text-center text-sm text-gray-600 pt-2">
+                ইতিমধ্যে একটি অ্যাকাউন্ট আছে?{" "}
+                <a
+                  href="/login"
+                  className="text-pink-600 hover:text-pink-700 font-semibold hover:underline"
+                >
+                  লগইন করুন
+                </a>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

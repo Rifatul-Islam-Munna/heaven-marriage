@@ -8,12 +8,18 @@ import { Phone, ArrowRight, Loader2, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCommonMutationApi } from "@/api-hooks/use-api-mutation";
 import { toast } from "sonner";
-import Image from "next/image";
 import { normalizeBangladeshMobile } from "@/lib/bangladesh-mobile";
+import PhoneNumberInput from "@/components/custom/common/PhoneNumberInput";
 
 const ForgotPassword = () => {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<"phone" | "email">("phone");
+  const resetSubject =
+    mode === "email"
+      ? email.trim().toLowerCase()
+      : normalizeBangladeshMobile(phoneNumber) || "";
 
   // Send OTP mutation
   const { mutate: sendOtp, isPending } = useCommonMutationApi({
@@ -23,45 +29,45 @@ const ForgotPassword = () => {
     successMessage: "অ্যাকাউন্টটি থাকলে নিবন্ধিত ফোন বা ইমেইলে OTP পাঠানো হবে",
     onSuccess: (data) => {
       // Navigate to verify OTP page with phone number
-      sessionStorage.setItem("niqaha_reset_subject", normalizeContact(phoneNumber));
-      sessionStorage.setItem("niqaha_reset_sent_at",String(Date.now()));
-      sessionStorage.setItem("niqaha_reset_challenge",data.challengeId);
+      sessionStorage.setItem("niqaha_reset_subject", resetSubject);
+      sessionStorage.setItem("niqaha_reset_sent_at", String(Date.now()));
+      sessionStorage.setItem("niqaha_reset_challenge", data.challengeId);
       router.push("/forgot/verify-otp");
     },
   });
-
-  const normalizeContact = (value: string) => value.includes("@") ? value.trim().toLowerCase() :
-    normalizeBangladeshMobile(value) ?? value.replace(/[০-৯]/g,n=>String("০১২৩৪৫৬৭৮৯".indexOf(n))).replace(/[\s()-]/g,"");
-  // Validate phone number
-  const validatePhone = (phone: string) => {
-    // Bangladesh phone number validation (11 digits starting with 01)
-    const phoneRegex = /^(?:01[3-9]\d{8}|\+[1-9]\d{6,14}|[^\s@]+@[^\s@]+\.[^\s@]+)$/;
-    return phoneRegex.test(phone);
-  };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!phoneNumber) {
-      toast.error("ফোন নম্বর বা ইমেইল লিখুন", {
+    if (mode === "phone" ? !phoneNumber : !email.trim()) {
+      toast.error(mode === "phone" ? "ফোন নম্বর লিখুন" : "ইমেইল লিখুন", {
         style: { background: "red", color: "white" },
       });
       return;
     }
 
-    if (!validatePhone(normalizeContact(phoneNumber))) {
-      toast.error("সঠিক নিবন্ধিত ফোন নম্বর বা ইমেইল লিখুন", {
-        duration: 5000,
-        style: { background: "red", color: "white" },
-      });
+    if (
+      mode === "phone"
+        ? !resetSubject
+        : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetSubject)
+    ) {
+      toast.error(
+        mode === "phone"
+          ? "ফোন OTP আপাতত শুধু সঠিক বাংলাদেশি মোবাইল নম্বরে পাঠানো যায়। বিদেশি নম্বর হলে ইমেইল OTP নির্বাচন করুন।"
+          : "সঠিক নিবন্ধিত ইমেইল লিখুন",
+        {
+          duration: 5000,
+          style: { background: "red", color: "white" },
+        },
+      );
       return;
     }
 
     // Send OTP
     if (isPending) return;
-    sendOtp({ phoneNumber: normalizeContact(phoneNumber) });
+    sendOtp({ phoneNumber: resetSubject });
   };
 
   return (
@@ -91,29 +97,60 @@ const ForgotPassword = () => {
 
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Phone Number Input */}
+              <div
+                className="grid grid-cols-2 gap-1 rounded-xl bg-pink-50 p-1"
+                role="group"
+                aria-label="OTP পাঠানোর মাধ্যম"
+              >
+                <button
+                  type="button"
+                  onClick={() => setMode("phone")}
+                  aria-pressed={mode === "phone"}
+                  className={`h-10 rounded-lg text-sm font-semibold ${mode === "phone" ? "bg-white text-pink-700 shadow-sm" : "text-gray-600"}`}
+                >
+                  মোবাইল
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("email")}
+                  aria-pressed={mode === "email"}
+                  className={`h-10 rounded-lg text-sm font-semibold ${mode === "email" ? "bg-white text-pink-700 shadow-sm" : "text-gray-600"}`}
+                >
+                  ইমেইল
+                </button>
+              </div>
               <div className="space-y-2">
                 <Label
-                  htmlFor="phoneNumber"
+                  htmlFor={mode === "phone" ? "phoneNumber" : "email"}
                   className="text-gray-700 font-medium"
                 >
-                  ফোন নম্বর বা ইমেইল <span className="text-red-500">*</span>
+                  {mode === "phone" ? "মোবাইল নম্বর" : "ইমেইল ঠিকানা"}{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
+                {mode === "phone" ? (
+                  <PhoneNumberInput
                     id="phoneNumber"
-                    type="text"
-                    placeholder="+8801712345678 / name@example.com"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="pl-10 h-12 text-lg border-gray-300 focus:border-pink-500 focus:ring-pink-500"
-                    maxLength={254}
+                    onChange={setPhoneNumber}
+                    required
                     disabled={isPending}
                   />
-                </div>
+                ) : (
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isPending}
+                    className="h-12 text-base border-gray-300 focus:border-pink-500 focus:ring-pink-500"
+                  />
+                )}
                 <p className="text-xs text-gray-500 mt-1">
-                  দেশের কোডসহ ফোন নম্বর বা নিবন্ধিত ইমেইল লিখুন
+                  {mode === "phone"
+                    ? "বাংলাদেশের মোবাইল নম্বরের জন্য +880 ডিফল্ট। বিদেশি নম্বর হলে ইমেইল OTP ব্যবহার করুন।"
+                    : "আপনার অ্যাকাউন্টে নিবন্ধিত ইমেইল লিখুন।"}
                 </p>
               </div>
 

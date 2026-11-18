@@ -4,26 +4,39 @@ import { useEffect } from "react";
 import { getTrackingPurchase } from "@/actions/auth";
 import { hasTrackingConsent, purchaseEvent } from "./google-tag-manager";
 
-export default function PurchaseTracker() {
+type PurchasePurpose = "premium" | "connections";
+
+export default function PurchaseTracker({
+  paymentId,
+  purpose,
+  enabled = false,
+}: {
+  paymentId?: string;
+  purpose?: PurchasePurpose;
+  enabled?: boolean;
+}) {
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paymentId = params.get("payment_id");
-    const purpose = params.get("purpose");
-    if (!paymentId || paymentId.length > 150 || !["premium", "connections"].includes(purpose || "")) return;
+    if (!enabled || !paymentId || paymentId.length > 150 ||
+      !purpose || !["premium", "connections"].includes(purpose)) return;
+
     let cancelled = false;
     const track = async () => {
       if (!hasTrackingConsent()) return;
       try {
-        const receipt = await getTrackingPurchase(paymentId, purpose as "premium" | "connections");
+        const receipt = await getTrackingPurchase(paymentId, purpose);
         if (!cancelled && receipt) await purchaseEvent(receipt);
-      } catch { /* Tracking must not interrupt the completed payment. */ }
+      } catch {
+        // Tracking must never interrupt a verified payment.
+      }
     };
+
     void track();
     window.addEventListener("niqaha:tracking-consent-granted", track);
     return () => {
       cancelled = true;
       window.removeEventListener("niqaha:tracking-consent-granted", track);
     };
-  }, []);
+  }, [enabled, paymentId, purpose]);
+
   return null;
 }

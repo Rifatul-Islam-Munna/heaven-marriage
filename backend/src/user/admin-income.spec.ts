@@ -4,7 +4,7 @@ const NOW=new Date('2026-11-08T12:00:00.000Z'); // 18:00 in Bangladesh
 
 describe('Admin verified income report',()=>{
   const connection=[
-    {status:'paid',amount:1000,currency:'BDT',paidAt:'2026-11-05T11:00:00Z',paymentId:'bkash-1'},
+    {status:'paid',amount:1000,currency:'BDT',paidAt:'2026-11-05T11:00:00Z',paymentId:'zinipay-1',gateway:'zinipay'},
     {status:'paid',amount:500,currency:'BDT',paidAt:'2026-11-03T09:00:00Z',paymentId:'manual:1'},
     {status:'refunded',amount:200,currency:'BDT',paidAt:'2026-09-30T11:00:00Z',
       refundedAt:'2026-11-07T11:00:00Z',paymentId:'bkash-r'},
@@ -14,24 +14,24 @@ describe('Admin verified income report',()=>{
     {status:'paid',amount:3000,currency:'BDT',paidAt:'2026-10-25T10:00:00Z',paymentId:'bkash-late'},
   ];
   const premium=[
-    {status:'paid',amount:2000,currency:'BDT',paidAt:'2026-11-06T11:00:00Z',paymentId:'bkash-premium'},
+    {status:'paid',amount:2000,currency:'BDT',paidAt:'2026-11-06T11:00:00Z',paymentId:'zinipay-premium',gateway:'zinipay'},
   ];
 
   it('uses Bangladesh calendar month boundaries',()=>{
     expect(bangladeshMonth(new Date('2026-10-31T17:59:59Z'))).toBe('2026-10');
     expect(bangladeshMonth(new Date('2026-10-31T18:00:00Z'))).toBe('2026-11');
   });
-  it('separates bKash, manual receipts, premium and refunds; excludes pending',()=>{
+  it('separates ZiniPay, legacy bKash, manual receipts, premium and refunds',()=>{
     const report=buildIncomeReport(connection,premium,NOW);
     expect(report.current).toMatchObject({
       gross:3500,connectionGross:1500,premiumGross:2000,refunds:200,net:3300,
-      payments:3,manualNet:500,bkashNet:2800,
+      payments:3,manualNet:500,zinipayNet:3000,bkashNet:-200,
     });
     expect(report.previous.net).toBe(4000);
     expect(report.previousComparableNet).toBe(1000);
     expect(report.growthPercent).toBe(230);
     expect(report.months).toHaveLength(6);
-    expect(report.recent[0]).toMatchObject({event:'refund',source:'connections',amount:200});
+    expect(report.recent[0]).toMatchObject({event:'refund',source:'connections',method:'bKash',amount:200});
     expect(report.recent.some(x=>x.source==='premium' && x.event==='paid')).toBe(true);
   });
   it('counts a refund in the date it is recorded, not the original purchase month',()=>{

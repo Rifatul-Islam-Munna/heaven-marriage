@@ -1,5 +1,5 @@
 import {DashboardPermission} from '../staff-access/permissions';
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, Logger, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, BadRequestException, HttpCode, ServiceUnavailableException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminSetPasswordDto, AdminUserDto, FindOneDto, FindOneTokenDto, LoginDto, NewPasswordResetWithOtp, OtpstringDto, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
@@ -8,13 +8,11 @@ import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
 import { RolesGuard } from 'src/lib/roles.guard';
 import { Roles } from 'src/lib/roles.decorator';
 import { UserType } from './entities/user.entity';
-import { type Response } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { RequestNumberDto } from './dto/request-number.dto';
 @Controller('user')
 @UseGuards(ThrottlerGuard)
 export class UserController {
-  private logger = new Logger(UserController.name)
   constructor(private readonly userService: UserService) {}
 
     @Post()
@@ -134,48 +132,48 @@ export class UserController {
 
 
 
-  @Throttle({default:{limit:30,ttl:60000}})
-  @Get('premium-payment-callback')
-  async premiumPaymentCallback(
-    @Query('paymentID') paymentID: string,
-    @Query('status') status: string,
-    @Res() res: Response,
-  ) {
-    const base = process.env.FRONTEND_URL;
-    if (!base) throw new BadRequestException('Frontend URL is not configured');
-    const redirectBase = base.replace(/\/$/, '');
-    if (status !== 'success' || !paymentID)
-      return res.redirect(redirectBase + '/payment/failed?purpose=premium');
-    try {
-      const result = await this.userService.executePremiumPayment(paymentID);
-      return res.redirect(redirectBase + (result.success
-        ? '/payment/successfull?purpose=premium&payment_id=' + encodeURIComponent(paymentID)
-        : '/payment/failed?purpose=premium'));
-    } catch {
-      return res.redirect(redirectBase + '/payment/failed?purpose=premium');
-    }
+  private async processZiniPayWebhook(payload: Record<string, unknown>) {
+    const invoiceId = typeof payload.invoice_id === 'string' ? payload.invoice_id.trim() : '';
+    if (!invoiceId || invoiceId.length > 150)
+      throw new BadRequestException('Invalid ZiniPay invoice reference');
+
+    // The webhook's status is only a notification. The backend still verifies
+    // the invoice directly with ZiniPay before granting anything.
+    if (!['true', '1'].includes(String(payload.status ?? '').toLowerCase()))
+      return { received: true, verified: false };
+
+    const premium = await this.userService.executePremiumPayment(invoiceId);
+    if (premium.success)
+      return { received: true, verified: true, purpose: 'premium' };
+    if (premium.retryable)
+      throw new ServiceUnavailableException('ZiniPay verification is still pending; retry this webhook');
+
+    const connections = await this.userService.executePayment(invoiceId);
+    if (connections.retryable)
+      throw new ServiceUnavailableException('ZiniPay verification is still pending; retry this webhook');
+    return {
+      received: true,
+      verified: connections.success,
+      ...(connections.success ? { purpose: 'connections' } : {}),
+    };
   }
 
-  @Throttle({default:{limit:60,ttl:60}})
-  @Get("execute-payment-callback")
- async executePayment( @Query('paymentID') paymentID: string,
-    @Query('status') status: string,
-    @Res() res: Response,) {
-       if (!paymentID || !status) {
-        this.logger.error('Missing paymentID or status');
-        throw new BadRequestException('Missing paymentID or status');
-      }
-      const frontendBaseUrl = process.env.FRONTEND_URL as string;
-      if (status === 'success') {
-        const result = await this.userService.executePayment(paymentID);
-        if(result.success){
-         return res.redirect(`${frontendBaseUrl}/payment/successfull?purpose=connections&payment_id=${encodeURIComponent(paymentID)}`);
-        }
-           return res.redirect(`${frontendBaseUrl}/payment/failed`);
-      }
-   return   res.redirect(`${frontendBaseUrl}/payment/failed`);
+  @Post('zinipay-payment-webhook')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async zinipayPaymentWebhook(@Body() body: unknown, @Query() query: Record<string, unknown>) {
+    const queryPayload = query && typeof query === 'object' ? query : {};
+    const bodyPayload = body && typeof body === 'object' && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : {};
+    return this.processZiniPayWebhook({ ...queryPayload, ...bodyPayload });
+  }
 
-
+  // The documentation also supports query-parameter webhook callbacks.
+  @Get('zinipay-payment-webhook')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async zinipayPaymentWebhookQuery(@Query() query: Record<string, unknown>) {
+    return this.processZiniPayWebhook(query || {});
   }
   @UseGuards(AuthGuard,ThrottlerGuard )
   @Throttle({default:{limit:500, ttl:1800000}})

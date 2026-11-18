@@ -4,7 +4,7 @@ export type PremiumStage='onboarding'|'preferences'|'shortlisting'|'connecting'|
 export const PREMIUM_STAGES:readonly PremiumStage[]=[
   'onboarding','preferences','shortlisting','connecting','completed','paused',
 ] as const;
-export function premiumEntitlement(settings:PremiumSettings,at=new Date(),source:'bkash'|'admin'='bkash') {
+export function premiumEntitlement(settings:PremiumSettings,at=new Date(),source:'bkash'|'zinipay'|'admin'='zinipay') {
   return {
     source,stage:'onboarding' as PremiumStage,startedAt:at,
     expiresAt:new Date(at.getTime()+settings.durationDays*86400000),

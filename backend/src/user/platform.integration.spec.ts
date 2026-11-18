@@ -12,10 +12,9 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
     db: Connection,
     users: Model<any>,
     service: PlatformService;
-  const bkash = {
-    createPayment: jest.fn(),
-    executePayment: jest.fn(),
-    queryPayment: jest.fn(),
+  const ziniPay = {
+    createInvoice: jest.fn(),
+    verifyInvoice: jest.fn(),
   };
   const messages = { send: jest.fn() };
   const account = async (extra: any = {}) =>
@@ -34,7 +33,7 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
       dbName: 'niqaha_upgrade_tests',
     }).asPromise();
     users = db.model(User.name, UserSchema);
-    service = new PlatformService(db, users, bkash as any, messages as any, new QuestionConfigService(db));
+    service = new PlatformService(db, users, ziniPay as any, messages as any, new QuestionConfigService(db));
     await service.onModuleInit();
   }, 120000);
   afterAll(async () => {
@@ -197,24 +196,20 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
     const a = await account(),
       id = 'order-1',
       paymentId = 'payment-1';
-    await db
-      .collection('connection_orders')
-      .insertOne({
-        id,
-        paymentId,
-        userId: String(a._id),
-        quantity: 5,
-        amount: 500,
-        currency: 'BDT',
-        status: 'pending',
-      });
-    bkash.executePayment.mockResolvedValue({
-      paymentID: paymentId,
-      payerReference: id,
-      transactionStatus: 'Completed',
-      amount: '500',
+    await db.collection('connection_orders').insertOne({
+      id,
+      paymentId,
+      userId: String(a._id),
+      quantity: 5,
+      amount: 500,
       currency: 'BDT',
-      trxID: 'verified',
+      status: 'pending',
+    });
+    ziniPay.verifyInvoice.mockResolvedValue({
+      invoice_id: paymentId,
+      status: 'COMPLETED',
+      amount: '500',
+      transaction_id: 'verified',
     });
     await Promise.all(
       Array.from({ length: 6 }, () => service.executePayment(paymentId)),
@@ -226,34 +221,44 @@ describe('Connection authorization and payment integrity (isolated MongoDB)', ()
   it('denies credits for wrong amounts, currencies and pending payments', async () => {
     const a = await account();
     for (const [i, result] of [
-      { amount: '1', currency: 'BDT', transactionStatus: 'Completed' },
-      { amount: '500', currency: 'USD', transactionStatus: 'Completed' },
-      { amount: '500', currency: 'BDT', transactionStatus: 'Pending' },
+      { amount: '1', status: 'COMPLETED' },
+      { amount: '500', status: 'PENDING' },
+      { amount: '500', status: 'FAILED' },
     ].entries()) {
       const paymentId = 'p' + i;
-      await db
-        .collection('connection_orders')
-        .insertOne({
-          id: 'o' + i,
-          paymentId,
-          userId: String(a._id),
-          quantity: 5,
-          amount: 500,
-          currency: 'BDT',
-          status: 'pending',
-        });
-      bkash.executePayment.mockResolvedValue({
-        ...result,
-        paymentID: paymentId,
-        payerReference: 'o' + i,
+      await db.collection('connection_orders').insertOne({
+        id: 'o' + i,
+        paymentId,
+        userId: String(a._id),
+        quantity: 5,
+        amount: 500,
+        currency: 'BDT',
+        status: 'pending',
       });
-      bkash.queryPayment.mockResolvedValue({
+      ziniPay.verifyInvoice.mockResolvedValue({
         ...result,
-        paymentID: paymentId,
-        payerReference: 'o' + i,
+        invoice_id: paymentId,
       });
       expect((await service.executePayment(paymentId)).success).toBe(false);
     }
+    expect((await users.findById(a._id)).numberOfConnections).toBe(0);
+  });
+  it('does not re-verify or credit a connection order already marked failed', async () => {
+    const a = await account();
+    await db.collection('connection_orders').insertOne({
+      id: 'failed-order',
+      paymentId: 'failed-invoice',
+      userId: String(a._id),
+      quantity: 5,
+      amount: 500,
+      currency: 'BDT',
+      status: 'failed',
+    });
+
+    expect(await service.executePayment('failed-invoice')).toEqual({
+      success: false,
+    });
+    expect(ziniPay.verifyInvoice).not.toHaveBeenCalled();
     expect((await users.findById(a._id)).numberOfConnections).toBe(0);
   });
   it('revokes only the refunded payment credits and linked permissions', async () => {

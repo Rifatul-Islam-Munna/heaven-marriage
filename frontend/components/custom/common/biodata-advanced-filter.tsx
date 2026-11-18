@@ -51,7 +51,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
+  CommandSearch,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -321,7 +321,7 @@ function FilterContent({
                       <DialogTitle>জেলা নির্বাচন করুন</DialogTitle>
                     </DialogHeader>
                     <Command className="rounded-none">
-                      <CommandInput
+                      <CommandSearch
                         placeholder="জেলা খুঁজুন..."
                         className="h-9"
                       />
@@ -386,7 +386,7 @@ function FilterContent({
                   </PopoverTrigger>
                   <PopoverContent className="w-[260px] p-0" align="start">
                     <Command>
-                      <CommandInput
+                      <CommandSearch
                         placeholder="জেলা খুঁজুন..."
                         className="h-9"
                       />
@@ -454,7 +454,7 @@ function FilterContent({
                       <DialogTitle>উপজেলা নির্বাচন করুন</DialogTitle>
                     </DialogHeader>
                     <Command className="rounded-none">
-                      <CommandInput
+                      <CommandSearch
                         placeholder="উপজেলা খুঁজুন..."
                         className="h-9"
                       />
@@ -519,7 +519,7 @@ function FilterContent({
                   </PopoverTrigger>
                   <PopoverContent className="w-[260px] p-0" align="start">
                     <Command>
-                      <CommandInput
+                      <CommandSearch
                         placeholder="উপজেলা খুঁজুন..."
                         className="h-9"
                       />

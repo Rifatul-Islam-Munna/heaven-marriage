@@ -7,12 +7,20 @@ import { ConfigService } from '@nestjs/config';
 import { UserService } from './user.service';
 import { OAuth2Client } from 'google-auth-library';
 import { adminFilter, adminSort } from './profile-rules';
-import { UpdateUserDto, ReqForDto, NewPasswordResetWithOtp } from './dto/update-user.dto';
+import {
+  UpdateUserDto,
+  ReqForDto,
+  NewPasswordResetWithOtp,
+} from './dto/update-user.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { of, throwError } from 'rxjs';
 import { SmsService } from './sms.service';
-import { MessagingService, normalizePhone } from './messaging.service';
+import {
+  MessagingService,
+  normalizePhone,
+  normalizeContactPhone,
+} from './messaging.service';
 describe('OTP challenge security', () => {
   let mongo: MongoMemoryServer,
     db: Connection,
@@ -67,6 +75,35 @@ describe('OTP challenge security', () => {
       service.verify({ challengeId: r.challengeId, otp: code }),
     ).rejects.toThrow();
   });
+  it('verifies an email OTP copied with Bengali digits and spaces without burning a valid attempt', async () => {
+    const r = await service.register({
+      name: 'Email OTP Test',
+      gender: 'female',
+      email: 'email-otp@example.com',
+      password: 'Password123',
+    });
+    const code = messages.send.mock.calls[0][1].match(/\d{6}/)[0];
+    const bengali = code.replace(
+      /[0-9]/g,
+      (digit: string) => '০১২৩৪৫৬৭৮৯'[Number(digit)],
+    );
+
+    await expect(
+      service.verify({ challengeId: r.challengeId, otp: '12345' }),
+    ).rejects.toThrow('Invalid or expired OTP');
+    const challenge = await db
+      .collection('identity_challenges')
+      .findOne({ id: r.challengeId });
+    expect(challenge?.attempts).toBe(1);
+    expect(challenge?.used).toBe(false);
+
+    const verified = await service.verify({
+      challengeId: r.challengeId,
+      otp: `${bengali.slice(0, 3)} ${bengali.slice(3)}`,
+    });
+    expect(verified.data.isEmailVerified).toBe(true);
+  });
+
   it('rejects expired codes and limits guesses to five attempts', async () => {
     const r = await service.register({
       name: 'Test',
@@ -99,33 +136,44 @@ describe('OTP challenge security', () => {
     '+8801712345678',
     '8801712345678',
     '০১৭১২৩৪৫৬৭৮',
-  ])('registers %s using Bangladesh mobile OTP without requiring a country code', async (input) => {
-    const result = await service.register({
-      name: 'Bangladesh Test',
-      gender: 'female',
-      phoneNumber: input,
-      password: 'Password123',
-    });
-    expect(messages.send).toHaveBeenCalledWith(
-      '01712345678',
-      expect.stringContaining('Niqaha.com OTP'),
-    );
-    const code = messages.send.mock.calls[0][1].match(/\d{6}/)[0];
-    const verified = await service.verify({ challengeId: result.challengeId, otp: code });
-    expect(verified.data.phoneNumber).toBe('01712345678');
-    expect(verified.data.isPhoneVerified).toBe(true);
-    expect(verified.data.isEmailVerified).not.toBe(true);
-    const loggedIn = await service.login({ phoneNumber: input, password: 'Password123' });
-    expect(loggedIn.user.phoneNumber).toBe('01712345678');
-  });
+  ])(
+    'registers %s using Bangladesh mobile OTP without requiring a country code',
+    async (input) => {
+      const result = await service.register({
+        name: 'Bangladesh Test',
+        gender: 'female',
+        phoneNumber: input,
+        password: 'Password123',
+      });
+      expect(messages.send).toHaveBeenCalledWith(
+        '01712345678',
+        expect.stringContaining('Niqaha.com OTP'),
+      );
+      const code = messages.send.mock.calls[0][1].match(/\d{6}/)[0];
+      const verified = await service.verify({
+        challengeId: result.challengeId,
+        otp: code,
+      });
+      expect(verified.data.phoneNumber).toBe('01712345678');
+      expect(verified.data.isPhoneVerified).toBe(true);
+      expect(verified.data.isEmailVerified).not.toBe(true);
+      const loggedIn = await service.login({
+        phoneNumber: input,
+        password: 'Password123',
+      });
+      expect(loggedIn.user.phoneNumber).toBe('01712345678');
+    },
+  );
 
   it('rejects international mobile numbers during registration', async () => {
-    await expect(service.register({
-      name: 'Not Bangladesh',
-      gender: 'male',
-      phoneNumber: '+14155550123',
-      password: 'Password123',
-    })).rejects.toThrow('শুধু বাংলাদেশের');
+    await expect(
+      service.register({
+        name: 'Not Bangladesh',
+        gender: 'male',
+        phoneNumber: '+14155550123',
+        password: 'Password123',
+      }),
+    ).rejects.toThrow('শুধু বাংলাদেশের');
     expect(messages.send).not.toHaveBeenCalled();
   });
 
@@ -437,17 +485,42 @@ describe('OTP challenge security', () => {
     ).rejects.toMatchObject({ status: 503 });
   });
 
-  it('preserves optional email clearing and updates phone-only accounts through the admin DTO',async()=>{
-    const admin=await users.create({name:'Admin',role:'admin',phoneNumber:'01712345678'});
-    const u=await users.create({name:'Phone user',phoneNumber:'01812345678',isOtpVerified:true,isPhoneVerified:true});
-    const dto=plainToInstance(UpdateUserDto,{id:String(u._id),phoneNumber:'01912345678',email:null});
+  it('preserves optional email clearing and updates phone-only accounts through the admin DTO', async () => {
+    const admin = await users.create({
+      name: 'Admin',
+      role: 'admin',
+      phoneNumber: '01712345678',
+    });
+    const u = await users.create({
+      name: 'Phone user',
+      phoneNumber: '01812345678',
+      isOtpVerified: true,
+      isPhoneVerified: true,
+    });
+    const dto = plainToInstance(UpdateUserDto, {
+      id: String(u._id),
+      phoneNumber: '01912345678',
+      email: null,
+    });
     expect(dto.email).toBeNull();
     expect(await validate(dto)).toEqual([]);
-    const result:any=await service.adminUpdateProfile(String(admin._id),String(u._id),{},dto);
-    expect(result.phoneNumber).toBe('01912345678');expect(result.email).toBeUndefined();
-    const reset=await service.resetRequest({phoneNumber:'01912345678'});
-    await service.reset({challengeId:reset.challengeId,otp:deliveredCode(),newPassword:'NewPhone123'});
-    await expect(service.login({phoneNumber:'01912345678',password:'NewPhone123'})).resolves.toHaveProperty('access_token');
+    const result: any = await service.adminUpdateProfile(
+      String(admin._id),
+      String(u._id),
+      {},
+      dto,
+    );
+    expect(result.phoneNumber).toBe('01912345678');
+    expect(result.email).toBeUndefined();
+    const reset = await service.resetRequest({ phoneNumber: '01912345678' });
+    await service.reset({
+      challengeId: reset.challengeId,
+      otp: deliveredCode(),
+      newPassword: 'NewPhone123',
+    });
+    await expect(
+      service.login({ phoneNumber: '01912345678', password: 'NewPhone123' }),
+    ).resolves.toHaveProperty('access_token');
   });
   it('cannot use a registration code to reset a password', async () => {
     const r = await service.register({
@@ -499,6 +572,10 @@ describe('OTP request validation and SMS submission', () => {
     );
     expect(normalizePhone('+880 (1812) 345678')).toBe('01812345678');
     expect(() => normalizePhone('abc')).toThrow();
+    expect(normalizeContactPhone('01712345678')).toBe('+8801712345678');
+    expect(normalizeContactPhone('+1 202 555 0123')).toBe('+12025550123');
+    expect(normalizeContactPhone('০১৭১২৩৪৫৬৭৮')).toBe('+8801712345678');
+    expect(() => normalizeContactPhone('12345')).toThrow();
   });
   const config = new ConfigService({
     BULKSMSBD_API_KEY: 'fake-key',
@@ -509,55 +586,76 @@ describe('OTP request validation and SMS submission', () => {
     [1007, 'Insufficient SMS balance'],
     [1012, 'Bengali'],
     [1032, 'not whitelisted'],
-  ])('reports actionable BulkSMSBD response code %s without exposing provider data', async (code, explanation) => {
-    const post = jest.fn().mockReturnValue(of({
-      data: { response_code: code, error_message: 'Secret provider details' },
-    }));
-    const sms = new SmsService({ post } as any, config);
-    await expect(
-      sms.sendSms({ number: '01712345678', message: 'Test code 123456' }),
-    ).rejects.toThrow(explanation as string);
-    expect(post).toHaveBeenCalledTimes(1);
-  });
+  ])(
+    'reports actionable BulkSMSBD response code %s without exposing provider data',
+    async (code, explanation) => {
+      const post = jest.fn().mockReturnValue(
+        of({
+          data: {
+            response_code: code,
+            error_message: 'Secret provider details',
+          },
+        }),
+      );
+      const sms = new SmsService({ post } as any, config);
+      await expect(
+        sms.sendSms({ number: '01712345678', message: 'Test code 123456' }),
+      ).rejects.toThrow(explanation as string);
+      expect(post).toHaveBeenCalledTimes(1);
+    },
+  );
   it.each([
     '01712345678',
     '1712345678',
     '8801712345678',
     '+8801712345678',
     '০১৭১২৩৪৫৬৭৮',
-  ])('submits %s only through BulkSMSBD as a POST with Bangla-safe encoding', async (phone) => {
-    const post = jest.fn().mockReturnValue(of({
-      data: { response_code: '202', message_id: 'synthetic' },
-    }));
-    const sms = new SmsService({ post } as any, config);
-    await expect(
-      sms.sendSms({ number: phone, message: 'আপনার OTP: 123456' }),
-    ).resolves.toMatchObject({ success: true });
-    const [url, rawBody, opts] = post.mock.calls[0];
-    const body = new URLSearchParams(rawBody);
-    expect(url).toBe('https://bulksmsbd.net/api/smsapi');
-    expect(body.get('number')).toBe('8801712345678');
-    expect(body.get('message')).toBe('আপনার OTP: 123456');
-    expect(body.get('api_key')).toBe('fake-key');
-    expect(body.get('senderid')).toBe('fake-sender');
-    expect(opts.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
-    expect(opts.timeout).toBe(15000);
-    expect(url).not.toContain('fake-key');
-  });
+  ])(
+    'submits %s only through BulkSMSBD as a POST with Bangla-safe encoding',
+    async (phone) => {
+      const post = jest.fn().mockReturnValue(
+        of({
+          data: { response_code: '202', message_id: 'synthetic' },
+        }),
+      );
+      const sms = new SmsService({ post } as any, config);
+      await expect(
+        sms.sendSms({ number: phone, message: 'আপনার OTP: 123456' }),
+      ).resolves.toMatchObject({ success: true });
+      const [url, rawBody, opts] = post.mock.calls[0];
+      const body = new URLSearchParams(rawBody);
+      expect(url).toBe('https://bulksmsbd.net/api/smsapi');
+      expect(body.get('number')).toBe('8801712345678');
+      expect(body.get('message')).toBe('আপনার OTP: 123456');
+      expect(body.get('api_key')).toBe('fake-key');
+      expect(body.get('senderid')).toBe('fake-sender');
+      expect(opts.headers['Content-Type']).toBe(
+        'application/x-www-form-urlencoded',
+      );
+      expect(opts.timeout).toBe(15000);
+      expect(url).not.toContain('fake-key');
+    },
+  );
   it('rejects international and invalid numbers without contacting BulkSMSBD', async () => {
     const post = jest.fn();
     const sms = new SmsService({ post } as any, config);
     for (const phone of ['+14155550123', '017123', '001712345678']) {
-      await expect(sms.sendSms({ number: phone, message: 'Test' }))
-        .rejects.toMatchObject({ status: 400 });
+      await expect(
+        sms.sendSms({ number: phone, message: 'Test' }),
+      ).rejects.toMatchObject({ status: 400 });
     }
     expect(post).not.toHaveBeenCalled();
   });
   it('reports a safe provider rejection sent with HTTP 403 and never leaks credentials', async () => {
-    const post = jest.fn().mockReturnValue(throwError(() => ({
-      response: { status: 403, data: { response_code: 1032, message: 'Server IP 203.0.113.5' } },
-      config: { data: 'api_key=fake-key&message=Test+code+123456' },
-    })));
+    const post = jest.fn().mockReturnValue(
+      throwError(() => ({
+        response: {
+          status: 403,
+          data: { response_code: 1032, message: 'Server IP 203.0.113.5' },
+        },
+        config: { data: 'api_key=fake-key&message=Test+code+123456' },
+      })),
+    );
     const sms = new SmsService({ post } as any, config);
     let message = '';
     try {
@@ -571,9 +669,14 @@ describe('OTP request validation and SMS submission', () => {
     expect(message).not.toContain('123456');
   });
   it('reads the official BulkSMSBD balance endpoint with no SMS submission', async () => {
-    const post = jest.fn().mockReturnValue(of({ data: { response_code: 202, balance: '496' } }));
+    const post = jest
+      .fn()
+      .mockReturnValue(of({ data: { response_code: 202, balance: '496' } }));
     const sms = new SmsService({ post } as any, config);
-    await expect(sms.checkBalance()).resolves.toEqual({ success: true, balance: 496 });
+    await expect(sms.checkBalance()).resolves.toEqual({
+      success: true,
+      balance: 496,
+    });
     const [url, rawBody] = post.mock.calls[0];
     expect(url).toBe('https://bulksmsbd.net/api/getBalanceApi');
     expect(new URLSearchParams(rawBody).get('api_key')).toBe('fake-key');
@@ -588,26 +691,38 @@ describe('OTP request validation and SMS submission', () => {
       }),
       sms as any,
     );
-    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
-      Response.json({ id: 'test-resend-email-id' }, { status: 200 }),
-    );
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        Response.json({ id: 'test-resend-email-id' }, { status: 200 }),
+      );
     try {
       await gateway.send('+8801712345678', 'synthetic');
       expect(sms.sendSms).toHaveBeenCalledWith({
-        number: '01712345678', message: 'synthetic',
+        number: '01712345678',
+        message: 'synthetic',
       });
       await gateway.send('test@example.com', 'synthetic');
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0][0]).toBe('https://api.resend.com/emails');
-      await expect(gateway.send('+14155550123', 'synthetic'))
-        .rejects.toThrow('Bangladesh mobile numbers only');
+      await expect(gateway.send('+14155550123', 'synthetic')).rejects.toThrow(
+        'Bangladesh mobile numbers only',
+      );
       expect(sms.sendSms).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledTimes(1);
       fetchMock.mockResolvedValueOnce(
-        Response.json({ name: 'validation_error', message: 'sender not verified', statusCode: 403 }, { status: 403 }),
+        Response.json(
+          {
+            name: 'validation_error',
+            message: 'sender not verified',
+            statusCode: 403,
+          },
+          { status: 403 },
+        ),
       );
-      await expect(gateway.send('test@example.com', 'synthetic'))
-        .rejects.toMatchObject({ status: 503 });
+      await expect(
+        gateway.send('test@example.com', 'synthetic'),
+      ).rejects.toMatchObject({ status: 503 });
     } finally {
       fetchMock.mockRestore();
     }

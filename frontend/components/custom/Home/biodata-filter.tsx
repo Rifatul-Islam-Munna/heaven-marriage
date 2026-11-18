@@ -21,7 +21,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
+  CommandSearch,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -222,7 +222,7 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandInput placeholder="খুঁজুন..." className="h-10" />
+                      <CommandSearch placeholder="খুঁজুন..." className="h-10" />
                       <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup>
                         {genderOptions.map((option) => (
@@ -277,7 +277,7 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandInput placeholder="খুঁজুন..." className="h-10" />
+                      <CommandSearch placeholder="খুঁজুন..." className="h-10" />
                       <CommandEmpty>কিছু পাওয়া যায়নি।</CommandEmpty>
                       <CommandGroup>
                         {filteredMaritalStatus.map((option) => (
@@ -334,7 +334,7 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandInput
+                      <CommandSearch
                         placeholder="দেশ খুঁজুন..."
                         className="h-10"
                       />
@@ -396,7 +396,7 @@ export default function BiodataFilter() {
                     align="start"
                   >
                     <Command>
-                      <CommandInput
+                      <CommandSearch
                         placeholder="জেলা খুঁজুন..."
                         className="h-10"
                       />

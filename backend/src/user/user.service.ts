@@ -1,16 +1,60 @@
 import { IdentityService } from './identity.service';
-import { QuestionConfigService, sanitizeDynamicAnswers, assertQuestionRules } from '../profile-questions/question-config.service';
+import { normalizeContactPhone } from './messaging.service';
+import {
+  QuestionConfigService,
+  sanitizeDynamicAnswers,
+  assertQuestionRules,
+} from '../profile-questions/question-config.service';
 import { ageFromBirthDate, applyBirthDate } from './birth-date';
 import { PlatformService } from './platform.service';
-import { samePhone, adminSort, adminFilter, editableProfile, profileUpdateSet, profileUpdatePreview, completion, visibleFilter, publicProfile } from './profile-rules';
-import {buildProfileCompletionSnapshot,describeProfileCompletion,needsProfileCompletionSync} from './profile-completion-snapshot';
-import { favouritePagination, favouritesPipeline, type FavouriteDirection } from './favourites';
-import { biodataStage, hasSubmittedBiodata, hasStartedBiodata } from './biodata-lifecycle';
+import {
+  samePhone,
+  adminSort,
+  adminFilter,
+  editableProfile,
+  profileUpdateSet,
+  profileUpdatePreview,
+  completion,
+  visibleFilter,
+  publicProfile,
+} from './profile-rules';
+import {
+  buildProfileCompletionSnapshot,
+  describeProfileCompletion,
+  needsProfileCompletionSync,
+} from './profile-completion-snapshot';
+import {
+  favouritePagination,
+  favouritesPipeline,
+  type FavouriteDirection,
+} from './favourites';
+import {
+  biodataStage,
+  hasSubmittedBiodata,
+  hasStartedBiodata,
+} from './biodata-lifecycle';
 import { dailyRotationExpression } from './discovery-selection';
 import { recordDiscoveryEvent } from './discovery-cycle';
-import { HttpException, Injectable, Logger, OnModuleInit, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AdminSetPasswordDto, AdminUserDto, FindOneDto, LoginDto, NewPasswordResetWithOtp, ReqForDto, ResetPasswordDto, UpdateUserDto, UserFilterDto } from './dto/update-user.dto';
+import {
+  AdminSetPasswordDto,
+  AdminUserDto,
+  FindOneDto,
+  LoginDto,
+  NewPasswordResetWithOtp,
+  ReqForDto,
+  ResetPasswordDto,
+  UpdateUserDto,
+  UserFilterDto,
+} from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument, UserType } from './entities/user.entity';
 import { Model, Types } from 'mongoose';
@@ -20,37 +64,61 @@ import { JwtService } from '@nestjs/jwt';
 import ShortUniqueId from 'short-unique-id';
 import { Shortlist, ShortlistDocument } from './entities/shortlist.schema';
 import { CreateShortlistDto, PaginationDto } from './dto/create-shortlist.dto';
-import { BkashService } from './bkash.service';
 import { ConfigService } from '@nestjs/config';
 import { PricingService } from 'src/pricing/pricing.service';
 import { RequestNumberDto } from './dto/request-number.dto';
-import { RequestNumber, RequestNumberDocument } from './entities/RequestNumber.schema';
+import {
+  RequestNumber,
+  RequestNumberDocument,
+} from './entities/RequestNumber.schema';
 import { TelegramChannel, TelegramService } from './telegram.service';
-import {OAuth2Client } from "google-auth-library"
-import { Cron,CronExpression } from '@nestjs/schedule';
+import { OAuth2Client } from 'google-auth-library';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { OtpService } from './otp.service';
 import { SmsService } from './sms.service';
 import { Counter, CounterDocument } from './entities/counter.schema';
 import { PdfService } from './pdf.service';
 @Injectable()
-export class UserService  implements OnModuleInit{
-  private logger = new Logger(UserService.name)
-  constructor(@InjectModel(User.name) private userModel:Model<UserDocument>,@InjectModel(Shortlist.name) private shortlistModel:Model<ShortlistDocument> , private jwtService:JwtService, private bkash:BkashService,  private readonly configService: ConfigService,private pricingService: PricingService,@InjectModel(RequestNumber.name) private requestNumberModel:Model<RequestNumberDocument>, private telegramService:TelegramService,private otpService:OtpService, private smsService:SmsService,@InjectModel(Counter.name) private counterModel:Model<CounterDocument>, private pdfService:PdfService, private identity:IdentityService, private platform:PlatformService, private questions:QuestionConfigService){}
-   async onModuleInit() {
+export class UserService implements OnModuleInit {
+  private logger = new Logger(UserService.name);
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Shortlist.name)
+    private shortlistModel: Model<ShortlistDocument>,
+    private jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private pricingService: PricingService,
+    @InjectModel(RequestNumber.name)
+    private requestNumberModel: Model<RequestNumberDocument>,
+    private telegramService: TelegramService,
+    private otpService: OtpService,
+    private smsService: SmsService,
+    @InjectModel(Counter.name) private counterModel: Model<CounterDocument>,
+    private pdfService: PdfService,
+    private identity: IdentityService,
+    private platform: PlatformService,
+    private questions: QuestionConfigService,
+  ) {}
+  async onModuleInit() {
     await this.ensurePhoneNumberIndex();
-    const findOneAdmin = await this.userModel.findOne({role:UserType.ADMIN}).lean().exec();
-    if(!findOneAdmin){
-      const rewPAssword =  this.configService.get<string>('ADMIN_PASSWORD') as string
-      const passwordHash = await bcrypt.hash(rewPAssword, 10)
-     const createAdmin = await this.userModel.create({
-      name:"admin",
-       phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
-       password: passwordHash,
-       role: UserType.ADMIN,
-       isOtpVerified:true
-     })
+    const findOneAdmin = await this.userModel
+      .findOne({ role: UserType.ADMIN })
+      .lean()
+      .exec();
+    if (!findOneAdmin) {
+      const rewPAssword = this.configService.get<string>(
+        'ADMIN_PASSWORD',
+      ) as string;
+      const passwordHash = await bcrypt.hash(rewPAssword, 10);
+      const createAdmin = await this.userModel.create({
+        name: 'admin',
+        phoneNumber: this.configService.get<string>('ADMIN_USER') as string,
+        password: passwordHash,
+        role: UserType.ADMIN,
+        isOtpVerified: true,
+      });
     }
-   }
+  }
   private async ensurePhoneNumberIndex() {
     const currentIndexes = await this.userModel.collection.indexes();
     const hasExpectedPhoneIndex = currentIndexes.some(
@@ -69,7 +137,9 @@ export class UserService  implements OnModuleInit{
     );
 
     if (legacyPhoneIndex) {
-      this.logger.warn('Replacing legacy phoneNumber_1 index so null phone numbers are allowed');
+      this.logger.warn(
+        'Replacing legacy phoneNumber_1 index so null phone numbers are allowed',
+      );
       await this.userModel.collection.dropIndex('phoneNumber_1');
     }
 
@@ -87,34 +157,50 @@ export class UserService  implements OnModuleInit{
   /** Small bounded reconciliation for members not opened in the admin table
    * since the last Dynamic Question Builder revision. Safe across restarts. */
   @Cron(CronExpression.EVERY_10_MINUTES)
-  async refreshStaleCompletionSnapshots(){
-    try{
-      const schema=await this.questions.get();
-      const profiles=await this.userModel.find({role:UserType.USER,
-        biodataStatus:{$ne:'deleted'},completionSchemaRevision:{$ne:schema.revision}})
-        .limit(200).lean().exec();
-      if(!profiles.length)return;
-      const writes=profiles.map((member:any)=>({
-        updateOne:{
-          filter:{_id:member._id,updatedAt:member.updatedAt,
-            completionSchemaRevision:{$ne:schema.revision}},
-          update:{$set:buildProfileCompletionSnapshot(member,schema)},
+  async refreshStaleCompletionSnapshots() {
+    try {
+      const schema = await this.questions.get();
+      const profiles = await this.userModel
+        .find({
+          role: UserType.USER,
+          biodataStatus: { $ne: 'deleted' },
+          completionSchemaRevision: { $ne: schema.revision },
+        })
+        .limit(200)
+        .lean()
+        .exec();
+      if (!profiles.length) return;
+      const writes = profiles.map((member: any) => ({
+        updateOne: {
+          filter: {
+            _id: member._id,
+            updatedAt: member.updatedAt,
+            completionSchemaRevision: { $ne: schema.revision },
+          },
+          update: { $set: buildProfileCompletionSnapshot(member, schema) },
         },
       }));
-      await this.userModel.collection.bulkWrite(writes,{ordered:false});
-    }catch(error){
-      this.logger.warn('Completion snapshot reconciliation skipped: '+String(error));
+      await this.userModel.collection.bulkWrite(writes, { ordered: false });
+    } catch (error) {
+      this.logger.warn(
+        'Completion snapshot reconciliation skipped: ' + String(error),
+      );
     }
   }
 
-  async create(createUserDto: CreateUserDto) {return this.identity.register(createUserDto);}
+  async create(createUserDto: CreateUserDto) {
+    return this.identity.register(createUserDto);
+  }
 
-  async resendOtp(id:string){return this.identity.resend(id);}
-  async verifyOtp(payload:any) {return this.identity.verify(payload);}
+  async resendOtp(id: string) {
+    return this.identity.resend(id);
+  }
+  async verifyOtp(payload: any) {
+    return this.identity.verify(payload);
+  }
 
- @Cron(CronExpression.EVERY_10_MINUTES)
-async findUserAndUpdated() {
-  
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async findUserAndUpdated() {
     // Find all users where:
     // 1. otpValidatedAt exists (not null/undefined)
     // 2. otpValidatedAt is less than current time (expired)
@@ -125,161 +211,254 @@ async findUserAndUpdated() {
           $exists: true, // Field exists
           $lt: new Date(), // Less than current time (expired)
         },
-        isOtpVerified:false
+        isOtpVerified: false,
       },
       {
         $set: {
           otpValidatedAt: null,
           otpNumber: null,
         },
-      }
+      },
     );
 
     console.log(`Cleared ${result.modifiedCount} expired OTPs`);
     return { success: true, clearedCount: result.modifiedCount };
-  
-}
+  }
 
-
-  async updatedFullUserInformation(updated:UpdateUserDto,userId:string) {
-    const current:any=await this.userModel.findById(userId).lean();
-    if(!current)throw new HttpException('Account unavailable',404);
+  async updatedFullUserInformation(updated: UpdateUserDto, userId: string) {
+    const current: any = await this.userModel.findById(userId).lean();
+    if (!current) throw new HttpException('Account unavailable', 404);
     if (current.biodataStatus === 'deleted')
-      throw new ForbiddenException('This biodata has been deleted after administrator approval.');
-    const schema=await this.questions.get();
-    const payload=editableProfile(updated);
-    applyBirthDate(payload,current);
-    if((updated as any).dynamicAnswers!==undefined){
-      payload.dynamicAnswers=sanitizeDynamicAnswers((updated as any).dynamicAnswers,
-        current.dynamicAnswers,schema.questions,payload.gender||current.gender,current);
+      throw new ForbiddenException(
+        'This biodata has been deleted after administrator approval.',
+      );
+    const schema = await this.questions.get();
+    const payload = editableProfile(updated);
+    applyBirthDate(payload, current);
+    for (const field of ['guardianPhone', 'whatsapp'] as const) {
+      if (Object.prototype.hasOwnProperty.call(payload, field)) {
+        payload[field] = payload[field]
+          ? normalizeContactPhone(String(payload[field]))
+          : '';
+      }
     }
-    assertQuestionRules(profileUpdatePreview(current,payload),schema.questions,
-      (updated as any).submit === true ? undefined : current);
+    if ((updated as any).dynamicAnswers !== undefined) {
+      payload.dynamicAnswers = sanitizeDynamicAnswers(
+        (updated as any).dynamicAnswers,
+        current.dynamicAnswers,
+        schema.questions,
+        payload.gender || current.gender,
+        current,
+      );
+    }
+    assertQuestionRules(
+      profileUpdatePreview(current, payload),
+      schema.questions,
+      (updated as any).submit === true ? undefined : current,
+    );
     // Account contact changes use separate verification; existing contact data stays intact.
-    if(payload.guardianPhone&&samePhone(payload.guardianPhone,current.phoneNumber))throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে',400);
+    if (
+      payload.guardianPhone &&
+      samePhone(payload.guardianPhone, current.phoneNumber)
+    )
+      throw new HttpException('নিজের ও অভিভাবকের ফোন নম্বর আলাদা হতে হবে', 400);
     if ((updated as any).draftStep !== undefined)
-      payload.draftStep=Math.max(0,Math.min(9,Number((updated as any).draftStep)||0));
-    payload.draftSavedAt=new Date();
+      payload.draftStep = Math.max(
+        0,
+        Math.min(9, Number((updated as any).draftStep) || 0),
+      );
+    payload.draftSavedAt = new Date();
     const alreadySubmitted = hasSubmittedBiodata(current);
-    const needsReviewSubmission = !alreadySubmitted ||
-      (current.verificationStatus === 'rejected' && !current.isPublishFromAdmin);
-    if((updated as any).submit===true && needsReviewSubmission) {
-      const state=profileUpdatePreview(current,payload);
-      const status=completion(state,schema.questions);
-      if(status.percentage<100)throw new HttpException({message:'Required questions are unanswered',missing:status.remaining},400);
-      payload.biodataStatus='submitted';
+    const needsReviewSubmission =
+      !alreadySubmitted ||
+      (current.verificationStatus === 'rejected' &&
+        !current.isPublishFromAdmin);
+    if ((updated as any).submit === true && needsReviewSubmission) {
+      const state = profileUpdatePreview(current, payload);
+      const status = completion(state, schema.questions);
+      if (status.percentage < 100)
+        throw new HttpException(
+          {
+            message: 'Required questions are unanswered',
+            missing: status.remaining,
+          },
+          400,
+        );
+      payload.biodataStatus = 'submitted';
       // Keep the FIRST submission timestamp even when a rejected biodata is resubmitted.
-      if (!current.submittedAt) payload.submittedAt=new Date();
-      payload.isPublishFromAdmin=false;
-      payload.verificationStatus='pending';
+      if (!current.submittedAt) payload.submittedAt = new Date();
+      payload.isPublishFromAdmin = false;
+      payload.verificationStatus = 'pending';
     }
     // Editing a previously submitted/published biodata does not reset its review
     // status or demand an entirely new submission. Only admins publish profiles.
-    const filter:any = { _id: userId, biodataStatus: { $ne: 'deleted' } };
+    const filter: any = { _id: userId, biodataStatus: { $ne: 'deleted' } };
     if ((updated as any).submit === true && needsReviewSubmission) {
       filter.isPublishFromAdmin = { $ne: true };
       filter.verificationStatus = current.verificationStatus;
       filter.biodataStatus = current.biodataStatus;
     }
-    const expected=profileUpdatePreview(current,payload);
-    const snapshot=buildProfileCompletionSnapshot(expected,schema);
-    const data=await this.userModel.findOneAndUpdate(filter,
-      {$set:{...profileUpdateSet(payload),...snapshot}},
-      {new:true,runValidators:true})
-      .select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
-    if (!data) throw new HttpException('Biodata state changed. Refresh and retry.', 409);
-    const savedProgress=describeProfileCompletion(data,schema).completion;
-    return {message:(updated as any).submit
-      ? !needsReviewSubmission ? 'Biodata already submitted; edits saved' : 'Biodata submitted for review'
-      : 'Biodata changes saved',
-      data,completion:savedProgress,
-      biodataStage:biodataStage(data,savedProgress.percentage)};
+    const expected = profileUpdatePreview(current, payload);
+    const snapshot = buildProfileCompletionSnapshot(expected, schema);
+    const data = await this.userModel
+      .findOneAndUpdate(
+        filter,
+        { $set: { ...profileUpdateSet(payload), ...snapshot } },
+        { new: true, runValidators: true },
+      )
+      .select(
+        '-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds',
+      )
+      .lean();
+    if (!data)
+      throw new HttpException('Biodata state changed. Refresh and retry.', 409);
+    const savedProgress = describeProfileCompletion(data, schema).completion;
+    return {
+      message: (updated as any).submit
+        ? !needsReviewSubmission
+          ? 'Biodata already submitted; edits saved'
+          : 'Biodata submitted for review'
+        : 'Biodata changes saved',
+      data,
+      completion: savedProgress,
+      biodataStage: biodataStage(data, savedProgress.percentage),
+    };
   }
 
-  async loginUser(payload:LoginDto){return this.identity.login(payload);}
+  async loginUser(payload: LoginDto) {
+    return this.identity.login(payload);
+  }
 
-  async loginWithGoogle(tokenId:string){
-     const clientId=this.configService.get<string>('GOOGLE_CLIENT_ID');
-     if(!clientId)throw new HttpException('Google sign-in is not configured',503);
-     const client = new OAuth2Client(clientId);
-     let ticket;
-     try{ticket=await client.verifyIdToken({idToken:tokenId,audience:clientId});}
-     catch{throw new HttpException('Google sign-in could not be verified. Please try again.',401);}
-   const googlePayload = ticket.getPayload();
-   if(!googlePayload?.email_verified||!googlePayload.email)throw new HttpException('Google email is not verified',401);
-   googlePayload.email=googlePayload.email.trim().toLowerCase();
-   const {email,name,picture,} = googlePayload as {email:string,name:string,picture:string}
+  async loginWithGoogle(tokenId: string) {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId)
+      throw new HttpException('Google sign-in is not configured', 503);
+    const client = new OAuth2Client(clientId);
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken: tokenId,
+        audience: clientId,
+      });
+    } catch {
+      throw new HttpException(
+        'Google sign-in could not be verified. Please try again.',
+        401,
+      );
+    }
+    const googlePayload = ticket.getPayload();
+    if (!googlePayload?.email_verified || !googlePayload.email)
+      throw new HttpException('Google email is not verified', 401);
+    googlePayload.email = googlePayload.email.trim().toLowerCase();
+    const { email, name, picture } = googlePayload as {
+      email: string;
+      name: string;
+      picture: string;
+    };
 
-   let isNewUser=false;
-   let finUserByEmail = await this.userModel.findOne({email:email});
-  const newId = await this.counterModel.findOneAndUpdate({_id:"counter"},{$inc:{seq:1}},{new:true, upsert: true }).lean();
-  const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
-   if(!finUserByEmail){
-     const claim=await this.userModel.db.collection('identity_claims').findOneAndUpdate({_id:email as any},{$setOnInsert:{userId:new Types.ObjectId()}},{upsert:true,returnDocument:'after'});
-     isNewUser=true;
-     finUserByEmail = await this.userModel.findOneAndUpdate({_id:claim!.userId},{$setOnInsert:{
-      email:email,
-      name:name,
-      isOtpVerified:true,
-      isEmailVerified:true,
-      userId:userIdCount
+    let isNewUser = false;
+    let finUserByEmail = await this.userModel.findOne({ email: email });
+    const newId = await this.counterModel
+      .findOneAndUpdate(
+        { _id: 'counter' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true },
+      )
+      .lean();
+    const userIdCount = `${String(newId.seq).padStart(6, '0')}`;
+    if (!finUserByEmail) {
+      const claim = await this.userModel.db
+        .collection('identity_claims')
+        .findOneAndUpdate(
+          { _id: email as any },
+          { $setOnInsert: { userId: new Types.ObjectId() } },
+          { upsert: true, returnDocument: 'after' },
+        );
+      isNewUser = true;
+      finUserByEmail = await this.userModel.findOneAndUpdate(
+        { _id: claim!.userId },
+        {
+          $setOnInsert: {
+            email: email,
+            name: name,
+            isOtpVerified: true,
+            isEmailVerified: true,
+            userId: userIdCount,
+          },
+        },
+        { upsert: true, returnDocument: 'after' },
+      );
+    }
+    if (!finUserByEmail) throw new HttpException('Unable to sign in', 400);
+    if (
+      finUserByEmail.password &&
+      finUserByEmail.isOtpVerified &&
+      !finUserByEmail.isEmailVerified
+    )
+      throw new HttpException(
+        'Please sign in with your password and verify this email in your dashboard before using Google sign-in.',
+        400,
+      );
+    if (!finUserByEmail.isOtpVerified) {
+      finUserByEmail = await this.userModel.findByIdAndUpdate(
+        finUserByEmail._id,
+        {
+          $set: { isOtpVerified: true, isEmailVerified: true, name },
+          $unset: { password: 1 },
+        },
+        { returnDocument: 'after' },
+      );
+    } else if (!finUserByEmail.isEmailVerified) {
+      finUserByEmail = await this.userModel.findByIdAndUpdate(
+        finUserByEmail._id,
+        { $set: { isEmailVerified: true } },
+        { returnDocument: 'after' },
+      );
+    }
+    if (!finUserByEmail) throw new HttpException('Unable to sign in', 400);
+    const access_token = await this.identity.token(finUserByEmail);
+    return {
+      message: 'User logged in successfully',
+      access_token: access_token,
 
-     }},{upsert:true,returnDocument:'after'})
-   }
-   if(!finUserByEmail)throw new HttpException('Unable to sign in',400);
-   if(finUserByEmail.password&&finUserByEmail.isOtpVerified&&!finUserByEmail.isEmailVerified)throw new HttpException('Please sign in with your password and verify this email in your dashboard before using Google sign-in.',400);
-   if(!finUserByEmail.isOtpVerified) {
-     finUserByEmail=await this.userModel.findByIdAndUpdate(finUserByEmail._id,{$set:{isOtpVerified:true,isEmailVerified:true,name},$unset:{password:1}},{returnDocument:'after'});
-   }else if(!finUserByEmail.isEmailVerified) {
-     finUserByEmail=await this.userModel.findByIdAndUpdate(finUserByEmail._id,{$set:{isEmailVerified:true}},{returnDocument:'after'});
-   }
-   if(!finUserByEmail)throw new HttpException('Unable to sign in',400);
-   const access_token = await this.identity.token(finUserByEmail);
-     return{
-       message:'User logged in successfully',
-      access_token:access_token,
-     
       isNewUser,
-      user:this.identity.safe(finUserByEmail)
-     }
-
+      user: this.identity.safe(finUserByEmail),
+    };
   }
 
- async findAll(userQuery: UserFilterDto) {
+  async findAll(userQuery: UserFilterDto) {
+    const {
+      ageMax,
+      ageMin,
+      category,
+      districtId,
+      economicStatus,
+      educationMedium,
+      fiqh,
+      gender,
+      heightMax,
+      heightMin,
+      maritalStatus,
+      page = 1,
+      profession,
+      query,
+      religiousEducation,
+      skinColor,
+      upazilaId,
+      cityCorporation,
+      area,
+      country,
+      polygamy,
+    } = userQuery;
 
-  const {
-    ageMax,
-    ageMin,
-    category,
-    districtId,
-    economicStatus,
-    educationMedium,
-    fiqh,
-    gender,
-    heightMax,
-    heightMin,
-    maritalStatus,
-    page = 1,
-    profession,
-    query,
-    religiousEducation,
-    skinColor,
-    upazilaId,
-    cityCorporation,
-    area,
-    country,
-    polygamy
-    
-  } = userQuery;
+    console.log('Received query params:', userQuery);
 
-  console.log('Received query params:', userQuery);
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const pipeline: any[] = [];
+    const isBiodataNumber = query && /^\d+$/.test(query.trim());
 
-  const limit = 10;
-  const skip = (page - 1) * limit;
-  const pipeline: any[] = [];
-  const isBiodataNumber = query && /^\d+$/.test(query.trim());
-
-/* pipeline.push({
+    /* pipeline.push({
   $match: {
     $and: [
       { isPublished: { $eq: true } },
@@ -289,572 +468,814 @@ async findUserAndUpdated() {
     ]
   }
 }); */
-  const firstMatch: any = {
-    ...visibleFilter,
-    role: UserType.USER,
-    $and: [
-     /*  { isPublished: { $eq: true } },
+    const firstMatch: any = {
+      ...visibleFilter,
+      role: UserType.USER,
+      $and: [
+        /*  { isPublished: { $eq: true } },
       { isPublished: { $ne: null } }, */
-      { isPublishFromAdmin: { $eq: true } },
-      { isPublishFromAdmin: { $ne: null } }
-    ]
-  };
+        { isPublishFromAdmin: { $eq: true } },
+        { isPublishFromAdmin: { $ne: null } },
+      ],
+    };
 
-  // 1. Fuzzy Search Stage (only if query provided)
-   if (query && !isBiodataNumber) {
-    firstMatch.$and.push({
-      $text: { 
-        $search: query,
-        $caseSensitive: false,
-        $diacriticSensitive: false
-      }
-    });
-  }
-   pipeline.push({ $match: firstMatch });
-  if (query && !isBiodataNumber) {
-    pipeline.push({
-      $addFields: { 
-        searchScore: { $meta: 'textScore' } 
-      }
-    });
-    
-    pipeline.push({
-      $sort: { searchScore: -1 }
-    });
-  }
+    // 1. Fuzzy Search Stage (only if query provided)
+    if (query && !isBiodataNumber) {
+      firstMatch.$and.push({
+        $text: {
+          $search: query,
+          $caseSensitive: false,
+          $diacriticSensitive: false,
+        },
+      });
+    }
+    pipeline.push({ $match: firstMatch });
+    if (query && !isBiodataNumber) {
+      pipeline.push({
+        $addFields: {
+          searchScore: { $meta: 'textScore' },
+        },
+      });
 
-  if (query && isBiodataNumber) {
-    const numericQuery = parseInt(query);
-    pipeline.push({
-      $match: {
-        $or: [
-          { userId: query },                           // Exact match "000004"
-          { userId: String(numericQuery) },            // Match "4"
-          { userId: { $regex: `^0*${numericQuery}$` } } // Match with any leading zeros
-        ]
-      }
-    });
-  }
-  // 2. Build $match conditions
-  const matchConditions: any = {};
+      pipeline.push({
+        $sort: { searchScore: -1 },
+      });
+    }
 
-  if (gender && gender !== 'all') {
-    matchConditions.gender = gender;
-  }
-  this.logger.debug('polygamy',polygamy)
- if(polygamy){
-  matchConditions['marriageInformationWomen.polygamyConsentOptions'] = 'yes'
- }
-  if (maritalStatus && maritalStatus.length > 0 && maritalStatus[0] !== 'all') {
-  const hasPolygamy = maritalStatus.includes('yes');
-  const otherStatuses = maritalStatus.filter(status => status !== 'yes');
-  
-  if (hasPolygamy && otherStatuses.length > 0) {
-    // Both regular marital status and polygamy
-    matchConditions.$or = [
-      { maritalStatus: { $in: otherStatuses } },
-      { 'marriageInformationWomen.polygamyConsentOptions': 'yes' }
-    ];
-  } else if (hasPolygamy) {
-    // Only polygamy
-    matchConditions['marriageInformationWomen.polygamyConsentOptions'] = 'yes';
-  } else {
-    // Only regular marital status
-    matchConditions.maritalStatus = { $in: otherStatuses };
-  }
-}
+    if (query && isBiodataNumber) {
+      const numericQuery = parseInt(query);
+      pipeline.push({
+        $match: {
+          $or: [
+            { userId: query }, // Exact match "000004"
+            { userId: String(numericQuery) }, // Match "4"
+            { userId: { $regex: `^0*${numericQuery}$` } }, // Match with any leading zeros
+          ],
+        },
+      });
+    }
+    // 2. Build $match conditions
+    const matchConditions: any = {};
 
+    if (gender && gender !== 'all') {
+      matchConditions.gender = gender;
+    }
+    this.logger.debug('polygamy', polygamy);
+    if (polygamy) {
+      matchConditions['marriageInformationWomen.polygamyConsentOptions'] =
+        'yes';
+    }
+    if (
+      maritalStatus &&
+      maritalStatus.length > 0 &&
+      maritalStatus[0] !== 'all'
+    ) {
+      const hasPolygamy = maritalStatus.includes('yes');
+      const otherStatuses = maritalStatus.filter((status) => status !== 'yes');
 
-  if (ageMin !== undefined || ageMax !== undefined) {
-    matchConditions.age = {};
-    if (ageMin !== undefined) matchConditions.age.$gte = ageMin;
-    if (ageMax !== undefined) matchConditions.age.$lte = ageMax;
-  }
-
-  if (districtId) {
-    matchConditions['address.district'] = districtId;
-  }
-
-  if (upazilaId) {
-    matchConditions['address.upazila'] = upazilaId;
-  }
-  if(cityCorporation)matchConditions['address.cityCorporation']=cityCorporation;
-  if(area)matchConditions['address.area']=area;
-  if(country){
-    // Do not overwrite the $or used by the marital-status/polygamy filter.
-    matchConditions.$and = [
-      ...(matchConditions.$and || []),
-      {$or:[{residenceCountry:country},{residenceCountry:{$exists:false},nationality:country}]},
-    ];
-  }
-
-  if (educationMedium && educationMedium.length > 0) {
-    matchConditions['educationInfo.educationMethod'] = { $in: educationMedium };
-  }
-
-  if (religiousEducation && religiousEducation.length > 0) {
-    matchConditions['personalInformation.islamicStudy'] = { $in: religiousEducation };
-  }
-
- // After building matchConditions, add conversion for height
-if (heightMin !== undefined || heightMax !== undefined) {
-  // Add a stage to convert height string to number
-  pipeline.push({
-    $addFields: {
-      'personalInformation.heightNumeric': {
-        $toDouble: {
-          $ifNull: ['$personalInformation.height', 0]
-        }
+      if (hasPolygamy && otherStatuses.length > 0) {
+        // Both regular marital status and polygamy
+        matchConditions.$or = [
+          { maritalStatus: { $in: otherStatuses } },
+          { 'marriageInformationWomen.polygamyConsentOptions': 'yes' },
+        ];
+      } else if (hasPolygamy) {
+        // Only polygamy
+        matchConditions['marriageInformationWomen.polygamyConsentOptions'] =
+          'yes';
+      } else {
+        // Only regular marital status
+        matchConditions.maritalStatus = { $in: otherStatuses };
       }
     }
-  });
 
-  // Now use the numeric field for comparison
-  matchConditions['personalInformation.heightNumeric'] = {};
-  if (heightMin !== undefined) matchConditions['personalInformation.heightNumeric'].$gte = heightMin;
-  if (heightMax !== undefined) matchConditions['personalInformation.heightNumeric'].$lte = heightMax;
-}
-
-
-  if (skinColor && skinColor.length > 0) {
-    matchConditions['personalInformation.skinTone'] = { $in: skinColor };
-  }
-
-  if (fiqh && fiqh.length > 0) {
-    matchConditions['personalInformation.fiqhFollow'] = { $in: fiqh };
-  }
-
-  if (profession && profession.length > 0) {
-    matchConditions['occupational.profession'] = { $in: profession };
-  }
-
-  if (economicStatus && economicStatus.length > 0) {
-    matchConditions['familyInfo.familyFinancial'] = { $in: economicStatus };
-  }
-
- if(category?.includes('verified'))matchConditions.verificationStatus='approved';
- const premiumOnly = category?.includes('premium');
- const generalOnly = category?.includes('general');
- if (premiumOnly && !generalOnly) matchConditions.isSubscriber = true;
- else if (generalOnly && !premiumOnly) matchConditions.isSubscriber = { $ne: true };
-
-  // Add $match stage if conditions exist
-  if (Object.keys(matchConditions).length > 0) {
-    console.log('Adding match conditions:', matchConditions);
-    pipeline.push({ $match: matchConditions });
-  }
-
-  console.log('Pipeline before count:', JSON.stringify(pipeline));
-
-  // 3. Count total documents
-  const countPipeline = [...pipeline, { $count: 'total' }];
-  const countResult = await this.userModel.aggregate(countPipeline);
-  const total = countResult.length > 0 ? countResult[0].total : 0;
-
-  console.log('Total documents after filters:', total);
-
-  // A stable daily rotation gives published members fair exposure.
-  // $rand reshuffled for every page request and caused skipped/duplicate cards.
-  // Deterministic order lasts through pagination, then rotates next UTC day.
-  pipeline.push({ $addFields: { dailyRotation: dailyRotationExpression() } });
-  pipeline.push({ $sort: { dailyRotation: 1, _id: 1 } });
-
-
-  // 5. Add pagination
-  pipeline.push({ $skip: skip }, { $limit: limit });
-
-  // 6. Project specific fields
-  pipeline.push({
-    $project: {
-      _id: 1,
-      isSubscriber:1,
-      verificationStatus:1,
-      age: 1,
-      gender: 1,
-      maritalStatus: 1,
-      userId:1,
-      role: 1,
-      createdAt: 1,
-    
-      'address.district': 1,
-      'address.upazila': 1,
-      'educationInfo.educationMethod': 1,
-      'educationInfo.highestEducation': 1,
-      'personalInformation.height': 1,
-      'personalInformation.skinTone': 1,
-      'personalInformation.fiqhFollow': 1,
-      'occupational.profession': 1,
-      'familyInfo.familyFinancial': 1,
-       
-    },
-  });
-
-  console.log('Final pipeline:', JSON.stringify(pipeline));
-
-  // Execute aggregation
-  const users = await this.userModel.aggregate(pipeline);
-
-  console.log('Users returned:', users.length);
-
-  return {
-    docs: users.map(u=>({...u,isVerified:u.verificationStatus==='approved'})),
-    totalDocs: total,
-    limit,
-    page,
-    totalPages: Math.ceil(total / limit),
-    hasNextPage: page < Math.ceil(total / limit),
-    hasPrevPage: page > 1,
-    nextPage: page < Math.ceil(total / limit) ? page + 1 : null,
-    prevPage: page > 1 ? page - 1 : null,
-    pagingCounter: skip + 1,
-  };
-}
-
- async addToShortList(payload: CreateShortlistDto, userId: string) {
-  const target = payload.shortlistedUserId;
-  if (!target || !Types.ObjectId.isValid(target))
-    throw new HttpException('Valid biodata ID is required', 400);
-  if (String(target) === String(userId))
-    throw new HttpException('You cannot favourite your own biodata', 400);
-  // Reuse existing publication/contact authorization; it must be possible to view
-  // the biodata publicly before it can be added to favourites.
-  await this.platform.profile(target, userId);
-  const owner = new Types.ObjectId(userId);
-  const targetId = new Types.ObjectId(target);
-  let list = await this.shortlistModel.findOne({ userId: owner }).select('_id').lean();
-  if (!list) {
-    // New list documents use a deterministic _id (the account ObjectId).
-    // MongoDB's built-in _id uniqueness prevents concurrent first saves
-    // from creating duplicate list documents; legacy records are untouched.
-    try {
-      await this.shortlistModel.updateOne(
-        { _id: owner, userId: owner },
-        { $setOnInsert: { shortlistedUserId: [] } },
-        { upsert: true },
-      );
-    } catch (error) {
-      const createdByAnotherRequest = await this.shortlistModel
-        .findOne({ _id: owner, userId: owner }).select('_id').lean();
-      if (!createdByAnotherRequest) throw error;
+    if (ageMin !== undefined || ageMax !== undefined) {
+      matchConditions.age = {};
+      if (ageMin !== undefined) matchConditions.age.$gte = ageMin;
+      if (ageMax !== undefined) matchConditions.age.$lte = ageMax;
     }
-    list = await this.shortlistModel.findOne({ userId: owner }).select('_id').lean();
+
+    if (districtId) {
+      matchConditions['address.district'] = districtId;
+    }
+
+    if (upazilaId) {
+      matchConditions['address.upazila'] = upazilaId;
+    }
+    if (cityCorporation)
+      matchConditions['address.cityCorporation'] = cityCorporation;
+    if (area) matchConditions['address.area'] = area;
+    if (country) {
+      // Do not overwrite the $or used by the marital-status/polygamy filter.
+      matchConditions.$and = [
+        ...(matchConditions.$and || []),
+        {
+          $or: [
+            { residenceCountry: country },
+            { residenceCountry: { $exists: false }, nationality: country },
+          ],
+        },
+      ];
+    }
+
+    if (educationMedium && educationMedium.length > 0) {
+      matchConditions['educationInfo.educationMethod'] = {
+        $in: educationMedium,
+      };
+    }
+
+    if (religiousEducation && religiousEducation.length > 0) {
+      matchConditions['personalInformation.islamicStudy'] = {
+        $in: religiousEducation,
+      };
+    }
+
+    // After building matchConditions, add conversion for height
+    if (heightMin !== undefined || heightMax !== undefined) {
+      // Add a stage to convert height string to number
+      pipeline.push({
+        $addFields: {
+          'personalInformation.heightNumeric': {
+            $toDouble: {
+              $ifNull: ['$personalInformation.height', 0],
+            },
+          },
+        },
+      });
+
+      // Now use the numeric field for comparison
+      matchConditions['personalInformation.heightNumeric'] = {};
+      if (heightMin !== undefined)
+        matchConditions['personalInformation.heightNumeric'].$gte = heightMin;
+      if (heightMax !== undefined)
+        matchConditions['personalInformation.heightNumeric'].$lte = heightMax;
+    }
+
+    if (skinColor && skinColor.length > 0) {
+      matchConditions['personalInformation.skinTone'] = { $in: skinColor };
+    }
+
+    if (fiqh && fiqh.length > 0) {
+      matchConditions['personalInformation.fiqhFollow'] = { $in: fiqh };
+    }
+
+    if (profession && profession.length > 0) {
+      matchConditions['occupational.profession'] = { $in: profession };
+    }
+
+    if (economicStatus && economicStatus.length > 0) {
+      matchConditions['familyInfo.familyFinancial'] = { $in: economicStatus };
+    }
+
+    if (category?.includes('verified'))
+      matchConditions.verificationStatus = 'approved';
+    const premiumOnly = category?.includes('premium');
+    const generalOnly = category?.includes('general');
+    if (premiumOnly && !generalOnly) matchConditions.isSubscriber = true;
+    else if (generalOnly && !premiumOnly)
+      matchConditions.isSubscriber = { $ne: true };
+
+    // Add $match stage if conditions exist
+    if (Object.keys(matchConditions).length > 0) {
+      console.log('Adding match conditions:', matchConditions);
+      pipeline.push({ $match: matchConditions });
+    }
+
+    console.log('Pipeline before count:', JSON.stringify(pipeline));
+
+    // 3. Count total documents
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countResult = await this.userModel.aggregate(countPipeline);
+    const total = countResult.length > 0 ? countResult[0].total : 0;
+
+    console.log('Total documents after filters:', total);
+
+    // A stable daily rotation gives published members fair exposure.
+    // $rand reshuffled for every page request and caused skipped/duplicate cards.
+    // Deterministic order lasts through pagination, then rotates next UTC day.
+    pipeline.push({ $addFields: { dailyRotation: dailyRotationExpression() } });
+    pipeline.push({ $sort: { dailyRotation: 1, _id: 1 } });
+
+    // 5. Add pagination
+    pipeline.push({ $skip: skip }, { $limit: limit });
+
+    // 6. Project specific fields
+    pipeline.push({
+      $project: {
+        _id: 1,
+        isSubscriber: 1,
+        verificationStatus: 1,
+        age: 1,
+        gender: 1,
+        maritalStatus: 1,
+        userId: 1,
+        role: 1,
+        createdAt: 1,
+
+        'address.district': 1,
+        'address.upazila': 1,
+        'educationInfo.educationMethod': 1,
+        'educationInfo.highestEducation': 1,
+        'personalInformation.height': 1,
+        'personalInformation.skinTone': 1,
+        'personalInformation.fiqhFollow': 1,
+        'occupational.profession': 1,
+        'familyInfo.familyFinancial': 1,
+      },
+    });
+
+    console.log('Final pipeline:', JSON.stringify(pipeline));
+
+    // Execute aggregation
+    const users = await this.userModel.aggregate(pipeline);
+
+    console.log('Users returned:', users.length);
+
+    return {
+      docs: users.map((u) => ({
+        ...u,
+        isVerified: u.verificationStatus === 'approved',
+      })),
+      totalDocs: total,
+      limit,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPrevPage: page > 1,
+      nextPage: page < Math.ceil(total / limit) ? page + 1 : null,
+      prevPage: page > 1 ? page - 1 : null,
+      pagingCounter: skip + 1,
+    };
   }
-  if (!list) throw new HttpException('Could not initialize favourites', 500);
-  // With the $ne predicate only the request that actually adds this member
-  // matches. Timestamp-only changes cannot inflate interest counters.
-  const result = await this.shortlistModel.updateOne(
-    { _id: list._id, shortlistedUserId: { $ne: targetId } },
-    { $addToSet: { shortlistedUserId: targetId } },
-  );
-  const created = result.matchedCount > 0;
-  if (created) {
-    await this.userModel.updateOne({ _id: target }, { $inc: { profileInterests: 1 } });
-    await recordDiscoveryEvent(this.userModel.db, target, 'favourites')
-      .catch((error) => this.logger.warn('Could not update discovery favourite score: ' + String(error)));
-  }
-  return { success: true, created };
- }
- async removeFromShortList(payload: CreateShortlistDto, userId: string) {
-  const target = payload.shortlistedUserId;
-  if (!target || !Types.ObjectId.isValid(target))
-    throw new HttpException('Valid biodata ID is required', 400);
-  // Clear all matching legacy list documents, not just the first one.
-  const result = await this.shortlistModel.updateMany(
-    { userId: new Types.ObjectId(userId), shortlistedUserId: new Types.ObjectId(target) },
-    { $pull: { shortlistedUserId: new Types.ObjectId(target) } },
-  );
-  const removed = result.modifiedCount > 0;
-  if (removed) {
-    await this.userModel.updateOne(
-      { _id: target, profileInterests: { $gt: 0 } },
-      { $inc: { profileInterests: -1 } },
+
+  async addToShortList(payload: CreateShortlistDto, userId: string) {
+    const target = payload.shortlistedUserId;
+    if (!target || !Types.ObjectId.isValid(target))
+      throw new HttpException('Valid biodata ID is required', 400);
+    if (String(target) === String(userId))
+      throw new HttpException('You cannot favourite your own biodata', 400);
+    // Reuse existing publication/contact authorization; it must be possible to view
+    // the biodata publicly before it can be added to favourites.
+    await this.platform.profile(target, userId);
+    const owner = new Types.ObjectId(userId);
+    const targetId = new Types.ObjectId(target);
+    let list = await this.shortlistModel
+      .findOne({ userId: owner })
+      .select('_id')
+      .lean();
+    if (!list) {
+      // New list documents use a deterministic _id (the account ObjectId).
+      // MongoDB's built-in _id uniqueness prevents concurrent first saves
+      // from creating duplicate list documents; legacy records are untouched.
+      try {
+        await this.shortlistModel.updateOne(
+          { _id: owner, userId: owner },
+          { $setOnInsert: { shortlistedUserId: [] } },
+          { upsert: true },
+        );
+      } catch (error) {
+        const createdByAnotherRequest = await this.shortlistModel
+          .findOne({ _id: owner, userId: owner })
+          .select('_id')
+          .lean();
+        if (!createdByAnotherRequest) throw error;
+      }
+      list = await this.shortlistModel
+        .findOne({ userId: owner })
+        .select('_id')
+        .lean();
+    }
+    if (!list) throw new HttpException('Could not initialize favourites', 500);
+    // With the $ne predicate only the request that actually adds this member
+    // matches. Timestamp-only changes cannot inflate interest counters.
+    const result = await this.shortlistModel.updateOne(
+      { _id: list._id, shortlistedUserId: { $ne: targetId } },
+      { $addToSet: { shortlistedUserId: targetId } },
     );
-    await recordDiscoveryEvent(this.userModel.db, target, 'favourites', -1)
-      .catch((error) => this.logger.warn('Could not decrease discovery favourite score: ' + String(error)));
+    const created = result.matchedCount > 0;
+    if (created) {
+      await this.userModel.updateOne(
+        { _id: target },
+        { $inc: { profileInterests: 1 } },
+      );
+      await recordDiscoveryEvent(this.userModel.db, target, 'favourites').catch(
+        (error) =>
+          this.logger.warn(
+            'Could not update discovery favourite score: ' + String(error),
+          ),
+      );
+    }
+    return { success: true, created };
   }
-  return { success: true, removed };
-}
-async getShortlist(userId: string, paginationDto: PaginationDto) {
-  return this.listFavourites('given', userId, paginationDto);
-}
+  async removeFromShortList(payload: CreateShortlistDto, userId: string) {
+    const target = payload.shortlistedUserId;
+    if (!target || !Types.ObjectId.isValid(target))
+      throw new HttpException('Valid biodata ID is required', 400);
+    // Clear all matching legacy list documents, not just the first one.
+    const result = await this.shortlistModel.updateMany(
+      {
+        userId: new Types.ObjectId(userId),
+        shortlistedUserId: new Types.ObjectId(target),
+      },
+      { $pull: { shortlistedUserId: new Types.ObjectId(target) } },
+    );
+    const removed = result.modifiedCount > 0;
+    if (removed) {
+      await this.userModel.updateOne(
+        { _id: target, profileInterests: { $gt: 0 } },
+        { $inc: { profileInterests: -1 } },
+      );
+      await recordDiscoveryEvent(
+        this.userModel.db,
+        target,
+        'favourites',
+        -1,
+      ).catch((error) =>
+        this.logger.warn(
+          'Could not decrease discovery favourite score: ' + String(error),
+        ),
+      );
+    }
+    return { success: true, removed };
+  }
+  async getShortlist(userId: string, paginationDto: PaginationDto) {
+    return this.listFavourites('given', userId, paginationDto);
+  }
 
-async getWhoFavouritedMe(userId: string, paginationDto: PaginationDto) {
-  return this.listFavourites('received', userId, paginationDto);
-}
+  async getWhoFavouritedMe(userId: string, paginationDto: PaginationDto) {
+    return this.listFavourites('received', userId, paginationDto);
+  }
 
-/** Read only the logged-in member's outgoing/incoming favourites. */
-private async listFavourites(direction: FavouriteDirection, userId: string, paginationDto: PaginationDto) {
-  const { page, limit } = favouritePagination(paginationDto);
-  const [results, schema] = await Promise.all([
-    this.shortlistModel.aggregate(favouritesPipeline(direction, userId, page, limit)).exec(),
-    this.questions.get(),
-  ]);
-  const totalItems = results[0]?.metadata?.[0]?.totalItems || 0;
-  const data = (results[0]?.data || []).map((profile: any) => {
-    // Never serialize email, phone, name, identity, or arbitrary private answers.
-    const safe = publicProfile(profile);
-    this.questions.applyPublicVisibility(safe, schema);
-    return safe;
-  });
-  return { data, page, limit, totalItems };
-}
+  /** Read only the logged-in member's outgoing/incoming favourites. */
+  private async listFavourites(
+    direction: FavouriteDirection,
+    userId: string,
+    paginationDto: PaginationDto,
+  ) {
+    const { page, limit } = favouritePagination(paginationDto);
+    const [results, schema] = await Promise.all([
+      this.shortlistModel
+        .aggregate(favouritesPipeline(direction, userId, page, limit))
+        .exec(),
+      this.questions.get(),
+    ]);
+    const totalItems = results[0]?.metadata?.[0]?.totalItems || 0;
+    const data = (results[0]?.data || []).map((profile: any) => {
+      // Never serialize email, phone, name, identity, or arbitrary private answers.
+      const safe = publicProfile(profile);
+      this.questions.applyPublicVisibility(safe, schema);
+      return safe;
+    });
+    return { data, page, limit, totalItems };
+  }
 
-async findOne(id:FindOneDto,actor?:string,role?:string){return this.platform.profile(id.id,actor,role);}
+  async findOne(id: FindOneDto, actor?: string, role?: string) {
+    return this.platform.profile(id.id, actor, role);
+  }
 
-  async adminProfile(id:string,actorRole:string) {
-    await this.assertManageableTarget(id,actorRole);
+  async adminProfile(id: string, actorRole: string) {
+    await this.assertManageableTarget(id, actorRole);
     return this.finMyProfile(id);
   }
-  private async assertManageableTarget(id:string,actorRole:string){
-    if(actorRole===UserType.ADMIN)return;
-    if(!Types.ObjectId.isValid(id))throw new ForbiddenException('Account not available');
-    const target=await this.userModel.findById(id).select('role').lean();
-    if(!target||target.role!==UserType.USER)
-      throw new ForbiddenException('Staff and administrator accounts can only be managed by administrators');
+  private async assertManageableTarget(id: string, actorRole: string) {
+    if (actorRole === UserType.ADMIN) return;
+    if (!Types.ObjectId.isValid(id))
+      throw new ForbiddenException('Account not available');
+    const target = await this.userModel.findById(id).select('role').lean();
+    if (!target || target.role !== UserType.USER)
+      throw new ForbiddenException(
+        'Staff and administrator accounts can only be managed by administrators',
+      );
   }
   async finMyProfile(id: string) {
-    const findOne = await this.userModel.findById(id).select("  -password -otpNumber -otpValidatedAt ").lean();
-    if(!findOne) {
+    const findOne = await this.userModel
+      .findById(id)
+      .select('  -password -otpNumber -otpValidatedAt ')
+      .lean();
+    if (!findOne) {
       throw new HttpException('User not found', 400);
     }
     // Mongoose Map fields do not JSON-serialize their entries. Admin profile
     // responses must expose legacy customFields as a plain object so every
     // previously saved custom answer can hydrate into its editable control.
-    const asPlainRecord=(value:any):Record<string,unknown>=>value instanceof Map
-      ? Object.fromEntries(value.entries())
-      : value&&typeof value==='object'&&!Array.isArray(value)?{...value}:{};
-    const profile={...findOne,
-      customFields:asPlainRecord(findOne.customFields),
-      dynamicAnswers:asPlainRecord(findOne.dynamicAnswers),
+    const asPlainRecord = (value: any): Record<string, unknown> =>
+      value instanceof Map
+        ? Object.fromEntries(value.entries())
+        : value && typeof value === 'object' && !Array.isArray(value)
+          ? { ...value }
+          : {};
+    const profile = {
+      ...findOne,
+      customFields: asPlainRecord(findOne.customFields),
+      dynamicAnswers: asPlainRecord(findOne.dynamicAnswers),
     };
-    const schema=await this.questions.get();
-    const {snapshot,completion:profileCompletion}=describeProfileCompletion(profile,schema);
+    const schema = await this.questions.get();
+    const { snapshot, completion: profileCompletion } =
+      describeProfileCompletion(profile, schema);
     // Reconcile the same revisioned completion snapshot shown in Member Management.
     // A conditional raw write avoids changing a concurrent profile update.
-    if(findOne.role===UserType.USER && findOne.biodataStatus!=='deleted' &&
-       needsProfileCompletionSync(findOne,snapshot)){
-      try{
+    if (
+      findOne.role === UserType.USER &&
+      findOne.biodataStatus !== 'deleted' &&
+      needsProfileCompletionSync(findOne, snapshot)
+    ) {
+      try {
         await this.userModel.collection.updateOne(
-          {_id:findOne._id,updatedAt:(findOne as unknown as {updatedAt?:Date}).updatedAt},
-          {$set:snapshot},
+          {
+            _id: findOne._id,
+            updatedAt: (findOne as unknown as { updatedAt?: Date }).updatedAt,
+          },
+          { $set: snapshot },
         );
-      }catch(error){this.logger.warn('Profile completion cache sync skipped: '+String(error));}
+      } catch (error) {
+        this.logger.warn(
+          'Profile completion cache sync skipped: ' + String(error),
+        );
+      }
     }
-    return {...profile,age:ageFromBirthDate(profile.dateOfBirth)??profile.age,...snapshot,completion:profileCompletion,profileQuestionSchema:schema,
-      biodataStage:biodataStage(findOne,profileCompletion.percentage),
-      alreadySubmitted:hasSubmittedBiodata(findOne)};
+    return {
+      ...profile,
+      age: ageFromBirthDate(profile.dateOfBirth) ?? profile.age,
+      ...snapshot,
+      completion: profileCompletion,
+      profileQuestionSchema: schema,
+      biodataStage: biodataStage(findOne, profileCompletion.percentage),
+      alreadySubmitted: hasSubmittedBiodata(findOne),
+    };
   }
 
- async update( updateUserDto: UpdateUserDto,actor:string,actorRole:string=UserType.ADMIN) {
-    await this.assertManageableTarget(updateUserDto.id,actorRole);
-    const {id,password, _v,updatedAt,createdAt,...raw} = updateUserDto
-    const rest:any=editableProfile(raw);
-    const current:any=await this.userModel.findById(id).lean();
-    if(!current)throw new HttpException('User not found',400);
-    const activeSchema=await this.questions.get();
-    if(Object.keys(rest).length||raw.isPublishFromAdmin===true){
-      applyBirthDate(rest,current);
-      if(rest.dynamicAnswers!==undefined)rest.dynamicAnswers=sanitizeDynamicAnswers(
-        rest.dynamicAnswers,current.dynamicAnswers,activeSchema.questions,rest.gender||current.gender,current);
-      assertQuestionRules(profileUpdatePreview(current,rest),activeSchema.questions,
-        raw.isPublishFromAdmin === true ? undefined : current);
+  async update(
+    updateUserDto: UpdateUserDto,
+    actor: string,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    await this.assertManageableTarget(updateUserDto.id, actorRole);
+    const { id, password, _v, updatedAt, createdAt, ...raw } = updateUserDto;
+    const rest: any = editableProfile(raw);
+    const current: any = await this.userModel.findById(id).lean();
+    if (!current) throw new HttpException('User not found', 400);
+    const activeSchema = await this.questions.get();
+    if (Object.keys(rest).length || raw.isPublishFromAdmin === true) {
+      applyBirthDate(rest, current);
+      if (rest.dynamicAnswers !== undefined)
+        rest.dynamicAnswers = sanitizeDynamicAnswers(
+          rest.dynamicAnswers,
+          current.dynamicAnswers,
+          activeSchema.questions,
+          rest.gender || current.gender,
+          current,
+        );
+      assertQuestionRules(
+        profileUpdatePreview(current, rest),
+        activeSchema.questions,
+        raw.isPublishFromAdmin === true ? undefined : current,
+      );
     }
-    if(updateUserDto.numberOfConnections!==undefined&&current.numberOfConnections!==updateUserDto.numberOfConnections){await this.platform.setBalance(actor,id,updateUserDto.numberOfConnections,updateUserDto.adjustmentReason||"",updateUserDto.requestId||"");}
-    await this.platform.audit(actor,"profile.admin.update",id);
-    for(const k of ['isPublishFromAdmin','isPublished','verificationStatus','statusReason'])if(raw[k]!==undefined)rest[k]=raw[k];
-    if(rest.isPublishFromAdmin===true) {
-      rest.verificationStatus='approved';
-      rest.biodataStatus='approved';
-      rest.isPublished=true;
+    if (
+      updateUserDto.numberOfConnections !== undefined &&
+      current.numberOfConnections !== updateUserDto.numberOfConnections
+    ) {
+      await this.platform.setBalance(
+        actor,
+        id,
+        updateUserDto.numberOfConnections,
+        updateUserDto.adjustmentReason || '',
+        updateUserDto.requestId || '',
+      );
     }
-    if(rest.isPublishFromAdmin===false)rest.verificationStatus='rejected';
-    const findOne = await this.identity.adminUpdateProfile(actor,id,rest,raw);
-    if(!findOne) {
+    await this.platform.audit(actor, 'profile.admin.update', id);
+    for (const k of [
+      'isPublishFromAdmin',
+      'isPublished',
+      'verificationStatus',
+      'statusReason',
+    ])
+      if (raw[k] !== undefined) rest[k] = raw[k];
+    if (rest.isPublishFromAdmin === true) {
+      rest.verificationStatus = 'approved';
+      rest.biodataStatus = 'approved';
+      rest.isPublished = true;
+    }
+    if (rest.isPublishFromAdmin === false) rest.verificationStatus = 'rejected';
+    const findOne = await this.identity.adminUpdateProfile(
+      actor,
+      id,
+      rest,
+      raw,
+    );
+    if (!findOne) {
       throw new HttpException('User not found', 400);
     }
     // Account and biodata edits made by administrators also refresh the cache.
-    const snapshot=buildProfileCompletionSnapshot(findOne,activeSchema);
+    const snapshot = buildProfileCompletionSnapshot(findOne, activeSchema);
     await this.userModel.collection.updateOne(
-      {_id:findOne._id,updatedAt:(findOne as unknown as {updatedAt?:Date}).updatedAt},
-      {$set:snapshot},
+      {
+        _id: findOne._id,
+        updatedAt: (findOne as unknown as { updatedAt?: Date }).updatedAt,
+      },
+      { $set: snapshot },
     );
-    return {...findOne,...snapshot};
+    return { ...findOne, ...snapshot };
   }
 
-   async removeUser(id:string){return this.platform.createCase(id,'deletion',{});}
+  async removeUser(id: string) {
+    return this.platform.createCase(id, 'deletion', {});
+  }
 
   /** Admin-only: set a new login password for any account (no old password needed). */
-  async adminSetPassword(dto:AdminSetPasswordDto,actor:string,actorRole:string=UserType.ADMIN){
-    await this.assertManageableTarget(dto.id,actorRole);
-    const result=await this.identity.adminSetPassword(actor,dto.id,dto.newPassword);
-    await this.platform.audit(actor,"account.admin.password",dto.id);
+  async adminSetPassword(
+    dto: AdminSetPasswordDto,
+    actor: string,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    await this.assertManageableTarget(dto.id, actorRole);
+    const result = await this.identity.adminSetPassword(
+      actor,
+      dto.id,
+      dto.newPassword,
+    );
+    await this.platform.audit(actor, 'account.admin.password', dto.id);
     return result;
   }
 
-   async remove(id: FindOneDto,actor:string,actorRole:string=UserType.ADMIN) {
-     await this.assertManageableTarget(id.id,actorRole);
-     await this.platform.audit(actor,"account.admin.delete",id.id);
-     const findOne = await this.userModel.findByIdAndDelete(id.id).lean();
-    if(!findOne) {
+  async remove(
+    id: FindOneDto,
+    actor: string,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    await this.assertManageableTarget(id.id, actorRole);
+    await this.platform.audit(actor, 'account.admin.delete', id.id);
+    const findOne = await this.userModel.findByIdAndDelete(id.id).lean();
+    if (!findOne) {
       throw new HttpException('User not found', 400);
     }
     return findOne;
   }
 
-
-  async updatePassword(id:string, updateDto:ResetPasswordDto){
-    const {newPassword,oldPassword} = updateDto
-    const findOne = await this.userModel.findById(id).select("password").lean();
-    if(!findOne) {
+  async updatePassword(id: string, updateDto: ResetPasswordDto) {
+    const { newPassword, oldPassword } = updateDto;
+    const findOne = await this.userModel.findById(id).select('password').lean();
+    if (!findOne) {
       throw new HttpException('User not found', 400);
     }
-    const isMatch = await bcrypt.compare(oldPassword,findOne.password);
-    if(!isMatch){
+    const isMatch = await bcrypt.compare(oldPassword, findOne.password);
+    if (!isMatch) {
       throw new HttpException('Invalid credentials', 400);
     }
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    const updatePassword = await this.userModel.findByIdAndUpdate(id,{$set:{password:passwordHash}},{new:true}).lean();
-    if(!updatePassword) {
+    const updatePassword = await this.userModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { password: passwordHash } },
+        { new: true },
+      )
+      .lean();
+    if (!updatePassword) {
       throw new HttpException('User not found', 400);
     }
-    return {message:'Password updated successfully'};
+    return { message: 'Password updated successfully' };
   }
 
+  async getUserForAdmin(
+    query: AdminUserDto,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    const {
+      page = 1,
+      limit = 10,
+      gender = 'all',
+      query: searchQuery,
+      isPublished,
+    } = query;
+    const skip = (page - 1) * limit;
+    this.logger.debug('searchQuery->', isPublished);
 
+    const filter: any = adminFilter(query);
+    // This is member management, not the staff directory. Soft-deleted bios
+    // are excluded everywhere, including the unfiltered total/count cards.
+    filter.biodataStatus = { $ne: 'deleted' };
+    if (actorRole !== UserType.ADMIN || !query.role || query.role === 'all')
+      filter.role = UserType.USER;
 
- async getUserForAdmin(query: AdminUserDto,actorRole:string=UserType.ADMIN) {
-  const { page = 1, limit = 10, gender = 'all', query: searchQuery,isPublished } = query;
-  const skip = (page - 1) * limit;
-  this.logger.debug("searchQuery->",isPublished)
+    const [data, totalItems, questionSchema] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select(
+          '-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds',
+        )
+        .skip(skip)
+        .limit(limit)
+        .sort(adminSort(query.sort, query.reviewQueue === 'true'))
+        .lean()
+        .exec(),
+      this.userModel.countDocuments(filter).exec(),
+      this.questions.get(),
+    ]);
 
-  const filter:any=adminFilter(query);
-  // This is member management, not the staff directory. Soft-deleted bios
-  // are excluded everywhere, including the unfiltered total/count cards.
-  filter.biodataStatus={ $ne:'deleted' };
-  if(actorRole!==UserType.ADMIN || !query.role || query.role==='all')filter.role=UserType.USER;
+    const totalPages = Math.ceil(totalItems / limit);
+    const stale: any[] = [];
+    const members = data.map((member: any) => {
+      const snapshot = buildProfileCompletionSnapshot(member, questionSchema);
+      const stage = biodataStage(member, snapshot.completionPercentage);
+      const journey =
+        stage === 'published'
+          ? 'published'
+          : hasSubmittedBiodata(member)
+            ? 'submitted'
+            : hasStartedBiodata(member)
+              ? 'in_progress'
+              : 'signed_up';
+      if (needsProfileCompletionSync(member, snapshot))
+        stale.push({ member, snapshot });
+      return {
+        ...member,
+        ...snapshot,
+        biodataStage: stage,
+        memberJourney: journey,
+      };
+    });
+    // Live schema is authoritative; persist outdated rows without changing updatedAt.
+    // Compare updatedAt to avoid overwriting progress from a concurrent biodata save.
+    if (stale.length) {
+      try {
+        await this.userModel.collection.bulkWrite(
+          stale.map(({ member, snapshot }) => ({
+            updateOne: {
+              filter: { _id: member._id, updatedAt: member.updatedAt },
+              update: { $set: snapshot },
+            },
+          })),
+          { ordered: false },
+        );
+      } catch (error) {
+        this.logger.warn(
+          'Could not refresh member completion cache: ' + String(error),
+        );
+      }
+    }
 
-  const [data, totalItems, questionSchema] = await Promise.all([
-    this.userModel
-      .find(filter)
-.select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds')
-      .skip(skip)
-      .limit(limit)
-      .sort(adminSort(query.sort, query.reviewQueue === 'true'))
-      .lean()
-      .exec(),
-    this.userModel.countDocuments(filter).exec(),
-    this.questions.get(),
-  ]);
-
-  const totalPages = Math.ceil(totalItems / limit);
-  const stale:any[]=[];
-  const members = data.map((member:any) => {
-    const snapshot=buildProfileCompletionSnapshot(member,questionSchema);
-    const stage=biodataStage(member,snapshot.completionPercentage);
-    const journey=stage==='published'?'published':
-      hasSubmittedBiodata(member)?'submitted':
-      hasStartedBiodata(member)?'in_progress':'signed_up';
-    if(needsProfileCompletionSync(member,snapshot))stale.push({member,snapshot});
-    return {...member,...snapshot,biodataStage:stage,memberJourney:journey};
-  });
-  // Live schema is authoritative; persist outdated rows without changing updatedAt.
-  // Compare updatedAt to avoid overwriting progress from a concurrent biodata save.
-  if(stale.length){
-    try{
-      await this.userModel.collection.bulkWrite(stale.map(({member,snapshot})=>({
-        updateOne:{filter:{_id:member._id,updatedAt:member.updatedAt},
-          update:{$set:snapshot}},
-      })),{ordered:false});
-    }catch(error){this.logger.warn('Could not refresh member completion cache: '+String(error));}
-  }
-
-  return {
-    data:members,
-    page,
-    limit,
-    totalItems,
-    totalPages,
-    hasNextPage: page < totalPages,
-    hasPreviousPage: page > 1,
-  };
-}
-
-/** Explicit, reviewable publish action used by the member list. */
-async publishUserAdmin(id:string,actor:string,actorRole:string=UserType.ADMIN) {
-  await this.assertManageableTarget(id,actorRole);
-  const member:any = await this.userModel.findById(id).lean();
-  if(!member || member.role!==UserType.USER || member.biodataStatus==='deleted')
-    throw new BadRequestException('Member biodata not available');
-  if(member.verificationStatus==='suspended')
-    throw new ForbiddenException('Suspended members cannot be published');
-  if(!hasSubmittedBiodata(member))
-    throw new BadRequestException('The member must submit their biodata before publishing');
-  const progress=completion(member,(await this.questions.get()).questions);
-  if(progress.percentage<100)
-    throw new BadRequestException('Required biodata fields are incomplete ('+progress.percentage+'%)');
-  const updated=await this.userModel.findOneAndUpdate(
-    {_id:id,role:UserType.USER,biodataStatus:{$in:['submitted','approved']},
-      verificationStatus:{$ne:'suspended'}},
-    {$set:{isPublished:true,isPublishFromAdmin:true,verificationStatus:'approved',
-      biodataStatus:'approved'}},
-    {new:true,runValidators:true},
-  ).select('-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds').lean();
-  if(!updated)throw new BadRequestException('Biodata status changed. Refresh and retry.');
-  await this.platform.audit(actor,'biodata.admin.publish',id);
-  return {message:'Biodata published',data:updated};
-}
-
-async toggleSubscription(id:string,actor:string,actorRole:string=UserType.ADMIN) {
-  await this.assertManageableTarget(id,actorRole);
-  const findOne = await this.userModel.findById(id).select('isSubscriber').lean();
-  if(!findOne)throw new HttpException('User not found',400);
-  await this.platform.adminTogglePremium(actor,id,!findOne.isSubscriber);
-  return this.userModel.findById(id).select('-password -otpNumber -otpValidatedAt').lean();
-}
-async userDeleteAdmin(id:string) {
-  const findOne = await this.userModel.findByIdAndDelete(id).lean();
-  if(!findOne) {
-    throw new HttpException('User not found', 400);
-  }
-  
-  return findOne;
-}
-
-
-async createPayment(pkgId:string,id:string){return this.platform.createPayment(id,pkgId);}
-async executePayment(paymentId:string){return this.platform.executePayment(paymentId);}
-async executePremiumPayment(paymentId:string){return this.platform.executePremiumPayment(paymentId);}
-
-
-async createRequestNumber(payload:RequestNumberDto,userId:string){return this.platform.unlock(userId,payload.requestUserId);}
-
-async getMyRequests(userId:string,query:PaginationDto){
- const balance=await this.platform.connections(userId);
- const page=Math.max(1,query.page||1),limit=Math.min(100,Math.max(1,query.limit||10));
- const history=balance.history.slice((page-1)*limit,page*limit);
- const data=await Promise.all(history.map(async x=>{try{return {...x,requestUserId:await this.platform.profile(x.profileId,userId)};}catch{return {...x,requestUserId:null};}}));
- return {data,page,limit,totalItems:balance.history.length,totalPages:Math.ceil(balance.history.length/limit)};
-}
-
-async RequestForOtpRestPassword(payload:ReqForDto){return this.identity.resetRequest(payload);}
-async ResetPasswordWithOtp(payload:NewPasswordResetWithOtp){return this.identity.reset(payload);}
-
-
-//bot 
-
- async sendToUser(user: UserDocument) {
-    const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
-    const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
-      const completionPercentage = this.calculateDataCompletion(user);
-       if (completionPercentage < 55) {
-    this.logger.warn(`User ${user.userId} data is only ${completionPercentage}% complete. Skipping PDF send.`);
-    return false;
-  }
-    if(user?.isPdfSend) {
-      this.logger.warn(`User ${user.userId} has already sent a PDF. Skipping PDF send.`);
-      return false;
+    return {
+      data: members,
+      page,
+      limit,
+      totalItems,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
     };
-    
+  }
+
+  /** Explicit, reviewable publish action used by the member list. */
+  async publishUserAdmin(
+    id: string,
+    actor: string,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    await this.assertManageableTarget(id, actorRole);
+    const member: any = await this.userModel.findById(id).lean();
+    if (
+      !member ||
+      member.role !== UserType.USER ||
+      member.biodataStatus === 'deleted'
+    )
+      throw new BadRequestException('Member biodata not available');
+    if (member.verificationStatus === 'suspended')
+      throw new ForbiddenException('Suspended members cannot be published');
+    if (!hasSubmittedBiodata(member))
+      throw new BadRequestException(
+        'The member must submit their biodata before publishing',
+      );
+    const progress = completion(member, (await this.questions.get()).questions);
+    if (progress.percentage < 100)
+      throw new BadRequestException(
+        'Required biodata fields are incomplete (' + progress.percentage + '%)',
+      );
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        {
+          _id: id,
+          role: UserType.USER,
+          biodataStatus: { $in: ['submitted', 'approved'] },
+          verificationStatus: { $ne: 'suspended' },
+        },
+        {
+          $set: {
+            isPublished: true,
+            isPublishFromAdmin: true,
+            verificationStatus: 'approved',
+            biodataStatus: 'approved',
+          },
+        },
+        { new: true, runValidators: true },
+      )
+      .select(
+        '-password -otpNumber -otpValidatedAt -connectionGrants -connectionUnlocks -creditedPaymentIds',
+      )
+      .lean();
+    if (!updated)
+      throw new BadRequestException(
+        'Biodata status changed. Refresh and retry.',
+      );
+    await this.platform.audit(actor, 'biodata.admin.publish', id);
+    return { message: 'Biodata published', data: updated };
+  }
+
+  async toggleSubscription(
+    id: string,
+    actor: string,
+    actorRole: string = UserType.ADMIN,
+  ) {
+    await this.assertManageableTarget(id, actorRole);
+    const findOne = await this.userModel
+      .findById(id)
+      .select('isSubscriber')
+      .lean();
+    if (!findOne) throw new HttpException('User not found', 400);
+    await this.platform.adminTogglePremium(actor, id, !findOne.isSubscriber);
+    return this.userModel
+      .findById(id)
+      .select('-password -otpNumber -otpValidatedAt')
+      .lean();
+  }
+  async userDeleteAdmin(id: string) {
+    const findOne = await this.userModel.findByIdAndDelete(id).lean();
+    if (!findOne) {
+      throw new HttpException('User not found', 400);
+    }
+
+    return findOne;
+  }
+
+  async createPayment(pkgId: string, id: string) {
+    return this.platform.createPayment(id, pkgId);
+  }
+  async executePayment(paymentId: string) {
+    return this.platform.executePayment(paymentId);
+  }
+  async executePremiumPayment(paymentId: string) {
+    return this.platform.executePremiumPayment(paymentId);
+  }
+
+  async createRequestNumber(payload: RequestNumberDto, userId: string) {
+    return this.platform.unlock(userId, payload.requestUserId);
+  }
+
+  async getMyRequests(userId: string, query: PaginationDto) {
+    const balance = await this.platform.connections(userId);
+    const page = Math.max(1, query.page || 1),
+      limit = Math.min(100, Math.max(1, query.limit || 10));
+    const history = balance.history.slice((page - 1) * limit, page * limit);
+    const data = await Promise.all(
+      history.map(async (x) => {
+        try {
+          return {
+            ...x,
+            requestUserId: await this.platform.profile(x.profileId, userId),
+          };
+        } catch {
+          return { ...x, requestUserId: null };
+        }
+      }),
+    );
+    return {
+      data,
+      page,
+      limit,
+      totalItems: balance.history.length,
+      totalPages: Math.ceil(balance.history.length / limit),
+    };
+  }
+
+  async RequestForOtpRestPassword(payload: ReqForDto) {
+    return this.identity.resetRequest(payload);
+  }
+  async ResetPasswordWithOtp(payload: NewPasswordResetWithOtp) {
+    return this.identity.reset(payload);
+  }
+
+  //bot
+
+  async sendToUser(user: UserDocument) {
+    const isMale =
+      user.gender?.toLowerCase() === 'male' ||
+      user.gender?.toLowerCase() === 'পুরুষ';
+    const isFemale =
+      user.gender?.toLowerCase() === 'female' ||
+      user.gender?.toLowerCase() === 'মহিলা';
+    const completionPercentage = this.calculateDataCompletion(user);
+    if (completionPercentage < 55) {
+      this.logger.warn(
+        `User ${user.userId} data is only ${completionPercentage}% complete. Skipping PDF send.`,
+      );
+      return false;
+    }
+    if (user?.isPdfSend) {
+      this.logger.warn(
+        `User ${user.userId} has already sent a PDF. Skipping PDF send.`,
+      );
+      return false;
+    }
+
     try {
       // Generate PDF
       this.logger.log(`Generating PDF for user ${user.userId}`);
@@ -870,7 +1291,9 @@ async ResetPasswordWithOtp(payload:NewPasswordResetWithOtp){return this.identity
 
       if (sent) {
         this.logger.log(`PDF sent successfully for user ${user.userId}`);
-        const findAdnUpdate = await this.userModel.findOneAndUpdate({_id:user._id},{isPdfSend:true}).exec();
+        const findAdnUpdate = await this.userModel
+          .findOneAndUpdate({ _id: user._id }, { isPdfSend: true })
+          .exec();
         return true;
       } else {
         this.logger.warn(`Failed to send PDF for user ${user.userId}`);
@@ -881,99 +1304,109 @@ async ResetPasswordWithOtp(payload:NewPasswordResetWithOtp){return this.identity
       return false;
     }
   }
- private calculateDataCompletion(user: UserDocument): number {
-  const fields = [
-    // Basic Info (10 fields)
-    user.name,
-    user.userId,
-    user.email,
-    user.phoneNumber,
-    user.gender,
-    user.maritalStatus,
-    user.age,
-    user.bloodGroup,
-    user.weight,
-    user.nationality,
+  private calculateDataCompletion(user: UserDocument): number {
+    const fields = [
+      // Basic Info (10 fields)
+      user.name,
+      user.userId,
+      user.email,
+      user.phoneNumber,
+      user.gender,
+      user.maritalStatus,
+      user.age,
+      user.bloodGroup,
+      user.weight,
+      user.nationality,
 
-    // Address (4 fields)
-    user.address?.district,
-    user.address?.upazila,
-    user.address?.permanentAddress,
-    user.address?.presentAddress,
+      // Address (4 fields)
+      user.address?.district,
+      user.address?.upazila,
+      user.address?.permanentAddress,
+      user.address?.presentAddress,
 
-    // Education (6 fields)
-    user.educationInfo?.educationMethod,
-    user.educationInfo?.highestEducation,
-    user.educationInfo?.highestEducationBoard,
-    user.educationInfo?.highestEducationGroup,
-    user.educationInfo?.highestEducationPassingYear,
-    user.educationInfo?.educationBackground,
+      // Education (6 fields)
+      user.educationInfo?.educationMethod,
+      user.educationInfo?.highestEducation,
+      user.educationInfo?.highestEducationBoard,
+      user.educationInfo?.highestEducationGroup,
+      user.educationInfo?.highestEducationPassingYear,
+      user.educationInfo?.educationBackground,
 
-    // Family (8 fields)
-    user.familyInfo?.isFatherAlive,
-    user.familyInfo?.fathersProfession,
-    user.familyInfo?.isMotherAlive,
-    user.familyInfo?.mothersProfession,
-    user.familyInfo?.brotherCount,
-    user.familyInfo?.sisterCount,
-    user.familyInfo?.familyFinancial,
-    user.familyInfo?.familyReligiousCondition,
+      // Family (8 fields)
+      user.familyInfo?.isFatherAlive,
+      user.familyInfo?.fathersProfession,
+      user.familyInfo?.isMotherAlive,
+      user.familyInfo?.mothersProfession,
+      user.familyInfo?.brotherCount,
+      user.familyInfo?.sisterCount,
+      user.familyInfo?.familyFinancial,
+      user.familyInfo?.familyReligiousCondition,
 
-    // Personal (10 fields)
-    user.personalInformation?.height,
-    user.personalInformation?.skinTone,
-    user.personalInformation?.outsideClothes,
-    user.personalInformation?.prayerFiverTimeFrom,
-    user.personalInformation?.reciteQuran,
-    user.personalInformation?.fiqhFollow,
-    user.personalInformation?.digitalMedia,
-    user.personalInformation?.islamicStudy,
-    user.personalInformation?.physicalStructure,
-    user.personalInformation?.maharaNonMahram,
+      // Personal (10 fields)
+      user.personalInformation?.height,
+      user.personalInformation?.skinTone,
+      user.personalInformation?.outsideClothes,
+      user.personalInformation?.prayerFiverTimeFrom,
+      user.personalInformation?.reciteQuran,
+      user.personalInformation?.fiqhFollow,
+      user.personalInformation?.digitalMedia,
+      user.personalInformation?.islamicStudy,
+      user.personalInformation?.physicalStructure,
+      user.personalInformation?.maharaNonMahram,
 
-    // Occupation (3 fields)
-    user.occupational?.profession,
-    user.occupational?.workingDetails,
-    user.occupational?.salary,
+      // Occupation (3 fields)
+      user.occupational?.profession,
+      user.occupational?.workingDetails,
+      user.occupational?.salary,
 
-    // Marriage Info (5 fields - conditional based on gender)
-    user.marriageInformationWomen?.isGuardiansAgreed || user.marriageInformationMan?.isGuardiansAgreed,
-    user.marriageInformationWomen?.jobAfterMarriage || user.marriageInformationMan?.wifeJobAfterMarriage,
-    user.marriageInformationWomen?.studyAfterMarriage || user.marriageInformationMan?.allowWifeStudyAfterMarriage,
-    user.marriageInformationWomen?.thoughtsOnMarriage || user.marriageInformationMan?.thoughtsOnMarriage,
-    user.marriageInformationWomen?.polygamyConsentOptions || user.marriageInformationMan?.livingPlaceAfterMarriage,
+      // Marriage Info (5 fields - conditional based on gender)
+      user.marriageInformationWomen?.isGuardiansAgreed ||
+        user.marriageInformationMan?.isGuardiansAgreed,
+      user.marriageInformationWomen?.jobAfterMarriage ||
+        user.marriageInformationMan?.wifeJobAfterMarriage,
+      user.marriageInformationWomen?.studyAfterMarriage ||
+        user.marriageInformationMan?.allowWifeStudyAfterMarriage,
+      user.marriageInformationWomen?.thoughtsOnMarriage ||
+        user.marriageInformationMan?.thoughtsOnMarriage,
+      user.marriageInformationWomen?.polygamyConsentOptions ||
+        user.marriageInformationMan?.livingPlaceAfterMarriage,
 
-    // Expected Partner (5 fields)
-    user.expectedLifePartner?.age,
-    user.expectedLifePartner?.education,
-    user.expectedLifePartner?.profession,
-    user.expectedLifePartner?.district,
-    user.expectedLifePartner?.maritalStatus,
-  ];
+      // Expected Partner (5 fields)
+      user.expectedLifePartner?.age,
+      user.expectedLifePartner?.education,
+      user.expectedLifePartner?.profession,
+      user.expectedLifePartner?.district,
+      user.expectedLifePartner?.maritalStatus,
+    ];
 
-  const totalFields = fields.length;
-  const filledFields = fields.filter(
-    field => field !== null && field !== undefined && field !== ''
-  ).length;
+    const totalFields = fields.length;
+    const filledFields = fields.filter(
+      (field) => field !== null && field !== undefined && field !== '',
+    ).length;
 
-  const percentage = Math.round((filledFields / totalFields) * 100);
-  return percentage;
-}
+    const percentage = Math.round((filledFields / totalFields) * 100);
+    return percentage;
+  }
 
-async findUserAndSendToTelegram(id: string) {
-  const user = await this.userModel.findById(id).exec();
-  if(!user) return;
-  const getValue = (value: any): string => {
-    if (value === null || value === undefined || value === '') return 'তথ্য নেই';
-    if (typeof value === 'boolean') return value ? 'হ্যাঁ' : 'না';
-    return String(value);
-  };
+  async findUserAndSendToTelegram(id: string) {
+    const user = await this.userModel.findById(id).exec();
+    if (!user) return;
+    const getValue = (value: any): string => {
+      if (value === null || value === undefined || value === '')
+        return 'তথ্য নেই';
+      if (typeof value === 'boolean') return value ? 'হ্যাঁ' : 'না';
+      return String(value);
+    };
 
-  // Determine if user is male or female
-  const isMale = user.gender?.toLowerCase() === 'male' || user.gender?.toLowerCase() === 'পুরুষ';
-  const isFemale = user.gender?.toLowerCase() === 'female' || user.gender?.toLowerCase() === 'মহিলা';
+    // Determine if user is male or female
+    const isMale =
+      user.gender?.toLowerCase() === 'male' ||
+      user.gender?.toLowerCase() === 'পুরুষ';
+    const isFemale =
+      user.gender?.toLowerCase() === 'female' ||
+      user.gender?.toLowerCase() === 'মহিলা';
 
- const message = `
+    const message = `
 🎉 <b>${isMale ? 'পুরুষ' : isFemale ? 'মহিলা' : ''} ব্যবহারকারী</b>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1068,7 +1501,9 @@ ${isMale ? `👖 টাখনুর উপরে কাপড়: ${getValue(use
 📋 কাজের বিবরণ: ${getValue(user.occupational?.workingDetails)}
 💰 বেতন: ${getValue(user.occupational?.salary)}
 
-${isFemale && user.marriageInformationWomen ? `
+${
+  isFemale && user.marriageInformationWomen
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
@@ -1079,9 +1514,13 @@ ${isFemale && user.marriageInformationWomen ? `
 👥 বহুবিবাহে সম্মতি: ${getValue(user.marriageInformationWomen.polygamyConsentOptions)}
 👶 সন্তান লালন-পালন: ${getValue(user.marriageInformationWomen.caringforChildren)}
 🤱 সন্তানের হেফাজত: ${getValue(user.marriageInformationWomen.childCustody)}
-` : ''}
+`
+    : ''
+}
 
-${isMale && user.marriageInformationMan ? `
+${
+  isMale && user.marriageInformationMan
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💑 <b>বিবাহ সংক্রান্ত তথ্য</b>
@@ -1092,9 +1531,13 @@ ${isMale && user.marriageInformationMan ? `
 🏠 বসবাসের স্থান: ${getValue(user.marriageInformationMan.livingPlaceAfterMarriage)}
 🎁 উপহার প্রত্যাশা: ${getValue(user.marriageInformationMan.expectedAnyGiftFromMarriage)}
 💭 বিয়ে নিয়ে চিন্তা: ${getValue(user.marriageInformationMan.thoughtsOnMarriage)}
-` : ''}
+`
+    : ''
+}
 
-${user.expectedLifePartner ? `
+${
+  user.expectedLifePartner
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💕 <b>প্রত্যাশিত জীবনসঙ্গী</b>
@@ -1108,79 +1551,97 @@ ${user.expectedLifePartner ? `
 💼 পেশা: ${getValue(user.expectedLifePartner.profession)}
 💰 আর্থিক অবস্থা: ${getValue(user.expectedLifePartner.financialCondition)}
 ✨ প্রত্যাশিত গুণাবলী: ${getValue(user.expectedLifePartner.expectedQuality)}
-` : ''}
+`
+    : ''
+}
 
-${user.pledge ? `
+${
+  user.pledge
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ <b>অঙ্গীকার</b>
 👨‍👩‍👧 অভিভাবক জানেন: ${getValue(user.pledge.youGordianKnowsThis)}
 ✓ সকল তথ্য সত্য: ${getValue(user.pledge.allTheInformationTrue)}
 ⚠️ ভুল তথ্যের দায়িত্ব: ${getValue(user.pledge.anyMisInformationWeAreNotKnowing)}
-` : ''}
+`
+    : ''
+}
 
-${user.howYouWannaGetMarried ? `
+${
+  user.howYouWannaGetMarried
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💑 <b>বিবাহের ধরন</b>
 💒 কীভাবে বিবাহ করতে চান: ${getValue(user.howYouWannaGetMarried)}
-` : ''}
+`
+    : ''
+}
 
-${user.customFields && user.customFields.size > 0 ? `
+${
+  user.customFields && user.customFields.size > 0
+    ? `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📝 <b>অতিরিক্ত তথ্য</b>
-${Array.from(user.customFields.entries()).map(([key, value]) => `${key}: ${getValue(value)}`).join('\n')}
-` : ''}
+${Array.from(user.customFields.entries())
+  .map(([key, value]) => `${key}: ${getValue(value)}`)
+  .join('\n')}
+`
+    : ''
+}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⏰ <b>সময়:</b> ${new Date().toLocaleString('bn-BD', { 
-    timeZone: 'Asia/Dhaka',
-    dateStyle: 'full',
-    timeStyle: 'short'
-  })}
+⏰ <b>সময়:</b> ${new Date().toLocaleString('bn-BD', {
+      timeZone: 'Asia/Dhaka',
+      dateStyle: 'full',
+      timeStyle: 'short',
+    })}
   `.trim();
 
-  try {
-    const sendToTelegram = await this.telegramService.sendToChannel({
-      channel: TelegramChannel.SUBSCRIBER,
-      message: message,
-      isHTML: true,
-    });
+    try {
+      const sendToTelegram = await this.telegramService.sendToChannel({
+        channel: TelegramChannel.SUBSCRIBER,
+        message: message,
+        isHTML: true,
+      });
 
-    if (sendToTelegram) {
-      this.logger.log(`User ${user.userId} info sent to Telegram successfully`);
-      return true;
-    } else {
-      this.logger.warn(`Failed to send user ${user.userId} info to Telegram`);
+      if (sendToTelegram) {
+        this.logger.log(
+          `User ${user.userId} info sent to Telegram successfully`,
+        );
+        return true;
+      } else {
+        this.logger.warn(`Failed to send user ${user.userId} info to Telegram`);
+        return false;
+      }
+    } catch (error) {
+      this.logger.error(`Error sending to Telegram: ${error.message}`);
       return false;
     }
-  } catch (error) {
-    this.logger.error(`Error sending to Telegram: ${error.message}`);
-    return false;
   }
-}
 
-async NumberRequest(payload: {
+  async NumberRequest(payload: {
     from: {
-        name: string;
-        email: string;
-        phoneNumber: string;
-        userId: string;
-        gender: string;
+      name: string;
+      email: string;
+      phoneNumber: string;
+      userId: string;
+      gender: string;
     };
     toUser: {
-        name: string;
-        email: string;
-        phoneNumber: string;
-        userId: string;
-        gender: string;
+      name: string;
+      email: string;
+      phoneNumber: string;
+      userId: string;
+      gender: string;
     };
-}) {
+  }) {
     const genderBangla = {
-        male: "পুরুষ",
-        female: "মহিলা"
+      male: 'পুরুষ',
+      female: 'মহিলা',
     };
 
     const message = `
@@ -1206,22 +1667,18 @@ async NumberRequest(payload: {
 
 ━━━━━━━━━━━━━━━━━━━━
 
-⏰ সময়: ${new Date().toLocaleString('bn-BD', { 
-        dateStyle: 'full', 
-        timeStyle: 'short',
-        timeZone: 'Asia/Dhaka' 
+⏰ সময়: ${new Date().toLocaleString('bn-BD', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: 'Asia/Dhaka',
     })}
 
     `.trim();
 
-  const sendToTelegram = await this.telegramService.sendToChannel({
+    const sendToTelegram = await this.telegramService.sendToChannel({
       channel: TelegramChannel.NUMBERREQUEST,
       message: message,
       isHTML: true,
     });
-}
-
-
-
-
+  }
 }

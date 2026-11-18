@@ -4,7 +4,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
+  CommandSearch,
   CommandItem,
 } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
@@ -63,7 +63,7 @@ export function AddressStep() {
           </PopoverTrigger>
           <PopoverContent className="w-[260px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="জেলা খুঁজুন..." className="h-10" />
+              <CommandSearch placeholder="জেলা খুঁজুন..." className="h-10" />
               <CommandEmpty>কোনো জেলা পাওয়া যায়নি।</CommandEmpty>
               <CommandGroup className="max-h-48 overflow-y-auto">
                 {districts.map((d) => (
@@ -111,7 +111,7 @@ export function AddressStep() {
           </PopoverTrigger>
           <PopoverContent className="w-[260px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="উপজেলা খুঁজুন..." className="h-10" />
+              <CommandSearch placeholder="উপজেলা খুঁজুন..." className="h-10" />
               <CommandEmpty>কোনো উপজেলা পাওয়া যায়নি।</CommandEmpty>
               <CommandGroup className="max-h-48 overflow-y-auto">
                 {availableUpazilas.map((upazila) => (

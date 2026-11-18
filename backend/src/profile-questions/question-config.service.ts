@@ -99,7 +99,8 @@ export function questionRuleErrors(profile:any,questions:ProfileQuestion[]){
       if(profile.residenceCountry&&profile.residenceCountry!=='Bangladesh')return false;
       if(['address.upazila','address.cityCorporation'].includes(q.path!)&&!profile.address?.district)return false;
       if(q.path==='address.area'&&(!profile.address?.district||!(profile.address?.cityCorporation||profile.address?.upazila)))return false;
-      if(q.path==='address.upazila'&&profile.address?.cityCorporation)return false;
+      // Match profile completion: these fields are alternatives; prefer upazila for legacy conflicts.
+      if(q.path==='address.upazila'&&profile.address?.cityCorporation&&!profile.address?.upazila)return false;
       if(q.path==='address.cityCorporation'&&profile.address?.upazila)return false;
     }
     return true;

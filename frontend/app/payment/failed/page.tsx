@@ -1,13 +1,40 @@
 "use client";
 
-import React from "react";
-import { XCircle, ArrowLeft, RefreshCw, Home } from "lucide-react";
+import React, { Suspense, useEffect } from "react";
+import { XCircle, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getPaymentStatus } from "@/actions/auth";
 
-const PaymentFailedPage = () => {
+const PaymentFailedContent = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("order_id") || "";
+  const purpose = searchParams.get("purpose");
+
+  useEffect(() => {
+    if (
+      !orderId ||
+      orderId.length > 150 ||
+      (purpose !== "premium" && purpose !== "connections")
+    )
+      return;
+    let cancelled = false;
+    void getPaymentStatus(orderId, purpose)
+      .then((result) => {
+        if (!cancelled && result?.status === "paid") {
+          const params = new URLSearchParams({ purpose, order_id: orderId });
+          window.location.replace("/payment/successfull?" + params.toString());
+        }
+      })
+      .catch(() => {
+        // Leave the result unconfirmed when the provider cannot be reached.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, purpose]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
@@ -25,20 +52,21 @@ const PaymentFailedPage = () => {
 
           {/* Error Message */}
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            পেমেন্ট ব্যর্থ হয়েছে!
+            পেমেন্ট নিশ্চিত করা যায়নি
           </h1>
           <p className="text-base md:text-lg text-gray-600 mb-8">
-            দুঃখিত, আপনার পেমেন্ট সম্পন্ন হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন।
+            আপনার পেমেন্টের অবস্থা সার্ভার থেকে যাচাই করা হচ্ছে। নিশ্চিত না হওয়া
+            পর্যন্ত কোনো সুবিধা সক্রিয় হবে না।
           </p>
 
           {/* Error Details */}
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
             <div className="flex items-center justify-center gap-2 text-red-700">
               <XCircle className="w-5 h-5" />
-              <span className="font-semibold">লেনদেন ব্যর্থ হয়েছে</span>
+              <span className="font-semibold">লেনদেন নিশ্চিত হয়নি</span>
             </div>
             <p className="text-sm text-red-600 mt-2">
-              পেমেন্ট প্রসেস সম্পন্ন হয়নি
+              পেমেন্টের অবস্থা যাচাই করা হচ্ছে
             </p>
           </div>
 
@@ -96,5 +124,19 @@ const PaymentFailedPage = () => {
     </div>
   );
 };
+
+const PaymentFailedPage = () => (
+  <Suspense
+    fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="text-sm text-gray-600">
+          পেমেন্টের অবস্থা যাচাই হচ্ছে...
+        </span>
+      </div>
+    }
+  >
+    <PaymentFailedContent />
+  </Suspense>
+);
 
 export default PaymentFailedPage;

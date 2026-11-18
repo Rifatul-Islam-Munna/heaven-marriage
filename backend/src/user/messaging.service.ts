@@ -8,20 +8,44 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { SmsService } from './sms.service';
+import {
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from 'libphonenumber-js';
+
+export function normalizeContactPhone(
+  value: string,
+  defaultCountry: CountryCode = 'BD',
+) {
+  const raw = String(value || '')
+    .trim()
+    .replace(/[০-৯]/g, (n) => String('০১২৩৪৫৬৭৮৯'.indexOf(n)))
+    .replace(/[٠-٩]/g, (n) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(n)));
+  if (!raw) return '';
+  const parsed = parsePhoneNumberFromString(raw, defaultCountry);
+  if (!parsed || !parsed.isValid())
+    throw new BadRequestException('সঠিক আন্তর্জাতিক মোবাইল নম্বর লিখুন');
+  return parsed.number;
+}
 
 export function normalizePhone(value: string) {
   const v = String(value || '')
     .replace(/[০-৯]/g, (n) => String('০১২৩৪৫৬৭৮৯'.indexOf(n)))
+    .replace(/[٠-٩]/g, (n) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(n)))
     .replace(/[\s()-]/g, '');
-  if (/^01[3-9]\d{8}$/.test(v)) return v;
-  if (/^1[3-9]\d{8}$/.test(v)) return '0' + v;
-  if (/^8801[3-9]\d{8}$/.test(v)) return '0' + v.slice(3);
-  if (/^\+8801[3-9]\d{8}$/.test(v)) return '0' + v.slice(4);
-  if (!/^\+[1-9]\d{6,14}$/.test(v))
+  let candidate = v;
+  if (/^01[3-9]\d{8}$/.test(v)) candidate = '+88' + v;
+  else if (/^1[3-9]\d{8}$/.test(v)) candidate = '+880' + v;
+  else if (/^8801[3-9]\d{8}$/.test(v)) candidate = '+' + v;
+  else if (!/^\+[1-9]\d{6,14}$/.test(v))
     throw new BadRequestException(
       'সঠিক আন্তর্জাতিক নম্বর (+country code) লিখুন',
     );
-  return v;
+
+  const parsed = parsePhoneNumberFromString(candidate);
+  if (!parsed || !parsed.isValid())
+    throw new BadRequestException('সঠিক আন্তর্জাতিক নম্বর লিখুন');
+  return parsed.country === 'BD' ? '0' + parsed.nationalNumber : parsed.number;
 }
 
 @Injectable()

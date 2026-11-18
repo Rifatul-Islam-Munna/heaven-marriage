@@ -15,7 +15,8 @@ import {
   InputGroup,
   InputGroupAddon,
 } from "@/components/ui/input-group"
-import { SearchIcon, CheckIcon } from "lucide-react"
+import { SearchIcon, CheckIcon, XIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 function Command({
   className,
@@ -84,6 +85,57 @@ function CommandInput({
           <SearchIcon className="size-4 shrink-0 opacity-50" />
         </InputGroupAddon>
       </InputGroup>
+    </div>
+  )
+}
+
+function CommandSearch({
+  placeholder = "খুঁজুন...",
+  className,
+  inputClassName,
+}: {
+  placeholder?: string
+  className?: string
+  inputClassName?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [value, setValue] = React.useState("")
+  const inputContainerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (open) inputContainerRef.current?.querySelector("input")?.focus()
+  }, [open])
+
+  return (
+    <div className={cn("px-1 pt-1", className)}>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-expanded={open}
+          aria-label={open ? "সার্চ বন্ধ করুন" : "খুঁজুন"}
+          onClick={() => {
+            setOpen((current) => {
+              if (current) setValue("")
+              return !current
+            })
+          }}
+          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+        >
+          {open ? <XIcon className="size-3.5" /> : <SearchIcon className="size-3.5" />}
+          {open ? "বন্ধ করুন" : "খুঁজুন"}
+        </Button>
+      </div>
+      <div ref={inputContainerRef} className={cn(!open && "hidden")}>
+        <CommandInput
+          autoFocus={open}
+          value={value}
+          onValueChange={setValue}
+          placeholder={placeholder}
+          className={cn("h-9", inputClassName)}
+        />
+      </div>
     </div>
   )
 }
@@ -180,6 +232,7 @@ export {
   Command,
   CommandDialog,
   CommandInput,
+  CommandSearch,
   CommandList,
   CommandEmpty,
   CommandGroup,

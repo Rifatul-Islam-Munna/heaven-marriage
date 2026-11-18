@@ -14,7 +14,7 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
+  CommandSearch,
   CommandItem,
 } from "@/components/ui/command";
 import {
@@ -104,7 +104,7 @@ export function PersonalInfoStep() {
             </PopoverTrigger>
             <PopoverContent className="w-full p-0">
               <Command>
-                <CommandInput placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
+                <CommandSearch placeholder="উচ্চতা খুঁজুন... (যেমন: 5 6)" />
                 <CommandEmpty>কোনো উচ্চতা পাওয়া যায়নি।</CommandEmpty>
                 <CommandGroup className="max-h-64 overflow-auto">
                   {heightOptions.map((option) => (

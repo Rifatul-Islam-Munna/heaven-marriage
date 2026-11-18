@@ -11,40 +11,51 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Heart, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { loginUser } from "@/actions/auth";
 import { loginEvent } from "@/lib/google-tag-manager";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { useUser } from "@/lib/useUser";
 import LoginWithGoogle from "./GoogleLogin";
 import AuthDivider from "./AuthDivider";
 import Image from "next/image";
 import Link from "next/link";
 import type { Route } from "next";
+import PhoneNumberInput from "@/components/custom/common/PhoneNumberInput";
 
 export default function SignIn() {
-  const { refetch } = useUser();
   const [formData, setFormData] = useState({
     phoneNumber: "",
+    email: "",
     password: "",
   });
+  const [mode, setMode] = useState<"phone" | "email">("phone");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const { mutate, isPending } = useMutation({
     mutationKey: ["login-user"],
-    mutationFn: () => loginUser(formData.phoneNumber, formData.password),
+    mutationFn: () =>
+      loginUser(
+        mode === "phone" ? formData.phoneNumber : formData.email,
+        formData.password,
+      ),
     onSuccess: async (data) => {
       if (data.data) {
-        await loginEvent(data.data.user, formData.phoneNumber.includes("@") ? "email" : "phone");
+        await loginEvent(data.data.user, mode);
         const next = new URLSearchParams(window.location.search).get("next");
-        const safeNext = next?.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
-          ? next : "/profile";
-        ["admin","seo","blog","manager"].includes(data?.data?.user?.role||"")
-          ? router.push("/dashboard")
-          : router.push(safeNext as Route);
+        const safeNext =
+          next?.startsWith("/") &&
+          !next.startsWith("//") &&
+          !next.includes("\\")
+            ? next
+            : "/profile";
+        const isStaff = ["admin", "seo", "blog", "manager"].includes(
+          data?.data?.user?.role || "",
+        );
+        if (isStaff) router.push("/dashboard");
+        else router.push(safeNext as Route);
         return toast.success("সফলভাবে লগইন হয়েছে");
       }
       return toast.error(data?.error?.message);
@@ -89,24 +100,61 @@ export default function SignIn() {
           </div>
           <AuthDivider label="অথবা মোবাইল / ইমেইল দিয়ে" />
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div
+              className="grid grid-cols-2 gap-1 rounded-xl bg-pink-50 p-1"
+              role="group"
+              aria-label="লগইন পদ্ধতি"
+            >
+              <button
+                type="button"
+                onClick={() => setMode("phone")}
+                aria-pressed={mode === "phone"}
+                className={`h-10 rounded-lg text-sm font-semibold ${mode === "phone" ? "bg-white text-pink-700 shadow-sm" : "text-gray-600"}`}
+              >
+                মোবাইল
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("email")}
+                aria-pressed={mode === "email"}
+                className={`h-10 rounded-lg text-sm font-semibold ${mode === "email" ? "bg-white text-pink-700 shadow-sm" : "text-gray-600"}`}
+              >
+                ইমেইল
+              </button>
+            </div>
             <div className="space-y-2">
               <Label
-                htmlFor="phoneNumber"
+                htmlFor={mode === "phone" ? "phoneNumber" : "email"}
                 className="text-gray-700 font-medium"
               >
-                মোবাইল নম্বর অথবা ইমেইল
+                {mode === "phone" ? "মোবাইল নম্বর" : "ইমেইল ঠিকানা"}
               </Label>
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="text"
-                autoComplete="username"
-                placeholder="০১৭১২৩৪৫৬৭৮"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                required
-                className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
-              />
+              {mode === "phone" ? (
+                <PhoneNumberInput
+                  id="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={(value) =>
+                    setFormData((current) => ({
+                      ...current,
+                      phoneNumber: value,
+                    }))
+                  }
+                  required
+                  placeholder="০১৭১২৩৪৫৬৭৮"
+                />
+              ) : (
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="username"
+                  placeholder="name@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  className="border-pink-200 focus:border-pink-500 focus:ring-pink-500 h-11"
+                />
+              )}
             </div>
 
             <div className="space-y-2">

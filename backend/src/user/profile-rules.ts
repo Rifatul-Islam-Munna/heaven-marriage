@@ -44,7 +44,8 @@ export function applicableRequiredQuestions(u:any, questions:readonly ProfileQue
     // not need Bangladeshi administrative divisions to submit their biodata.
     if(q.path?.startsWith('address.') && ['district','upazila','cityCorporation','area'].includes(q.path.split('.')[1])) {
       if(u?.residenceCountry && u.residenceCountry!=='Bangladesh')return false;
-      if(q.path==='address.upazila' && u?.address?.cityCorporation)return false;
+      // These are alternatives. For legacy records with both, prefer upazila.
+      if(q.path==='address.upazila' && u?.address?.cityCorporation && !u?.address?.upazila)return false;
       if(q.path==='address.cityCorporation' && u?.address?.upazila)return false;
     }
     return true;

@@ -59,6 +59,14 @@ export class PlatformController {
     @Query('purpose') purpose: string) {
     return this.service.trackingPurchase(r.user.id, paymentId, purpose);
   }
+  @Get('payment-status')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.USER)
+  @Throttle({ default: { limit: 12, ttl: 60000 } })
+  paymentStatus(@Req() r: ExpressRequest, @Query('orderId') orderId: string,
+    @Query('purpose') purpose: string) {
+    return this.service.paymentStatus(r.user.id, orderId, purpose);
+  }
   @Get('admirers') admirers(@Req() r: ExpressRequest) {
     return this.service.admirers(r.user.id);
   }

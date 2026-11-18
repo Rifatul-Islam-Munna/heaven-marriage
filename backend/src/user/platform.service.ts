@@ -14,7 +14,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { User, UserDocument, UserType } from './entities/user.entity';
-import { BkashService } from './bkash.service';
+import { ZiniPayService, type ZiniPayVerification } from './zinipay.service';
 import { MessagingService } from './messaging.service';
 import { completion, publicProfile, visibleFilter, PROFILE_FIELDS } from './profile-rules';
 import {describeProfileCompletion} from './profile-completion-snapshot';
@@ -32,7 +32,7 @@ export class PlatformService implements OnModuleInit {
   constructor(
     @InjectConnection() private db: Connection,
     @InjectModel(User.name) private users: Model<UserDocument>,
-    private bkash: BkashService,
+    private ziniPay: ZiniPayService,
     private messages: MessagingService,
     private questionConfig: QuestionConfigService,
     private sms?: SmsService,
@@ -355,110 +355,250 @@ export class PlatformService implements OnModuleInit {
     };
   }
 
+  /** Return the authenticated member's order state and safely retry provider verification. */
+  async paymentStatus(actor: string, orderId: string, purpose: string) {
+    if (
+      typeof orderId !== 'string' ||
+      !orderId.trim() ||
+      orderId.length > 150 ||
+      !['premium', 'connections'].includes(purpose)
+    )
+      throw new BadRequestException('Invalid payment reference');
+
+    const orders = this.db.collection(
+      purpose === 'premium' ? 'premium_orders' : 'connection_orders',
+    );
+    const filter = { userId: actor, id: orderId };
+    const order = await orders.findOne(filter, {
+      projection: { _id: 0, id: 1, paymentId: 1, status: 1, paidAt: 1 },
+    });
+    if (!order) throw new NotFoundException('Payment order unavailable');
+
+    if (
+      order.status === 'pending' &&
+      typeof order.paymentId === 'string' &&
+      order.paymentId
+    ) {
+      const now = new Date();
+      const retryBefore = new Date(now.getTime() - 10000);
+      const claim = await orders.updateOne(
+        {
+          ...filter,
+          status: 'pending',
+          paymentId: order.paymentId,
+          $or: [
+            { lastVerificationAt: { $exists: false } },
+            { lastVerificationAt: { $lte: retryBefore } },
+          ],
+        },
+        { $set: { lastVerificationAt: now } },
+      );
+      if (claim.modifiedCount) {
+        if (purpose === 'premium')
+          await this.executePremiumPayment(order.paymentId);
+        else await this.executePayment(order.paymentId);
+      }
+    }
+
+    const latest = await orders.findOne(filter, {
+      projection: { _id: 0, id: 1, paymentId: 1, status: 1, paidAt: 1 },
+    });
+    if (!latest) throw new NotFoundException('Payment order unavailable');
+    return {
+      orderId: latest.id,
+      purpose,
+      status: latest.status,
+      ...(latest.status === 'paid' && typeof latest.paymentId === 'string'
+        ? { paymentId: latest.paymentId }
+        : {}),
+      paidAt: latest.paidAt || null,
+    };
+  }
+
   /** Premium checkout is separate from connection_orders. It may grant only the configured included connections once. */
   async createPremiumPayment(actor: string) {
     const settings = resolvePremiumSettings(
-      (await this.db.collection('platform_settings').findOne({ key: 'public' }))?.premium,
+      (await this.db.collection('platform_settings').findOne({ key: 'public' }))
+        ?.premium,
     );
     if (!settings.visible || !settings.enabled)
-      throw new BadRequestException('Premium registration is currently unavailable');
-    if (!this.bkash.isConfigured())
-      throw new BadRequestException('Online bKash checkout is not configured yet');
+      throw new BadRequestException(
+        'Premium registration is currently unavailable',
+      );
+    if (!this.ziniPay.isConfigured())
+      throw new BadRequestException(
+        'Online ZiniPay checkout is not configured yet',
+      );
     const member = await this.users.findById(actor).lean();
     if (!member || member.role !== UserType.USER)
       throw new ForbiddenException('Only members can purchase premium');
-    if (premiumIsActive(member)) throw new BadRequestException('You already have an active premium membership');
+    if (premiumIsActive(member))
+      throw new BadRequestException(
+        'You already have an active premium membership',
+      );
     // Premium can be purchased before biodata completion; the team may help
     // the member complete their profile after successful payment.
     const cases = this.db.collection('service_cases');
     // A completed/expired Premium term needs a NEW case; never reuse its active case.
     const existing = await cases.findOne({
-      userId: actor, kind: 'premium',
+      userId: actor,
+      kind: 'premium',
       status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] },
     });
     let caseId: string = existing?.id;
     const amount = premiumTotal(settings);
     if (!caseId) {
       caseId = randomUUID();
-      await cases.insertOne({id:caseId,userId:actor,kind:'premium',
-        status:'pending',message:'',fee:amount,createdAt:new Date(),updatedAt:new Date()});
+      await cases.insertOne({
+        id: caseId,
+        userId: actor,
+        kind: 'premium',
+        status: 'pending',
+        message: '',
+        fee: amount,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }
     if (!Number.isSafeInteger(amount) || amount < 1)
       throw new BadRequestException('Invalid premium fee');
     const id = randomUUID();
     await this.db.collection('premium_orders').insertOne({
-      id, userId: actor, caseId, amount, currency: 'BDT',
-      premiumSnapshot: settings, status: 'pending', createdAt: new Date(),
+      id,
+      userId: actor,
+      caseId,
+      amount,
+      currency: 'BDT',
+      gateway: 'zinipay',
+      premiumSnapshot: settings,
+      status: 'pending',
+      createdAt: new Date(),
     });
     try {
-      const payment = await this.bkash.createPayment(amount, id, 'premium');
+      const member = await this.users
+        .findById(actor)
+        .select('name email')
+        .lean();
+      const payment = await this.ziniPay.createInvoice(amount, id, 'premium', {
+        name: member?.name || undefined,
+        email: member?.email || undefined,
+      });
       if (!payment.paymentId || !payment.paymentUrl)
-        throw new Error('Missing bKash checkout URL');
-      await this.db.collection('premium_orders').updateOne(
-        { id }, { $set: { paymentId: payment.paymentId } },
-      );
+        throw new Error('Missing ZiniPay checkout URL');
+      await this.db
+        .collection('premium_orders')
+        .updateOne({ id }, { $set: { paymentId: payment.paymentId } });
       return payment;
     } catch {
-      await this.db.collection('premium_orders').updateOne(
-        { id }, { $set: { status: 'failed' } },
+      await this.db
+        .collection('premium_orders')
+        .updateOne({ id }, { $set: { status: 'failed' } });
+      throw new BadRequestException(
+        'Unable to start ZiniPay premium checkout. Try again later.',
       );
-      throw new BadRequestException('Unable to start bKash premium checkout. Try again later.');
     }
   }
 
-  /** Verify with bKash itself, not with browser-supplied status. */
+  /** Verify the invoice directly with ZiniPay; never trust browser/webhook status. */
   async executePremiumPayment(paymentId: string) {
     if (!paymentId || paymentId.length > 150) return { success: false };
     const orders = this.db.collection('premium_orders');
     const order = await orders.findOne({ paymentId });
     if (!order || order.status === 'refunded') return { success: false };
     if (order.status === 'paid') return { success: true };
-    let result: any;
+    if (order.status !== 'pending') return { success: false };
+    let result: ZiniPayVerification;
     try {
-      result = await this.bkash.executePayment(paymentId);
-      if (result?.transactionStatus !== 'Completed')
-        result = await this.bkash.queryPayment(paymentId);
+      result = await this.ziniPay.verifyInvoice(paymentId);
     } catch {
-      try { result = await this.bkash.queryPayment(paymentId); }
-      catch { return { success: false }; }
+      return { success: false, retryable: true };
     }
-    if (result?.paymentID !== paymentId ||
-      result?.transactionStatus !== 'Completed' ||
-      Number(result.amount) !== order.amount ||
-      result.currency !== 'BDT' ||
-      (result.payerReference !== order.id &&
-        result.merchantInvoiceNumber !== order.id))
+    if (
+      String(result?.invoice_id || '') !== paymentId ||
+      !Number.isFinite(Number(result?.amount)) ||
+      Number(result.amount) !== order.amount
+    )
       return { success: false };
 
-    const snapshot=resolvePremiumSettings(order.premiumSnapshot);
-    const entitlement=premiumEntitlement(snapshot);
-    const included=snapshot.includedConnections;
+    const paymentStatus = String(result?.status || '').toUpperCase();
+    if (paymentStatus === 'FAILED') {
+      await orders.updateOne(
+        { paymentId, status: 'pending' },
+        { $set: { status: 'failed', failedAt: new Date() } },
+      );
+      return { success: false };
+    }
+    if (paymentStatus !== 'COMPLETED')
+      return { success: false, retryable: true };
+
+    const snapshot = resolvePremiumSettings(order.premiumSnapshot);
+    const entitlement = premiumEntitlement(snapshot, new Date(), 'zinipay');
+    const included = snapshot.includedConnections;
     const update = await this.users.collection.updateOne(
-      { _id: this.oid(order.userId), creditedPaymentIds: { $ne: paymentId }, role: UserType.USER },
       {
-        $set: { isSubscriber: true,premiumService:entitlement },
+        _id: this.oid(order.userId),
+        creditedPaymentIds: { $ne: paymentId },
+        role: UserType.USER,
+      },
+      {
+        $set: { isSubscriber: true, premiumService: entitlement },
         $addToSet: { creditedPaymentIds: paymentId } as any,
-        ...(included>0 ? {
-          $inc: {numberOfConnections:included},
-          $push: {connectionGrants:{id:'premium:'+paymentId,quantity:included,used:0,
-            status:'active',source:'premium',createdAt:new Date(),expiresAt:entitlement.expiresAt}},
-        } : {}),
+        ...(included > 0
+          ? {
+              $inc: { numberOfConnections: included },
+              $push: {
+                connectionGrants: {
+                  id: 'premium:' + paymentId,
+                  quantity: included,
+                  used: 0,
+                  status: 'active',
+                  source: 'premium',
+                  createdAt: new Date(),
+                  expiresAt: entitlement.expiresAt,
+                },
+              },
+            }
+          : {}),
       } as any,
     );
-    const member = await this.users.collection.findOne(
-      { _id: this.oid(order.userId), creditedPaymentIds: paymentId },
-    );
+    const member = await this.users.collection.findOne({
+      _id: this.oid(order.userId),
+      creditedPaymentIds: paymentId,
+    });
     if (!member) return { success: false };
-    await orders.updateOne({ paymentId, status: 'pending' },
-      { $set: { status: 'paid', transactionId: String(result.trxID || ''), paidAt: new Date() } });
-    await this.db.collection('service_cases').updateOne(
-      { id: order.caseId, userId: order.userId, kind: 'premium',
-        status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] } },
-      { $set: { status: 'active', method: 'bkash',
-        transactionReference: String(result.trxID || paymentId),
-        paymentId, fee: order.amount, updatedAt: new Date(),serviceStage:'onboarding' } },
+    await orders.updateOne(
+      { paymentId, status: 'pending' },
+      {
+        $set: {
+          status: 'paid',
+          transactionId: String(result.transaction_id || paymentId),
+          paidAt: new Date(),
+        },
+      },
     );
-    if (update.modifiedCount) await this.audit(order.userId, 'premium.bkash.activated', order.id);
+    await this.db
+      .collection('service_cases')
+      .updateOne(
+        {
+          id: order.caseId,
+          userId: order.userId,
+          kind: 'premium',
+          status: { $in: ['pending', 'contacted', 'payment_pending', 'paid'] },
+        },
+        {
+          $set: {
+            status: 'active',
+            method: 'zinipay',
+            transactionReference: String(result.transaction_id || paymentId),
+            paymentId,
+            fee: order.amount,
+            updatedAt: new Date(),
+            serviceStage: 'onboarding',
+          },
+        },
+      );
+    if (update.modifiedCount)
+      await this.audit(order.userId, 'premium.zinipay.activated', order.id);
     return { success: true };
   }
 
@@ -476,24 +616,35 @@ export class PlatformService implements OnModuleInit {
     if (!Number.isFinite(amount) || amount <= 0)
       throw new BadRequestException('Invalid package price');
     const id = randomUUID();
-    await this.db
-      .collection('connection_orders')
-      .insertOne({
-        id,
-        userId: actor,
-        packageId: pkgId,
-        packageName: p.title,
-        quantity: p.numberOfConnections,
-        amount,
-        currency: 'BDT',
-        validityDays: p.validityDays || null,
-        status: 'pending',
-        createdAt: new Date(),
-      });
+    await this.db.collection('connection_orders').insertOne({
+      id,
+      userId: actor,
+      packageId: pkgId,
+      packageName: p.title,
+      quantity: p.numberOfConnections,
+      amount,
+      currency: 'BDT',
+      gateway: 'zinipay',
+      validityDays: p.validityDays || null,
+      status: 'pending',
+      createdAt: new Date(),
+    });
     try {
-      const payment = await this.bkash.createPayment(amount, id);
+      const member = await this.users
+        .findById(actor)
+        .select('name email')
+        .lean();
+      const payment = await this.ziniPay.createInvoice(
+        amount,
+        id,
+        'connections',
+        {
+          name: member?.name || undefined,
+          email: member?.email || undefined,
+        },
+      );
       if (!payment.paymentId || !payment.paymentUrl)
-        throw new Error('Payment service unavailable');
+        throw new Error('ZiniPay service unavailable');
       await this.db
         .collection('connection_orders')
         .updateOne({ id }, { $set: { paymentId: payment.paymentId } });
@@ -510,23 +661,29 @@ export class PlatformService implements OnModuleInit {
       order = await orders.findOne({ paymentId });
     if (!order || order.status === 'refunded') return { success: false };
     if (order.status === 'paid') return { success: true };
-    let result: any;
+    if (order.status !== 'pending') return { success: false };
+    let result: ZiniPayVerification;
     try {
-      result = await this.bkash.executePayment(paymentId);
-      if (result?.transactionStatus !== 'Completed')
-        result = await this.bkash.queryPayment(paymentId);
+      result = await this.ziniPay.verifyInvoice(paymentId);
     } catch {
-      result = await this.bkash.queryPayment(paymentId);
+      return { success: false, retryable: true };
     }
     if (
-      result?.paymentID !== paymentId ||
-      result?.transactionStatus !== 'Completed' ||
-      Number(result.amount) !== order.amount ||
-      result.currency !== 'BDT' ||
-      (result.payerReference !== order.id &&
-        result.merchantInvoiceNumber !== order.id)
+      String(result?.invoice_id || '') !== paymentId ||
+      !Number.isFinite(Number(result?.amount)) ||
+      Number(result.amount) !== order.amount
     )
       return { success: false };
+    const paymentStatus = String(result?.status || '').toUpperCase();
+    if (paymentStatus === 'FAILED') {
+      await orders.updateOne(
+        { paymentId, status: 'pending' },
+        { $set: { status: 'failed', failedAt: new Date() } },
+      );
+      return { success: false };
+    }
+    if (paymentStatus !== 'COMPLETED')
+      return { success: false, retryable: true };
     // Grant + deduplication key live in the same atomic MongoDB user update.
     await this.users.collection.updateOne(
       { _id: this.oid(order.userId), creditedPaymentIds: { $ne: paymentId } },
@@ -559,7 +716,7 @@ export class PlatformService implements OnModuleInit {
       {
         $set: {
           status: 'paid',
-          transactionId: result.trxID,
+          transactionId: result.transaction_id || paymentId,
           paidAt: new Date(),
         },
       },
@@ -1149,7 +1306,7 @@ export class PlatformService implements OnModuleInit {
   }
   /** Finance overview: only confirmed settled orders are revenue; pending and credits are not. */
   async adminIncome() {
-    const projection={_id:0,id:1,status:1,amount:1,currency:1,paidAt:1,refundedAt:1,paymentId:1,transactionId:1,refundReference:1};
+    const projection={_id:0,id:1,status:1,amount:1,currency:1,paidAt:1,refundedAt:1,paymentId:1,gateway:1,transactionId:1,refundReference:1};
     const [connections,premium]=await Promise.all([
       this.db.collection('connection_orders').find({status:{$in:['paid','refunded']}},{projection}).toArray(),
       this.db.collection('premium_orders').find({status:{$in:['paid','refunded']}},{projection}).toArray(),

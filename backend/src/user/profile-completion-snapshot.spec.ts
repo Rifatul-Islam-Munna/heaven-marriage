@@ -57,6 +57,28 @@ describe('Versioned dynamic profile completion',()=>{
      completionRequiredCount:1,completionAnsweredCount:1,completionPercentage:100,
    });
  });
+ it('excludes city corporation after an upazila is selected',()=>{
+   const member={gender:'female',residenceCountry:'Bangladesh',
+     address:{district:'Dhaka',upazila:'Savar'}};
+   const upazila=BUILTINS.find(q=>q.path==='address.upazila')!;
+   const city=BUILTINS.find(q=>q.path==='address.cityCorporation')!;
+   const questions=[{...upazila,required:true,enabled:true,gender:'both' as const},
+     {...city,required:true,enabled:true,gender:'both' as const}];
+   expect(buildProfileCompletionSnapshot(member,schema(10,questions))).toMatchObject({
+     completionRequiredCount:1,completionAnsweredCount:1,completionPercentage:100,
+   });
+ });
+ it('uses upazila as the source when legacy data has both alternatives',()=>{
+   const member={gender:'female',residenceCountry:'Bangladesh',
+     address:{district:'Dhaka',upazila:'Savar',cityCorporation:'Dhaka North City Corporation'}};
+   const upazila=BUILTINS.find(q=>q.path==='address.upazila')!;
+   const city=BUILTINS.find(q=>q.path==='address.cityCorporation')!;
+   const questions=[{...upazila,required:true,enabled:true,gender:'both' as const},
+     {...city,required:true,enabled:true,gender:'both' as const}];
+   expect(buildProfileCompletionSnapshot(member,schema(11,questions))).toMatchObject({
+     completionRequiredCount:1,completionAnsweredCount:1,completionPercentage:100,
+   });
+ });
  it('marks old and missing snapshots for persistence after question revisions',()=>{
    const computed=buildProfileCompletionSnapshot({gender:'male',dynamicAnswers:{}},schema(11,[question(one)]));
    expect(needsProfileCompletionSync({completionPercentage:0},computed)).toBe(true);
