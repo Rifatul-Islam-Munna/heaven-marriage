@@ -32,7 +32,7 @@ describe('ZiniPayService', () => {
     };
   }
 
-  it('creates a hosted invoice with the documented API key header and safe return/webhook URLs', async () => {
+  it('creates a hosted invoice using only the documented headers and selected fields without metadata', async () => {
     const ctx = setup();
     const invoice = await ctx.service.createInvoice(
       1250,
@@ -41,7 +41,6 @@ describe('ZiniPayService', () => {
       {
         name: 'Member Name',
         email: 'member@example.test',
-        customerId: 'customer-123',
       },
     );
 
@@ -55,24 +54,42 @@ describe('ZiniPayService', () => {
       { headers: Record<string, string>; timeout: number },
     ];
     expect(url).toBe('https://api.zinipay.com/v1/payment/create');
-    expect(payload).toMatchObject({
+    expect(payload).toEqual({
       cus_name: 'Member Name',
       cus_email: 'member@example.test',
       amount: 1250,
-      metadata: {
-        order_id: 'order-123',
-        customer_id: 'customer-123',
-        purpose: 'premium',
-      },
       redirect_url:
         'https://niqaha.com/payment/successfull?purpose=premium&order_id=order-123',
       cancel_url:
         'https://niqaha.com/payment/failed?purpose=premium&order_id=order-123',
       webhook_url: 'https://api.niqaha.com/user/zinipay-payment-webhook',
     });
-    expect(options.headers['zini-api-key']).toBe('sandbox_test_8f4c9a2e7b31');
+    expect(options.headers).toEqual({
+      'Content-Type': 'application/json',
+      'zini-api-key': 'sandbox_test_8f4c9a2e7b31',
+    });
     expect(options.timeout).toBe(15000);
   });
+
+  it.each(['connections', 'premium'] as const)(
+    'keeps %s order references in return URLs without metadata or absent customer fields',
+    async (purpose) => {
+      const ctx = setup();
+      await ctx.service.createInvoice(600, 'order-123', purpose);
+      const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
+        string,
+        Record<string, unknown>,
+      ];
+      expect(payload).toEqual({
+        amount: 600,
+        redirect_url:
+          `https://niqaha.com/payment/successfull?purpose=${purpose}&order_id=order-123`,
+        cancel_url:
+          `https://niqaha.com/payment/failed?purpose=${purpose}&order_id=order-123`,
+        webhook_url: 'https://api.niqaha.com/user/zinipay-payment-webhook',
+      });
+    },
+  );
 
   it('uses the documented val_id invoice reference when the checkout URL does not expose one', async () => {
     const ctx = setup({
