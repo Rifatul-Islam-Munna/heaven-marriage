@@ -7,8 +7,8 @@ import { lastValueFrom } from 'rxjs';
 export type ZiniPayPurpose = 'connections' | 'premium';
 
 export type ZiniPayCustomer = {
-  name?: string;
-  email?: string;
+  name?: string | null;
+  email?: string | null;
 };
 
 export type ZiniPayInvoice = {
@@ -127,7 +127,6 @@ export class ZiniPayService {
     return (
       status.apiKeyConfigured &&
       status.frontendUrlConfigured &&
-      status.backendUrlConfigured &&
       status.apiBaseUrlConfigured
     );
   }
@@ -186,7 +185,7 @@ export class ZiniPayService {
     if (!this.isConfigured()) {
       const status = this.configurationStatus();
       const missing = Object.entries(status)
-        .filter(([, configured]) => !configured)
+        .filter(([key, configured]) => key !== 'backendUrlConfigured' && !configured)
         .map(([key]) => key);
       this.logger.error(
         'ZiniPay configuration incomplete: ' + missing.join(', '),
@@ -204,11 +203,6 @@ export class ZiniPayService {
       throw new Error('Invalid ZiniPay invoice details');
     }
 
-    const customerName =
-      typeof customer.name === 'string' ? customer.name.trim().slice(0, 120) : '';
-    const customerEmail =
-      typeof customer.email === 'string' ? customer.email.trim() : '';
-
     const frontendBase = this.frontendUrl
       .split(',')[0]
       .trim()
@@ -225,20 +219,33 @@ export class ZiniPayService {
     cancelUrl.searchParams.set('purpose', purpose);
     cancelUrl.searchParams.set('order_id', orderId);
 
+    const webhookUrl = this.isPublicHttpsUrl(backendBase)
+      ? backendBase + '/user/zinipay-payment-webhook'
+      : undefined;
+    const optionalFields = Object.fromEntries(
+      Object.entries({
+        cus_name: customer.name,
+        cus_email: customer.email,
+        cancel_url: cancelUrl.toString(),
+        webhook_url: webhookUrl,
+      }).flatMap(([field, value]) => {
+        const text = typeof value === 'string' ? value.trim() : '';
+        if (!text) return [];
+        return [[field, field === 'cus_name' ? text.slice(0, 120) : text]];
+      }),
+    );
     const payload = {
-      ...(customerName ? { cus_name: customerName } : {}),
-      ...(customerEmail ? { cus_email: customerEmail } : {}),
       amount,
       redirect_url: redirectUrl.toString(),
-      cancel_url: cancelUrl.toString(),
-      webhook_url: backendBase + '/user/zinipay-payment-webhook',
+      ...optionalFields,
     };
 
     // Log request shape only (never customer PII or API credentials) to make
     // provider-side VALIDATION_ERROR responses diagnosable in production.
     this.logger.log(
       `Creating ZiniPay invoice orderId=${orderId} purpose=${purpose} amount=${amount} ` +
-        `redirectHost=${new URL(redirectUrl).hostname} webhookHost=${new URL(backendBase).hostname}`,
+        `fields=${Object.keys(payload).join(',')} ` +
+        `redirectHost=${redirectUrl.hostname} webhookHost=${webhookUrl ? new URL(webhookUrl).hostname : 'omitted'}`,
     );
 
     try {

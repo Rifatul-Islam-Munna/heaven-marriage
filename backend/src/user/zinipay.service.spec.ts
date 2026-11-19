@@ -96,6 +96,7 @@ describe('ZiniPayService', () => {
 
   it.each([
     { label: 'missing', input: {}, expected: {} },
+    { label: 'null', input: { name: null, email: null }, expected: {} },
     { label: 'empty', input: { name: '', email: '' }, expected: {} },
     { label: 'blank', input: { name: '   ', email: '   ' }, expected: {} },
     { label: 'name only', input: { name: ' Member ' }, expected: { cus_name: 'Member' } },
@@ -115,6 +116,22 @@ describe('ZiniPayService', () => {
         cancel_url:
           'https://niqaha.com/payment/failed?purpose=connections&order_id=order-optional',
         webhook_url: 'https://api.niqaha.com/user/zinipay-payment-webhook',
+      });
+    },
+  );
+
+  it.each(['', '   ', 'http://backend.niqaha.com'])(
+    'omits an unavailable optional webhook URL (%s)',
+    async (backendUrl) => {
+      const ctx = setup(undefined, { BACKEND_URL: backendUrl });
+      expect(ctx.service.isConfigured()).toBe(true);
+      await ctx.service.createInvoice(200, 'order-optional', 'connections');
+      expect(ctx.http.post.mock.calls[0][1]).toEqual({
+        amount: 200,
+        redirect_url:
+          'https://niqaha.com/payment/successfull?purpose=connections&order_id=order-optional',
+        cancel_url:
+          'https://niqaha.com/payment/failed?purpose=connections&order_id=order-optional',
       });
     },
   );
@@ -213,7 +230,7 @@ describe('ZiniPayService', () => {
     });
     await expect(
       ctx.service.createInvoice(500, 'order-missing-callbacks', 'connections'),
-    ).rejects.toThrow('frontendUrlConfigured, backendUrlConfigured');
+    ).rejects.toThrow('ZiniPay configuration incomplete: frontendUrlConfigured');
   });
 
   it("uses the project's public Niqaha URLs when local FRONTEND_URL and BACKEND_URL are localhost", async () => {
@@ -263,12 +280,12 @@ describe('ZiniPayService', () => {
     ).rejects.toThrow('untrusted checkout URL');
   });
 
-  it('requires the server API key and configured return/webhook URLs', () => {
+  it('requires the server API key and return URL while allowing an absent webhook URL', () => {
     expect(
       setup(undefined, { ZINIPAY_API_KEY: '' }).service.isConfigured(),
     ).toBe(false);
     expect(setup(undefined, { BACKEND_URL: '' }).service.isConfigured()).toBe(
-      false,
+      true,
     );
     expect(setup(undefined, { FRONTEND_URL: '' }).service.isConfigured()).toBe(
       false,
