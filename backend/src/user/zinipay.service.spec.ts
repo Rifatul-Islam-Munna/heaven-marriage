@@ -1,9 +1,11 @@
 import type { HttpService } from '@nestjs/axios';
 import type { ConfigService } from '@nestjs/config';
-import { of } from 'rxjs';
+import { Logger } from '@nestjs/common';
+import { of, throwError } from 'rxjs';
 import { ZiniPayService } from './zinipay.service';
 
 describe('ZiniPayService', () => {
+  const customer = { email: 'member@example.test' };
   const values: Record<string, string> = {
     ZINIPAY_API_KEY: 'sandbox_test_8f4c9a2e7b31',
     ZINIPAY_API_BASE_URL: 'https://api.zinipay.com',
@@ -72,15 +74,16 @@ describe('ZiniPayService', () => {
   });
 
   it.each(['connections', 'premium'] as const)(
-    'keeps %s order references in return URLs without metadata or absent customer fields',
+    'keeps %s order references in return URLs without metadata or absent customer name',
     async (purpose) => {
       const ctx = setup();
-      await ctx.service.createInvoice(600, 'order-123', purpose);
+      await ctx.service.createInvoice(600, 'order-123', purpose, customer);
       const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
         string,
         Record<string, unknown>,
       ];
       expect(payload).toEqual({
+        cus_email: customer.email,
         amount: 600,
         redirect_url:
           `https://niqaha.com/payment/successfull?purpose=${purpose}&order_id=order-123`,
@@ -91,6 +94,71 @@ describe('ZiniPayService', () => {
     },
   );
 
+  it.each([
+    { label: 'missing', input: {}, expected: {} },
+    { label: 'empty', input: { name: '', email: '' }, expected: {} },
+    { label: 'blank', input: { name: '   ', email: '   ' }, expected: {} },
+    { label: 'name only', input: { name: ' Member ' }, expected: { cus_name: 'Member' } },
+    { label: 'email only', input: { email: ' member@example.test ' }, expected: { cus_email: 'member@example.test' } },
+  ])(
+    'omits absent customer fields for $label details without blocking checkout',
+    async ({ input, expected }) => {
+      const ctx = setup();
+      await expect(
+        ctx.service.createInvoice(200, 'order-optional', 'connections', input),
+      ).resolves.toMatchObject({ paymentId: 'invoice-123' });
+      expect(ctx.http.post.mock.calls[0][1]).toEqual({
+        ...expected,
+        amount: 200,
+        redirect_url:
+          'https://niqaha.com/payment/successfull?purpose=connections&order_id=order-optional',
+        cancel_url:
+          'https://niqaha.com/payment/failed?purpose=connections&order_id=order-optional',
+        webhook_url: 'https://api.niqaha.com/user/zinipay-payment-webhook',
+      });
+    },
+  );
+
+  it('trims customer email before sending it to the API', async () => {
+    const ctx = setup();
+    await ctx.service.createInvoice(200, 'order-email', 'connections', {
+      email: ' member@example.test ',
+    });
+    expect(ctx.http.post.mock.calls[0][1]).toMatchObject({
+      cus_email: 'member@example.test',
+    });
+  });
+
+  it('logs provider validation fields without logging the submitted values or API key', async () => {
+    const ctx = setup();
+    const failure = {
+      isAxiosError: true,
+      code: 'ERR_BAD_REQUEST',
+      response: {
+        status: 400,
+        data: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request data',
+          errors: [{ field: 'body.cus_email', message: 'Invalid email format', value: customer.email }],
+        },
+      },
+    };
+    ctx.http.post.mockReturnValue(throwError(() => failure));
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+    try {
+      await expect(
+        ctx.service.createInvoice(200, 'order-email', 'connections', customer),
+      ).rejects.toBe(failure);
+      const output = JSON.stringify(log.mock.calls);
+      expect(output).toContain('body.cus_email');
+      expect(output).toContain('Invalid email format');
+      expect(output).not.toContain(customer.email);
+      expect(output).not.toContain(values.ZINIPAY_API_KEY);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('uses the documented val_id invoice reference when the checkout URL does not expose one', async () => {
     const ctx = setup({
       status: true,
@@ -98,13 +166,13 @@ describe('ZiniPayService', () => {
       val_id: 'invoice-from-val-id',
     });
     await expect(
-      ctx.service.createInvoice(500, 'order-val-id', 'connections'),
+      ctx.service.createInvoice(500, 'order-val-id', 'connections', customer),
     ).resolves.toMatchObject({ paymentId: 'invoice-from-val-id' });
   });
 
   it('normalizes a host-only API base URL to HTTPS', async () => {
     const ctx = setup(undefined, { ZINIPAY_API_BASE_URL: 'api.zinipay.com' });
-    await ctx.service.createInvoice(500, 'order-base-url', 'connections');
+    await ctx.service.createInvoice(500, 'order-base-url', 'connections', customer);
     const [url] = ctx.http.post.mock.calls[0] as unknown as [string];
     expect(url).toBe('https://api.zinipay.com/v1/payment/create');
   });
@@ -122,7 +190,7 @@ describe('ZiniPayService', () => {
       FRONTEND_URL: 'https://staging.niqaha.com',
       BACKEND_URL: 'https://api-staging.niqaha.com',
     });
-    await ctx.service.createInvoice(500, 'order-staging', 'connections');
+    await ctx.service.createInvoice(500, 'order-staging', 'connections', customer);
     const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
       string,
       Record<string, unknown>,
@@ -154,7 +222,7 @@ describe('ZiniPayService', () => {
       BACKEND_URL: 'http://localhost:4000',
     });
     expect(ctx.service.isConfigured()).toBe(true);
-    await ctx.service.createInvoice(500, 'order-local', 'connections');
+    await ctx.service.createInvoice(500, 'order-local', 'connections', customer);
     const [, payload] = ctx.http.post.mock.calls[0] as unknown as [
       string,
       Record<string, unknown>,
@@ -191,7 +259,7 @@ describe('ZiniPayService', () => {
       payment_url: 'https://not-zinipay.example/payment/invoice-123',
     });
     await expect(
-      ctx.service.createInvoice(500, 'order-1', 'connections'),
+      ctx.service.createInvoice(500, 'order-1', 'connections', customer),
     ).rejects.toThrow('untrusted checkout URL');
   });
 

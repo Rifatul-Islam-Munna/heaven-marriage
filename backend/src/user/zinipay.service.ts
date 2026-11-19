@@ -139,7 +139,7 @@ export class ZiniPayService {
       return String(data);
     if (typeof data !== 'object') return 'unrecognized response type';
     const source = data as Record<string, unknown>;
-    const summary: Record<string, string> = {};
+    const summary: Record<string, unknown> = {};
     for (const key of [
       'message',
       'error',
@@ -155,6 +155,15 @@ export class ZiniPayService {
         typeof value === 'boolean'
       )
         summary[key] = String(value).slice(0, 250);
+    }
+    if (Array.isArray(source.errors)) {
+      summary.errors = source.errors.slice(0, 10).flatMap((error: unknown) => {
+        if (!error || typeof error !== 'object') return [];
+        const item = error as Record<string, unknown>;
+        if (typeof item.field !== 'string' || typeof item.message !== 'string')
+          return [];
+        return [{ field: item.field.slice(0, 150), message: item.message.slice(0, 250) }];
+      });
     }
     return Object.keys(summary).length
       ? JSON.stringify(summary)
@@ -195,6 +204,11 @@ export class ZiniPayService {
       throw new Error('Invalid ZiniPay invoice details');
     }
 
+    const customerName =
+      typeof customer.name === 'string' ? customer.name.trim().slice(0, 120) : '';
+    const customerEmail =
+      typeof customer.email === 'string' ? customer.email.trim() : '';
+
     const frontendBase = this.frontendUrl
       .split(',')[0]
       .trim()
@@ -212,8 +226,8 @@ export class ZiniPayService {
     cancelUrl.searchParams.set('order_id', orderId);
 
     const payload = {
-      ...(customer.name ? { cus_name: customer.name.slice(0, 120) } : {}),
-      ...(customer.email ? { cus_email: customer.email.slice(0, 254) } : {}),
+      ...(customerName ? { cus_name: customerName } : {}),
+      ...(customerEmail ? { cus_email: customerEmail } : {}),
       amount,
       redirect_url: redirectUrl.toString(),
       cancel_url: cancelUrl.toString(),

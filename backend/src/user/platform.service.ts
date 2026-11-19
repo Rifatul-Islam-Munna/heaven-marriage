@@ -489,10 +489,11 @@ export class PlatformService implements OnModuleInit {
         .collection('premium_orders')
         .updateOne({ id }, { $set: { paymentId: payment.paymentId } });
       return payment;
-    } catch {
+    } catch (error) {
       await this.db
         .collection('premium_orders')
         .updateOne({ id }, { $set: { status: 'failed' } });
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
         'Unable to start ZiniPay premium checkout. Try again later.',
       );
@@ -661,6 +662,7 @@ export class PlatformService implements OnModuleInit {
           { id },
           { $set: { status: 'failed', paymentFailure: { gateway: 'zinipay', reason: reason.slice(0, 700), failedAt: new Date() } } },
         );
+      if (e instanceof BadRequestException) throw e;
       throw new BadRequestException('Unable to create payment. Please retry. Check backend logs for the ZiniPay failure reason.');
     }
   }
