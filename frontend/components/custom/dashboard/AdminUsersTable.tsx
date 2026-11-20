@@ -8,7 +8,7 @@ import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 import {
   Check, ChevronLeft, ChevronRight, Copy, Filter, Loader2, Mail, Pencil, Phone, RefreshCw, Search, Send, Share2,
-  Trash2, Wallet, X, Globe2, Sparkles,
+  Trash2, Wallet, X, Globe2, Sparkles, FileText,
 } from "lucide-react";
 import { GetRequestNormal,PatchRequestAxios } from "@/api-hooks/api-hooks";
 import MemberDynamicColumnManager,{MemberValueButton,type MemberAdminColumn,type MemberAdminColumnsResponse} from "./MemberDynamicColumnManager";
@@ -354,16 +354,16 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     if (copied) toast.success("WhatsApp মেসেজ কপি করা হয়েছে। এতে ফোন নাম্বার রাখা হয়নি।");
     else toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
   };
-  const copyProfile = async (user: User) => {
+  const copyProfile = async (user: User, format: "short" | "long" = "short", includeContactNumber = false) => {
     setCopyingUserId(user._id);
     try {
       const profile = await queryClient.fetchQuery({
         queryKey: ["admin-share-profile", user._id],
         queryFn: () => GetRequestNormal<BiodataUser>(`/user/get-user-profile-admin?id=${user._id}`),
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
       });
-      const { copied } = await copyBiodataWhatsappText(profile, window.location.origin, { includeContactNumber: false });
-      if (copied) toast.success(`"${user.name}" এর WhatsApp মেসেজ কপি করা হয়েছে। এতে ফোন নাম্বার রাখা হয়নি।`);
+      const { copied } = await copyBiodataWhatsappText(profile, window.location.origin, { format, includeContactNumber });
+      if (copied) toast.success(`${format === "long" ? "লং" : "শর্ট"} CV ${includeContactNumber ? "যোগাযোগ নম্বরসহ" : "ফোন ছাড়া"} কপি হয়েছে`);
       else toast.error("মেসেজ কপি করা যায়নি। আবার চেষ্টা করুন।");
     } catch {
       toast.error("কপি করার জন্য প্রোফাইল লোড করা যায়নি। আবার চেষ্টা করুন।");
@@ -372,20 +372,6 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     }
   };
 
-  const copyWithContact=async(user:User)=>{
-    setCopyingUserId(user._id);
-    try{
-      const profile=await queryClient.fetchQuery({
-        queryKey:['admin-share-profile',user._id],
-        queryFn:()=>GetRequestNormal<BiodataUser>('/user/get-user-profile-admin?id='+user._id),
-        staleTime:300000,
-      });
-      const {copied}=await copyBiodataWhatsappText(profile,window.location.origin,{includeContactNumber:true});
-      if(copied)toast.success('যোগাযোগ নম্বরসহ বায়োডাটা কপি হয়েছে');
-      else toast.error('কপি করার অনুমতি পাওয়া যায়নি');
-    }catch{toast.error('বায়োডাটা লোড করা যায়নি');}
-    finally{setCopyingUserId(current=>current===user._id?null:current);}
-  };
   const quickFilters=[
     {key:'accountType',label:'মেম্বারশিপ',options:[
       {value:'premium',label:'প্রিমিয়াম'},{value:'general',label:'সাধারণ'}]},
@@ -436,15 +422,15 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
     </button>
     <button type="button" disabled={copyingUserId===user._id}
       onClick={()=>void copyProfile(user)}
-      aria-label={user.name+' এর ফোন ছাড়া বায়োডাটা কপি'}
-      title="ফোন ছাড়া বায়োডাটা কপি"
+      aria-label={user.name+' এর ফোন ছাড়া শর্ট CV কপি'}
+      title="ফোন ছাড়া শর্ট CV কপি"
       className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-800 transition hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:cursor-wait disabled:opacity-60">
       {copyingUserId===user._id?<Loader2 size={17} aria-hidden="true" className="animate-spin"/>:<Copy size={17} aria-hidden="true"/>}
     </button>
     <button type="button" disabled={copyingUserId===user._id}
-      onClick={()=>void copyWithContact(user)}
-      aria-label={user.name+' এর যোগাযোগসহ কপি'}
-      title="যোগাযোগসহ কপি"
+      onClick={()=>void copyProfile(user,"short",true)}
+      aria-label={user.name+' এর যোগাযোগসহ শর্ট CV কপি'}
+      title="যোগাযোগসহ শর্ট CV কপি"
       className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600 disabled:cursor-wait disabled:opacity-60">
       {copyingUserId===user._id?<Loader2 size={17} aria-hidden="true" className="animate-spin"/>:<Phone size={17} aria-hidden="true"/>}
     </button>
@@ -453,6 +439,20 @@ export default function AdminUsersTable({ quickLinks = [],isAdmin=false }: { qui
       title="সদস্য মুছুন"
       className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">
       <Trash2 size={17} aria-hidden="true"/>
+    </button>
+    <button type="button" disabled={copyingUserId===user._id}
+      onClick={()=>void copyProfile(user,"long")}
+      aria-label={user.name+' এর ফোন ছাড়া লং CV কপি'}
+      title="ফোন ছাড়া লং CV কপি"
+      className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 text-[12px] font-bold text-amber-800 transition hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={16} aria-hidden="true" className="animate-spin"/>:<FileText size={16} aria-hidden="true"/>} লং CV
+    </button>
+    <button type="button" disabled={copyingUserId===user._id}
+      onClick={()=>void copyProfile(user,"long",true)}
+      aria-label={user.name+' এর যোগাযোগসহ লং CV কপি'}
+      title="যোগাযোগসহ লং CV কপি"
+      className="col-span-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[12px] font-bold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600 disabled:cursor-wait disabled:opacity-60">
+      {copyingUserId===user._id?<Loader2 size={16} aria-hidden="true" className="animate-spin"/>:<Phone size={16} aria-hidden="true"/>} লং CV + ফোন
     </button>
   </div>;
 

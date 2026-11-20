@@ -34,6 +34,7 @@ import {
   hasStartedBiodata,
 } from './biodata-lifecycle';
 import { dailyRotationExpression } from './discovery-selection';
+import { biodataIdFilter } from './biodata-id';
 import { recordDiscoveryEvent } from './discovery-cycle';
 import {
   HttpException,
@@ -427,6 +428,11 @@ export class UserService implements OnModuleInit {
   }
 
   async findAll(userQuery: UserFilterDto) {
+    const biodataLookup = biodataIdFilter(userQuery.query);
+    // Direct ID lookup must not be hidden by the browser's default age/height filters.
+    const filters: UserFilterDto = biodataLookup
+      ? { query: userQuery.query, page: 1 }
+      : userQuery;
     const {
       ageMax,
       ageMin,
@@ -449,14 +455,14 @@ export class UserService implements OnModuleInit {
       area,
       country,
       polygamy,
-    } = userQuery;
+    } = filters;
 
     console.log('Received query params:', userQuery);
 
     const limit = 10;
     const skip = (page - 1) * limit;
     const pipeline: any[] = [];
-    const isBiodataNumber = query && /^\d+$/.test(query.trim());
+    const searchText = query?.trim();
 
     /* pipeline.push({
   $match: {
@@ -480,17 +486,17 @@ export class UserService implements OnModuleInit {
     };
 
     // 1. Fuzzy Search Stage (only if query provided)
-    if (query && !isBiodataNumber) {
+    if (searchText && !biodataLookup) {
       firstMatch.$and.push({
         $text: {
-          $search: query,
+          $search: searchText,
           $caseSensitive: false,
           $diacriticSensitive: false,
         },
       });
     }
     pipeline.push({ $match: firstMatch });
-    if (query && !isBiodataNumber) {
+    if (searchText && !biodataLookup) {
       pipeline.push({
         $addFields: {
           searchScore: { $meta: 'textScore' },
@@ -502,18 +508,7 @@ export class UserService implements OnModuleInit {
       });
     }
 
-    if (query && isBiodataNumber) {
-      const numericQuery = parseInt(query);
-      pipeline.push({
-        $match: {
-          $or: [
-            { userId: query }, // Exact match "000004"
-            { userId: String(numericQuery) }, // Match "4"
-            { userId: { $regex: `^0*${numericQuery}$` } }, // Match with any leading zeros
-          ],
-        },
-      });
-    }
+    if (biodataLookup) pipeline.push({ $match: biodataLookup });
     // 2. Build $match conditions
     const matchConditions: any = {};
 

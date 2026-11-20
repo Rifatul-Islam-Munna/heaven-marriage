@@ -8,7 +8,8 @@ import {
 import { districts } from "@/staticData/districts";
 import { upazilas } from "@/staticData/upazilas";
 import { savedBiodataAddress } from "./biodata-address";
-import { ageFromBirthDate, formatBirthDate } from "./birth-date";
+import { formatBirthDate } from "./birth-date";
+import { biodataCvFields, type BiodataCvOptions } from "./biodata-cv";
 
 export interface BiodataWhatsappGroup {
   id: "girls" | "boys";
@@ -123,22 +124,7 @@ const formatFemaleMarriagePreference = (user: User) =>
     (item) => item.value === user.marriageInformationWomen?.polygamyConsentOptions,
   )?.label || cleanText(user.marriageInformationWomen?.polygamyConsentOptions);
 
-const formatMaleStudyJobPreference = (user: User) =>
-  joinNonEmpty(
-    [
-      cleanText(user.marriageInformationMan?.allowWifeStudyAfterMarriage)
-        ? `পড়াশোনা - ${cleanText(user.marriageInformationMan?.allowWifeStudyAfterMarriage)}`
-        : undefined,
-      cleanText(user.marriageInformationMan?.wifeJobAfterMarriage)
-        ? `চাকরি - ${cleanText(user.marriageInformationMan?.wifeJobAfterMarriage)}`
-        : undefined,
-    ],
-    ", ",
-  );
-
-interface BuildBiodataWhatsappTextOptions {
-  includeContactNumber?: boolean;
-}
+type BuildBiodataWhatsappTextOptions = BiodataCvOptions;
 
 const writeTextToClipboard = async (message: string) => {
   if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
@@ -159,9 +145,8 @@ export const buildBiodataWhatsappText = (
   options: BuildBiodataWhatsappTextOptions = {},
 ) => {
   const { includeContactNumber = false } = options;
-  const contactWhatsapp = includeContactNumber
-    ? cleanText(user?.whatsapp) || cleanText(user?.phoneNumber)
-    : "";
+  const cv = biodataCvFields(user, options);
+  const field = cv.field;
   const isFemale = user.gender === "female";
   const publicProfileId = cleanText(user.userId) || cleanText(user._id);
   const biodataNumber = publicProfileId || "N/A";
@@ -174,64 +159,41 @@ export const buildBiodataWhatsappText = (
   const profileUrl = publicProfileId
     ? `${origin}/biodata/${publicProfileId}`
     : origin;
+  const details = options.format === "long" ? cv.sections() : [
+    field("name", "নামঃ"),
+    field("age", "বয়সঃ", value => formatAge(Number(value))),
+    formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
+    formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
+    field("dateOfBirth", "জন্ম তারিখঃ", value => formatBirthDate(String(value))),
+    field("educationInfo.educationBackground", "শিক্ষাগত ব্যাকগ্রাউন্ডঃ"),
+    field("educationInfo.educationMethod", "শিক্ষা মাধ্যমঃ", () => formatEducationBackground(user)),
+    field("educationInfo.highestEducation", "পড়াশুনাঃ", () => formatEducationSummary(user)),
+    field("occupational.profession", "পেশাঃ", () => formatProfession(user)),
+    field("personalInformation.height", "উচ্চতাঃ", value => formatHeight(String(value))),
+    field("personalInformation.physicalStructure", "শারীরিক কাঠামোঃ"),
+    field("personalInformation.skinTone", "গায়ের রঙঃ"),
+    field("maritalStatus", "বৈবাহিক অবস্থাঃ", value => formatMaritalStatus(String(value))),
+    !isFemale ? field("occupational.salary", "মাসিক আয়ঃ") : "",
+    isFemale ? field("marriageInformationWomen.polygamyConsentOptions",
+      "আপনি কারোর ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রুবা'আ) হতে রাজি আছেন কি নাঃ",
+      () => formatFemaleMarriagePreference(user)) : "",
+    !isFemale ? field("marriageInformationMan.wifeVailAfterMarriage", "বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন কি নাঃ") : "",
+    !isFemale ? field("marriageInformationMan.allowWifeStudyAfterMarriage", "স্ত্রীর পড়াশোনাঃ") : "",
+    !isFemale ? field("marriageInformationMan.wifeJobAfterMarriage", "স্ত্রীর চাকরিঃ") : "",
+    field("expectedLifePartner.maritalStatus", isFemale ? "পাত্রের বৈবাহিক অবস্থাঃ" : "পাত্রীর বৈবাহিক অবস্থাঃ"),
+    field("expectedLifePartner.expectedQuality", isFemale ? "কেমন পাত্র চানঃ" : "কেমন পাত্রী চানঃ"),
+    field("whatsapp", "আপনার হোয়াটসঅ্যাপ নাম্বারঃ"),
+    field("guardianPhone", "অভিভাবকের নম্বরঃ"),
+    ...cv.extras(),
+  ];
   const lines = [
-    "পাবলিক শর্ট সিভি",
+    options.format === "long" ? "বিস্তারিত সিভি" : "পাবলিক শর্ট সিভি",
     "",
     `${isFemale ? "🌿🍂" : "🌿🍁"} *${isFemale ? "পাত্রীর" : "পাত্রের"} বায়োডাটা নাম্বারঃ* ${biodataNumber}`,
     "",
-    formatLabelValueLine("নামঃ", user.identityUnlocked===false?undefined:user.name),
-    formatLabelValueLine("বয়সঃ", formatAge(ageFromBirthDate(user.dateOfBirth) ?? user.age)),
-    formatLabelValueLine("বর্তমান অবস্থানঃ", currentLocation),
-    formatLabelValueLine("স্থায়ী ঠিকানাঃ", permanentLocation),
-    formatLabelValueLine("জন্ম তারিখঃ", formatBirthDate(user.dateOfBirth)),
-    formatLabelValueLine(
-      "শিক্ষাগত ব্যাকগ্রাউন্ডঃ",
-      formatEducationBackground(user),
-    ),
-    formatLabelValueLine("পড়াশুনাঃ", formatEducationSummary(user)),
-    formatLabelValueLine("পেশাঃ", formatProfession(user)),
-    formatLabelValueLine(
-      "উচ্চতাঃ",
-      formatHeight(user.personalInformation?.height),
-    ),
-    formatLabelValueLine(
-      "শারীরিক কাঠামোঃ",
-      user.personalInformation?.physicalStructure,
-    ),
-    formatLabelValueLine("গায়ের রঙঃ", user.personalInformation?.skinTone),
-    formatLabelValueLine(
-      "বৈবাহিক অবস্থাঃ",
-      formatMaritalStatus(user.maritalStatus),
-    ),
-    !isFemale ? formatLabelValueLine(
-      "মাসিক আয়",
-      user?.occupational?.salary
-    ) : "",
-    isFemale
-      ? formatLabelValueLine(
-          "আপনি কারোর ২য়/৩য়/৪র্থ স্ত্রী (মাসনা, সুলাছা, রুবা'আ) হতে রাজি আছেন কি নাঃ",
-          formatFemaleMarriagePreference(user),
-        )
-      : "",
-    !isFemale
-      ? formatLabelValueLine(
-          "বিয়ের পর স্ত্রীকে পর্দায় রাখতে পারবেন কি নাঃ",
-          user.marriageInformationMan?.wifeVailAfterMarriage,
-        )
-      : "",
-    !isFemale
-      ? formatLabelValueLine(
-          "স্ত্রীকে পড়াশোনা/চাকরি করতে দিতে চান কি নাঃ",
-          formatMaleStudyJobPreference(user),
-        )
-      : "",
-    formatLabelValueLine(
-      isFemale ? "কেমন পাত্র চানঃ" : "কেমন পাত্রী চানঃ",
-      user.expectedLifePartner?.expectedQuality,
-    ),
-    formatLabelValueLine("আপনার হোয়াটসঅ্যাপ নাম্বারঃ", contactWhatsapp),
-    includeContactNumber ? formatLabelValueLine("মোবাইল নম্বর:",user.phoneNumber) : "",
-    includeContactNumber ? formatLabelValueLine("অভিভাবকের নম্বর:",user.guardianPhone) : "",
+    ...details,
+    includeContactNumber && !cv.schema.questions.some(q => q.path === "phoneNumber")
+      ? formatLabelValueLine("মোবাইল নম্বর:", user.phoneNumber) : "",
     "",
     `*${isFemale ? "পাত্রীর" : "পাত্রের"} বিস্তারিত বায়োডাটা লিংকঃ*`,
     profileUrl,

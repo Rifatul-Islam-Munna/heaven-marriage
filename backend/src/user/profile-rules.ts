@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { BUILTINS, answerForQuestion, type ProfileQuestion } from '../profile-questions/question-config.service';
 import { ageFromBirthDate } from './birth-date';
 import { publicAnswerSanitizer } from './public-answer-privacy';
+import { biodataIdFilter } from './biodata-id';
 
 export const PROFILE_FIELDS = [
   'name',
@@ -263,7 +264,11 @@ export const visibleFilter = {
 
 export function adminFilter(q: any) {
   const f: any = {};
-  if (q.query?.trim()) f.$text = { $search: q.query.trim() };
+  // Longer bare numbers remain contact searches in Member Management.
+  const biodataLookup = /^[০-৯\d]{7,}$/.test(q.query?.trim() || '')
+    ? undefined : biodataIdFilter(q.query);
+  if (biodataLookup) f.$and = [biodataLookup];
+  else if (q.query?.trim()) f.$text = { $search: q.query.trim() };
   if (q.gender && q.gender !== 'all') f.gender = q.gender;
   // A public biodata needs BOTH publish flags and must not be suspended/rejected.
   // The admin cards and table must use the same rule as public discovery.

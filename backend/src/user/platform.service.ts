@@ -25,6 +25,7 @@ import {premiumEntitlement,premiumIsActive,PREMIUM_STAGES} from './premium-servi
 import {buildIncomeReport,type SettledOrder} from './admin-income';
 import { dailyRotationExpression, selectDiscovery } from './discovery-selection';
 import { discoveryCycle, recordDiscoveryEvent } from './discovery-cycle';
+import { biodataIdFilter } from './biodata-id';
 
 @Injectable()
 export class PlatformService implements OnModuleInit {
@@ -89,7 +90,7 @@ export class PlatformService implements OnModuleInit {
   async profile(target: string, actor?: string, role?: string) {
     const u: any = await this.users
       .findOne(
-        Types.ObjectId.isValid(target) ? { _id: target } : { userId: target },
+        Types.ObjectId.isValid(target) ? { _id: target } : biodataIdFilter(target) || { userId: target },
       )
       .lean();
     if (!u) throw new NotFoundException('Profile unavailable');

@@ -61,15 +61,14 @@ export default function BiodataGrid({ biodatas }: BiodataGridProps) {
     polygamy: parseAsArrayOf(parseAsString).withDefault([]),
   });
 
-  const query = Object.entries(filters)
+  const query = new URLSearchParams(Object.entries(filters)
     .filter(
       ([_, value]) =>
         value != null &&
         value !== "" &&
         !(Array.isArray(value) && value.length === 0),
     )
-    .map(([key, value]) => `${key}=${value}`)
-    .join("&");
+    .map(([key, value]) => [key, String(value)])).toString();
 
   const { data, isLoading } = useQueryWrapper<PaginatedUserResponse>(
     ["get-biodatas", query],
