@@ -138,6 +138,7 @@ const CSS = `
 .qb-keyboard [data-question-content] [data-birth-date-select] select{min-height:2.75rem;height:2.75rem;font-size:16px!important}
 .qb-keyboard [data-question-header] button{min-height:2rem;height:2rem}
 .qb-keyboard [data-question-navigation] button{min-height:2.5rem;padding-top:.5rem;padding-bottom:.5rem;border-radius:.75rem}
+.qb-keyboard [data-question-navigation] [data-question-action=next]{min-height:3rem;font-size:.875rem}
 .qb-keyboard [data-question-content] h1{margin-top:.5rem;font-size:1rem;line-height:1.35}
 .qb-keyboard fieldset{margin-top:.5rem}
 .qb-keyboard [data-question-navigation]{gap:.25rem;padding-top:.25rem}
@@ -145,7 +146,7 @@ const CSS = `
 .qb-keyboard [data-question-content] [data-profile-question] label{font-size:.8125rem}
 .qb-keyboard [data-question-content] .rounded-full{padding:.25rem .55rem;font-size:.6875rem}
 .qb-keyboard [data-question-content] p{line-height:1.4}
-@media (max-width:380px){.qb-keyboard{padding:.375rem!important}.qb-keyboard [data-question-content] input:not([type=checkbox]):not([type=radio]):not([type=hidden]){padding-inline:.625rem!important}.qb-keyboard [data-question-navigation] button{padding-inline:.4rem;font-size:10px}}
+@media (max-width:380px){.qb-keyboard{padding:.375rem!important}.qb-keyboard [data-question-content] input:not([type=checkbox]):not([type=radio]):not([type=hidden]){padding-inline:.625rem!important}.qb-keyboard [data-question-navigation] button{padding-inline:.4rem;font-size:10px}.qb-keyboard [data-question-navigation] [data-question-action=next]{font-size:12px}}
 
 @media (prefers-reduced-motion:reduce){.qb-in,.qb-pop,.qb-float,.qb-shake,.qb-pulse{animation:none!important}.qb-confetti{display:none}}
 `;
@@ -1087,9 +1088,19 @@ export default function ProfileUpdateForm() {
 
   const answered = (q: ProfileQuestion, profile = formData) =>
     isAnswered(q, readQuestionAnswer(profile, q));
+  const unanswered = (q: ProfileQuestion) =>
+    !passedQuestions.current.has(q.id) && !answered(q);
+  // Conditional address fields can disappear after choosing a location. Never
+  // fall back to index zero: that reopens an already answered question.
+  const question =
+    flow.find((q) => q.id === activeQuestionId) ||
+    flow.find((q) => q.section === currentStep && unanswered(q)) ||
+    flow.find(unanswered);
   const levelIndex = Math.max(
     0,
-    levels.findIndex((level) => level.section.id === currentStep),
+    levels.findIndex(
+      (level) => level.section.id === (question?.section ?? currentStep),
+    ),
   );
   const level = levels[levelIndex];
   const levelQuestions = level?.questions ?? [];
@@ -1100,8 +1111,6 @@ export default function ProfileUpdateForm() {
   );
   const setQi = (index: number) =>
     setActiveQuestionId(levelQuestions[index]?.id ?? null);
-  const question =
-    levelQuestions[Math.min(qi, Math.max(0, levelQuestions.length - 1))];
   const questionRoot = useRef<HTMLDivElement>(null);
   const questionContent = useRef<HTMLDivElement>(null);
   const keyboardViewport = useQuestionKeyboardViewport(
@@ -1109,6 +1118,26 @@ export default function ProfileUpdateForm() {
     view === "play" && !!question,
   );
   useKeyboardBackGuard(questionRoot, !!keyboardViewport);
+
+  useEffect(() => {
+    if (view !== "play") return;
+    if (!question) {
+      setView("finish");
+      return;
+    }
+    // Pin a recovered question before its answer changes the pending list.
+    if (activeQuestionId !== question.id) {
+      setActiveQuestionId(question.id);
+      setCurrentStep(question.section);
+    }
+  }, [
+    view,
+    question?.id,
+    question?.section,
+    activeQuestionId,
+    currentStep,
+    setCurrentStep,
+  ]);
 
   useEffect(() => {
     if (!keyboardViewport) return;
@@ -1217,10 +1246,9 @@ export default function ProfileUpdateForm() {
       return;
     }
     if (!q.path) return;
-    const answerChanged =
-      readQuestionAnswer(useProfileStore.getState().formData, q) !== answer;
+    if (readQuestionAnswer(useProfileStore.getState().formData, q) === answer)
+      return;
     if (
-      answerChanged &&
       [
         "address.district",
         "address.upazila",
@@ -1247,17 +1275,17 @@ export default function ProfileUpdateForm() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       updateNestedField(parent as any, field, normalized);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (q.path === "address.district" && answerChanged) {
+      if (q.path === "address.district") {
         updateNestedField("address" as any, "upazila", "");
         updateNestedField("address" as any, "cityCorporation", "");
         updateNestedField("address" as any, "area", "");
       }
-      if (q.path === "address.cityCorporation" && answerChanged) {
+      if (q.path === "address.cityCorporation") {
         if (answer) updateNestedField("address" as any, "upazila", "");
         if (answer || formData.address?.cityCorporation)
           updateNestedField("address" as any, "area", "");
       }
-      if (q.path === "address.upazila" && answerChanged) {
+      if (q.path === "address.upazila") {
         if (answer) updateNestedField("address" as any, "cityCorporation", "");
         if (answer || formData.address?.upazila)
           updateNestedField("address" as any, "area", "");
@@ -1269,11 +1297,15 @@ export default function ProfileUpdateForm() {
   const goLevel = (index: number, startAt?: number) => {
     const target = levels[index];
     if (!target) return;
-    passedQuestions.current.clear();
-    setCurrentStep(target.section.id);
     const firstOpen = target.questions.findIndex(
       (q) => locationQuestionApplies(q, formData) && !answered(q),
     );
+    if (startAt === undefined && firstOpen < 0) {
+      setView("review");
+      return;
+    }
+    passedQuestions.current.clear();
+    setCurrentStep(target.section.id);
     setActiveQuestionId(
       target.questions[startAt ?? (firstOpen >= 0 ? firstOpen : 0)]?.id ?? null,
     );
@@ -1316,7 +1348,7 @@ export default function ProfileUpdateForm() {
       return;
     }
     const isDone = answered(question, fresh);
-    if (!skipped && question.required && !isDone) {
+    if (question.required && !isDone) {
       setShake((n) => n + 1);
       toast.error("এই প্রশ্নের উত্তর দেওয়া আবশ্যিক");
       return;
@@ -1352,7 +1384,7 @@ export default function ProfileUpdateForm() {
       const sectionIndex = sameSection.findIndex((q) => q.id === question.id);
       const following =
         currentIndex < 0
-          ? undefined
+          ? sameSection.find(available) || latestFlow.find(available)
           : sameSection.slice(sectionIndex + 1).find(available) ||
             sameSection.slice(0, sectionIndex).find(available) ||
             latestFlow
@@ -1718,7 +1750,7 @@ export default function ProfileUpdateForm() {
             {saveBadge}
           </div>
           <div
-            className={`grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 ${keyboardViewport ? "gap-1" : "gap-2 sm:gap-3"}`}
+            className={`grid w-full items-center ${question.required ? "grid-cols-[minmax(0,1fr)_minmax(0,2fr)]" : "grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]"} ${keyboardViewport ? "gap-1" : "gap-2 sm:gap-3"}`}
           >
             <button
               type="button"
@@ -1729,7 +1761,7 @@ export default function ProfileUpdateForm() {
                 else setView("journey");
               }}
               aria-label="আগের প্রশ্নে ফিরে যান"
-              className={`flex min-w-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 ${keyboardViewport ? "min-h-9 px-2 text-[11px]" : "min-h-12 px-3 text-xs sm:text-sm"}`}
+              className={`flex min-w-0 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 ${keyboardViewport ? "min-h-10 px-2 text-[11px]" : "min-h-11 px-2 text-[11px] sm:px-3 sm:text-xs"}`}
             >
               <ArrowLeft className="h-4 w-4 shrink-0" />
               <span className="truncate">পূর্ববর্তী</span>
@@ -1746,9 +1778,9 @@ export default function ProfileUpdateForm() {
               onClick={() => {
                 void next(false);
               }}
-              className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-pink-600 px-3 font-bold text-white shadow-md shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50 ${keyboardViewport ? "min-h-9 px-3 text-[11px]" : "min-h-12 px-4 text-xs sm:min-w-48 sm:text-sm"}`}
+              className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl bg-pink-600 font-bold text-white shadow-md shadow-pink-600/20 transition-colors hover:bg-pink-700 disabled:cursor-not-allowed disabled:opacity-50 ${keyboardViewport ? "min-h-12 px-3 text-sm" : "min-h-14 px-3 text-sm sm:px-5 sm:text-base"}`}
             >
-              <span className="whitespace-nowrap">
+              <span className="min-w-0 text-center leading-snug">
                 {isAdvancing
                   ? "সংরক্ষণ হচ্ছে…"
                   : qi < levelQuestions.length - 1
@@ -1759,23 +1791,21 @@ export default function ProfileUpdateForm() {
               </span>
               {!isAdvancing && <ChevronRight className="h-4 w-4 shrink-0" />}
             </button>
-            <button
-              type="button"
-              data-question-action="skip"
-              disabled={isAdvancing}
-              onClick={() => {
-                void next(true);
-              }}
-              aria-label={
-                question.required ? "প্রশ্নটি পরে দিন" : "প্রশ্নটি এড়িয়ে যান"
-              }
-              className={`flex min-w-0 items-center justify-center gap-1 rounded-xl border-2 border-amber-300 bg-amber-50 font-bold text-amber-900 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${keyboardViewport ? "min-h-9 px-2 text-[11px]" : "min-h-12 px-3 text-xs sm:text-sm"}`}
-            >
-              <span className="truncate">
-                {question.required ? "পরে দেব" : "এড়িয়ে যান"}
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0" />
-            </button>
+            {!question.required && (
+              <button
+                type="button"
+                data-question-action="skip"
+                disabled={isAdvancing}
+                onClick={() => {
+                  void next(true);
+                }}
+                aria-label="প্রশ্নটি এড়িয়ে যান"
+                className={`flex min-w-0 items-center justify-center gap-1 rounded-xl border-2 border-amber-300 bg-amber-50 font-bold text-amber-900 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${keyboardViewport ? "min-h-10 px-2 text-[11px]" : "min-h-11 px-2 text-[11px] sm:px-3 sm:text-xs"}`}
+              >
+                <span className="truncate">এড়িয়ে যান</span>
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              </button>
+            )}
           </div>
         </div>
       </div>,

@@ -471,6 +471,9 @@ export function DynamicQuestionStep({
       return;
     }
     if (!q.path) return;
+    // Reconfirming a saved location must not clear its already answered area.
+    if (readQuestionAnswer(useProfileStore.getState().formData, q) === answer)
+      return;
     const normalized =
       typeof answer === "string" &&
       [
